@@ -1,0 +1,199 @@
+/**
+ * HTTP routes for MonkStash Pay.
+ *
+ *   POST /api/invoices        create an invoice (Authorization: Bearer <PAY_API_KEY>)
+ *   GET  /api/invoices/:id    full invoice status, with your metadata (same key)
+ *   GET  /api/health          sync height, wallet state and subaddress lookahead gap (same key)
+ *   GET  /pay/:id             the checkout page your customer sees
+ *   GET  /pay/:id/status      live status for the checkout page (public, no metadata)
+ *   GET  /pay/:id/qr.svg      the payment QR code
+ *
+ * Until the first successful sync after a start, invoice routes answer 503 with Retry-After:
+ * the server cannot tell yet what has been paid. /api/health always answers.
+ *
+ * No customer data is logged. Responses carry strict security headers.
+ */
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { timingSafeEqual, createHash } from "node:crypto";
+import type { PayConfig } from "./config";
+import { BadRequest, createShopInvoice, LOOKAHEAD_WARN_GAP, openInvoiceCount, presentInvoice, subaddressUsage, TooManyOpen } from "./invoices";
+import { PriceUnavailable, UnsupportedCurrency, type PriceService } from "./prices";
+import type { Store } from "./store";
+import type { IncomingPayment, Watcher } from "./wallet";
+import QRCode from "qrcode";
+import { checkoutPage, notFoundPage, syncingPage, CHECKOUT_CSS, CHECKOUT_JS } from "./checkout";
+
+export interface AppState {
+  /** Latest incoming payments, refreshed by the sync loop. */
+  incoming: IncomingPayment[];
+  height: number;
+  /** Time of the last successful sync since this process started; null until the first one. */
+  lastSyncAt: number | null;
+  syncError: string | null;
+}
+
+export interface AppDeps {
+  cfg: PayConfig;
+  store: Store;
+  watcher: Watcher;
+  prices: PriceService;
+  state: AppState;
+}
+
+const MAX_BODY = 16 * 1024;
+const SECURITY_HEADERS: Record<string, string> = {
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "x-frame-options": "DENY",
+  "cross-origin-opener-policy": "same-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+};
+
+/** A small fixed-window rate limiter per client address. Memory only; nothing is logged. */
+function limiter(perMinute: number) {
+  const hits = new Map<string, { n: number; reset: number }>();
+  return (key: string, now = Date.now()): boolean => {
+    if (hits.size > 10_000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+    const h = hits.get(key);
+    if (!h || h.reset < now) { hits.set(key, { n: 1, reset: now + 60_000 }); return true; }
+    h.n += 1;
+    return h.n <= perMinute;
+  };
+}
+
+function send(res: ServerResponse, status: number, body: string, type: string, extra: Record<string, string> = {}) {
+  res.writeHead(status, { ...SECURITY_HEADERS, "content-type": type, "content-length": Buffer.byteLength(body), ...extra });
+  res.end(body);
+}
+const json = (res: ServerResponse, status: number, data: unknown) =>
+  send(res, status, JSON.stringify(data), "application/json; charset=utf-8", { "cache-control": "no-store" });
+const syncing = (res: ServerResponse) =>
+  send(res, 503, JSON.stringify({ error: SYNCING_MESSAGE }), "application/json; charset=utf-8", { "cache-control": "no-store", "retry-after": RETRY_AFTER_S });
+
+export class TooLarge extends Error {}
+
+export const SYNCING_MESSAGE = "The payment server is still syncing. Try again in a minute.";
+const RETRY_AFTER_S = "60";
+
+/** Reads a JSON body up to MAX_BODY. Larger bodies are drained (not stored) and answered with 413. */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size <= MAX_BODY) chunks.push(c);
+    });
+    req.on("end", () => (size > MAX_BODY ? reject(new TooLarge("Request body is too large (16 KB max).")) : resolve(Buffer.concat(chunks).toString("utf8"))));
+    req.on("error", reject);
+  });
+}
+
+export function createApp(deps: AppDeps) {
+  const { cfg, store, state } = deps;
+  const publicLimit = limiter(120);
+  const authFailLimit = limiter(10);
+  // Shop plugins create invoices on behalf of anonymous visitors. Limit each caller (by the same
+  // client address as the public routes), and separately cap how many unpaid invoices can be open
+  // at once (PAY_MAX_OPEN_INVOICES), so a flood of fake checkouts cannot fill the disk or burn
+  // through subaddresses.
+  const createLimit = limiter(60);
+  const keyHash = createHash("sha256").update(cfg.apiKey).digest();
+
+  const authorized = (req: IncomingMessage): boolean => {
+    const h = req.headers.authorization ?? "";
+    const m = /^Bearer\s+(.+)$/.exec(h);
+    if (!m) return false;
+    // Compare hashes in constant time, so neither length nor content leaks through timing.
+    return timingSafeEqual(createHash("sha256").update(m[1]!.trim()).digest(), keyHash);
+  };
+  // Per invoice too: a checkout page polls a few times a minute; far more means abuse.
+  const invoiceLimit = limiter(240);
+  const clientOf = (req: IncomingMessage) => {
+    if (cfg.trustProxy) {
+      // The proxy appends the address it saw, so the last entry is the one we can trust.
+      const fwd = String(req.headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+      if (fwd.length) return fwd[fwd.length - 1]!.slice(0, 64);
+    }
+    return req.socket.remoteAddress ?? "unknown";
+  };
+
+  return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const p = url.pathname;
+    const method = req.method ?? "GET";
+    try {
+      // ---- Static assets for the checkout page
+      if (method === "GET" && p === "/assets/checkout.css") return send(res, 200, CHECKOUT_CSS, "text/css; charset=utf-8", { "cache-control": "public, max-age=3600" });
+      if (method === "GET" && p === "/assets/checkout.js") return send(res, 200, CHECKOUT_JS, "text/javascript; charset=utf-8", { "cache-control": "public, max-age=3600" });
+
+      // ---- Public checkout
+      const pay = /^\/pay\/([A-Za-z0-9_-]{16,64})(\/status|\/qr\.svg)?$/.exec(p);
+      if (method === "GET" && pay) {
+        if (!publicLimit(clientOf(req)) || !invoiceLimit(pay[1]!)) return json(res, 429, { error: "Too many requests. Slow down." });
+        if (state.lastSyncAt === null) {
+          return pay[2] === "/status" || pay[2] === "/qr.svg" ? syncing(res) : send(res, 503, syncingPage(), "text/html; charset=utf-8", { "cache-control": "no-store", "retry-after": RETRY_AFTER_S });
+        }
+        const rec = store.get(pay[1]!);
+        if (!rec) return pay[2] ? json(res, 404, { error: "Not found." }) : send(res, 404, notFoundPage(), "text/html; charset=utf-8");
+        const view = presentInvoice(rec, state.incoming, cfg, { syncedAt: state.lastSyncAt });
+        if (pay[2] === "/qr.svg") {
+          const svg = await QRCode.toString(view.paymentUri, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#121a17", light: "#ffffff" } });
+          return send(res, 200, svg, "image/svg+xml", { "cache-control": "no-store" });
+        }
+        if (pay[2]) return json(res, 200, { status: view.status, expired: view.expired, pending: view.pending, received: view.received, remaining: view.remaining, overpaid: view.overpaid, confirmations: view.confirmations, requiredConfirmations: view.requiredConfirmations, paymentUri: view.paymentUri, expiresAt: view.expiresAt });
+        return send(res, 200, checkoutPage(view, cfg), "text/html; charset=utf-8", { "cache-control": "no-store" });
+      }
+
+      // ---- Shop API
+      if (p.startsWith("/api/")) {
+        if (!authorized(req)) {
+          if (!authFailLimit(clientOf(req))) return json(res, 429, { error: "Too many failed attempts. Wait a minute." });
+          return json(res, 401, { error: "Missing or wrong API key." }, );
+        }
+        if (method === "GET" && p === "/api/health") {
+          const subaddresses = subaddressUsage(store, cfg.account);
+          return json(res, 200, {
+            // Not ok until the first sync has finished: before that, no payment can be seen.
+            ok: !state.syncError && state.lastSyncAt !== null, network: cfg.network, height: state.height,
+            lastSyncAt: state.lastSyncAt ? new Date(state.lastSyncAt).toISOString() : null,
+            syncError: state.syncError, pendingWebhooks: store.outbox.length,
+            openInvoices: openInvoiceCount(store), maxOpenInvoices: cfg.maxOpenInvoices,
+            subaddresses: { ...subaddresses, warnAbove: LOOKAHEAD_WARN_GAP, lookaheadWarning: subaddresses.gap > LOOKAHEAD_WARN_GAP },
+          });
+        }
+        if (method === "POST" && p === "/api/invoices") {
+          if (!(req.headers["content-type"] ?? "").includes("application/json")) return json(res, 415, { error: "Send JSON with Content-Type: application/json." });
+          if (state.lastSyncAt === null) return syncing(res);
+          if (!createLimit(clientOf(req))) return json(res, 429, { error: "Too many new invoices from this client this minute. Try again shortly." });
+          let input: unknown;
+          const raw = await readBody(req);
+          try { input = JSON.parse(raw); } catch { throw new BadRequest("Body must be valid JSON."); }
+          if (!input || typeof input !== "object" || Array.isArray(input)) throw new BadRequest("Body must be a JSON object.");
+          const rec = await createShopInvoice(input as Record<string, unknown>, deps);
+          return json(res, 201, presentInvoice(rec, state.incoming, cfg, { withMetadata: true, syncedAt: state.lastSyncAt }));
+        }
+        const one = /^\/api\/invoices\/([A-Za-z0-9_-]{16,64})$/.exec(p);
+        if (method === "GET" && one) {
+          if (state.lastSyncAt === null) return syncing(res);
+          const rec = store.get(one[1]!);
+          if (!rec) return json(res, 404, { error: "No invoice with that id." });
+          return json(res, 200, presentInvoice(rec, state.incoming, cfg, { withMetadata: true, syncedAt: state.lastSyncAt }));
+        }
+        return json(res, 404, { error: "Unknown API route." });
+      }
+
+      if (method === "GET" && p === "/") return send(res, 200, "MonkStash Pay is running.\n", "text/plain; charset=utf-8");
+      return json(res, 404, { error: "Not found." });
+    } catch (err) {
+      if (err instanceof BadRequest) return json(res, 400, { error: err.message });
+      if (err instanceof TooLarge) return json(res, 413, { error: err.message });
+      if (err instanceof UnsupportedCurrency) return json(res, 400, { error: err.message });
+      if (err instanceof PriceUnavailable) return json(res, 503, { error: err.message });
+      if (err instanceof TooManyOpen) return json(res, 503, { error: err.message });
+      console.error("[pay] request failed:", (err as Error).message);
+      return json(res, 500, { error: "Something went wrong on the payment server." });
+    }
+  };
+}

@@ -1,0 +1,80 @@
+/* MonkStash for business. Its own layout on purpose: product tiles, a tinted "why" band and an
+   open FAQ, rather than the figure-numbered trust-page template. */
+
+.crumb { font-size: var(--step--1); color: var(--ink-3); margin-bottom: var(--s-6); display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.crumb a { color: var(--ink-2); }
+
+.hero { padding: var(--s-7) 0 var(--s-9); border-bottom: 1px solid var(--line-2); }
+.heroGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: var(--s-8); align-items: center; }
+.h1 { font-family: var(--font-display); font-weight: 500; font-size: var(--step-5); line-height: 1.04; letter-spacing: -0.01em; margin: var(--s-3) 0 var(--s-5); }
+.h1 em { display: block; color: var(--clay-ink); }
+.lede { font-size: var(--step-1); line-height: 1.55; color: var(--ink-2); margin: 0 0 var(--s-6); max-width: 34em; }
+.ctas { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.heroArt { min-width: 0; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-3); padding: var(--s-4); box-shadow: var(--shadow-2); }
+.heroArt svg { display: block; width: 100%; height: auto; }
+
+.section { padding: var(--s-9) 0; }
+.tint { background: var(--surface-2); border-block: 1px solid var(--line-2); }
+.h2 { font-family: var(--font-display); font-weight: 500; font-size: var(--step-3); line-height: 1.12; margin: var(--s-2) 0 var(--s-6); max-width: 22em; }
+
+/* Products: four tiles, cover on top, status badge. */
+.products { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-5); }
+.product { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-2); overflow: hidden; box-shadow: var(--shadow-1); }
+.productCover { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; border-bottom: 1px solid var(--line-2); background: #fbfbf7; }
+.productBody { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-5); flex: 1; }
+.productTop { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); }
+.who { font-size: var(--step--2); font-weight: 650; letter-spacing: 0.04em; color: var(--ink-3); }
+.product h3 { font-family: var(--font-display); font-weight: 500; font-size: var(--step-1); line-height: 1.2; margin: 0; }
+.product p { margin: 0; font-size: var(--step--1); color: var(--ink-2); line-height: 1.55; flex: 1; }
+.more { font-size: var(--step--1); font-weight: 650; color: var(--forest); padding-block: 6px; }
+.live, .coming { flex: none; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-pill); }
+.live { background: #e4efe7; color: var(--forest); }
+.coming { background: #f6e3d9; color: var(--clay-ink); }
+.note { margin: var(--s-5) 0 0; font-size: var(--step--1); color: var(--ink-3); max-width: 46em; }
+
+/* Why */
+.whyGrid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: var(--s-8); align-items: start; }
+.why { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-6) var(--s-7); }
+.why dt { font-family: var(--font-display); font-size: var(--step-1); margin-bottom: var(--s-2); padding-top: var(--s-3); border-top: 2px solid var(--clay); }
+.why dd { margin: 0; color: var(--ink-2); font-size: var(--step--1); line-height: 1.6; }
+
+.figure { min-width: 0; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-3); padding: var(--s-5); }
+.figure svg { display: block; width: 100%; height: auto; }
+
+/* Guides */
+.guides { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-5); }
+.guides li { display: flex; }
+.guide { flex: 1; display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-5); background: var(--surface); border: 1px solid var(--line-2); border-top: 3px solid var(--forest); border-radius: 0 0 var(--r-2) var(--r-2); color: var(--ink); transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+.guides li:nth-child(even) .guide { border-top-color: var(--clay); }
+.guide:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+.guide:focus-visible { outline: 2px solid var(--forest); outline-offset: 3px; }
+.guideCover { display: block; width: calc(100% + 2 * var(--s-5)); max-width: none; height: auto; aspect-ratio: 2 / 1; margin: calc(-1 * var(--s-5)) calc(-1 * var(--s-5)) var(--s-1); border-bottom: 1px solid var(--line); background: #fbfbf7; }
+.guideKicker { font-size: var(--step--2); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay-ink); }
+.guideTitle { font-family: var(--font-display); font-size: var(--step-1); line-height: 1.2; }
+.guideSummary { font-size: var(--step--1); line-height: 1.55; color: var(--ink-2); flex: 1; }
+.guideFoot { font-size: var(--step--1); font-weight: 650; color: var(--forest); }
+
+/* FAQ */
+.faqGrid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: var(--s-8); align-items: start; }
+.faq details { border-bottom: 1px solid var(--line-2); }
+.faq summary { cursor: pointer; list-style: none; padding: var(--s-4) var(--s-6) var(--s-4) 0; position: relative; font-family: var(--font-display); font-size: var(--step-1); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; position: absolute; right: 0; top: var(--s-4); color: var(--clay); font-family: var(--font-sans); }
+.faq details[open] summary::after { content: "−"; }
+.faq summary:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.faq details p { margin: 0 0 var(--s-4); color: var(--ink-2); line-height: 1.6; }
+
+/* Closing CTA */
+.cta { background: var(--ink); color: #fbfbf7; padding: var(--s-9) 0; text-align: center; }
+.cta h2 { font-family: var(--font-display); font-weight: 500; font-size: var(--step-3); margin: 0 0 var(--s-3); }
+.cta p { color: #d9dccf; margin: 0 auto var(--s-6); max-width: 32em; }
+.cta .ctas { justify-content: center; }
+.ctaGhost { border: 1px solid #fbfbf7; color: #fbfbf7; background: transparent; }
+
+@media (max-width: 1100px) { .products { grid-template-columns: repeat(2, minmax(0, 1fr)); } .guides { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .heroGrid, .whyGrid, .faqGrid { grid-template-columns: 1fr; gap: var(--s-6); }
+  .section { padding: var(--s-8) 0; }
+}
+@media (max-width: 600px) { .products, .guides, .why { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .guide, .guide:hover { transition: none; transform: none; } }

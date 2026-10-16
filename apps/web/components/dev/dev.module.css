@@ -1,0 +1,24 @@
+.panel { margin-top: var(--s-4); border: 1px dashed var(--line-strong); border-radius: var(--r-3); padding: var(--s-5); background: var(--surface-2); }
+.panelHead { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: var(--s-4); }
+.badge { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; padding: 3px var(--s-2); border-radius: 999px; background: var(--warn-soft); color: var(--warn); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); font: inherit; color: inherit; cursor: pointer; }
+.item:hover { border-color: var(--mint); }
+
+.board { width: min(100% - 2 * var(--s-4), 960px); margin: var(--s-6) auto var(--s-8); }
+.boardHead { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-5); }
+.grid { display: grid; gap: var(--s-4); }
+.wcard { border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); padding: var(--s-5); }
+.wtop { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.wbal { font-family: var(--font-display); font-size: var(--step-2); font-variant-numeric: tabular-nums; }
+.wbal span { font-family: var(--font-sans); font-size: var(--step-0); color: var(--ink-2); }
+.status { font-size: var(--step--1); color: var(--ink-2); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.dotSync { background: var(--warn); }
+.dotOk { background: var(--mint); }
+.dotErr { background: var(--danger); }
+.waddr { font-size: 0.78rem; word-break: break-all; color: var(--ink-2); margin: var(--s-2) 0; }
+.txmini { list-style: none; margin: var(--s-3) 0 0; padding: var(--s-3) 0 0; border-top: 1px solid var(--line); display: grid; gap: var(--s-1); font-size: var(--step--1); }
+.txmini li { display: flex; justify-content: space-between; gap: var(--s-3); }
+.txmini a { color: var(--ink-2); text-decoration: none; }
+.txmini a:hover { color: var(--mint); }

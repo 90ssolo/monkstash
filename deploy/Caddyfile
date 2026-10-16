@@ -1,0 +1,47 @@
+# HTTPS with automatic certificates. SITE_DOMAIN comes from .env (e.g. monkstash.com).
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		{$ONION_LOCATION_HEADER}
+		{$STAGING_ROBOTS_HEADER}
+	}
+	reverse_proxy web:3000
+}
+
+# The wallet on its own origin: its storage is out of reach of the content pages. The app
+# routes by host (apps/web/proxy.ts); this only adds HTTPS.
+wallet.{$SITE_DOMAIN} {
+	encode zstd gzip
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		{$STAGING_ROBOTS_HEADER}
+	}
+	reverse_proxy web:3000
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+# Someone typing www. in front of the wallet address still lands on the wallet.
+www.wallet.{$SITE_DOMAIN} {
+	redir https://wallet.{$SITE_DOMAIN}{uri} permanent
+}
+
+# Onion mirror: Tor connects here (inside the Docker network only, never published). Visitors'
+# addresses are hidden by Tor, so they are marked "tor" and share one rate-limit bucket; a
+# client cannot pick its own bucket by sending X-Forwarded-For.
+http://:8080 {
+	encode zstd gzip
+	header -Server
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-For tor
+	}
+}

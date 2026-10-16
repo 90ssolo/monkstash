@@ -1,0 +1,29 @@
+.figure { margin: var(--s-6) 0; }
+.stage {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface-2), var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: var(--s-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.stage::before {
+  /* a soft paper panel so the dotted grid reads as a subtle backdrop, not the subject */
+  content: "";
+  position: absolute;
+  inset: var(--s-4);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: var(--r-2);
+  pointer-events: none;
+}
+.stage > * { position: relative; z-index: 1; max-width: 560px; width: 100%; }
+.bleed .stage { padding: var(--s-4); }
+.caption {
+  margin-top: var(--s-3);
+  font-size: var(--step--1);
+  color: var(--ink-3);
+  text-align: center;
+}

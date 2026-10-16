@@ -1,0 +1,15 @@
+{
+  "name": "quietmint",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "dev": "pnpm --filter @quietmint/web dev",
+    "build": "pnpm --filter @quietmint/web build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "BSD-3-Clause"
+}

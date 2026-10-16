@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+apps/web/public/monero/
+.DS_Store
+*.tsbuildinfo
+test-wallets.local.json
+
+# Server-side state (donation tracker view-only wallet)
+.data/
+
+# Private planning (never published with the open-source repo)
+private/
+apps/pay/dist/
+apps/pay/data/
+apps/pay/.env

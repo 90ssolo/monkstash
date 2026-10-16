@@ -1,0 +1,4 @@
+# Files that run on Linux servers keep Linux line endings, even on Windows checkouts.
+deploy/** text eol=lf
+apps/pay/Dockerfile text eol=lf
+*.sh text eol=lf

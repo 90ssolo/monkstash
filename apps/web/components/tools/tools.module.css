@@ -1,0 +1,58 @@
+/* Address validator component (Ledger). Used by the validator page. */
+.tool { background: var(--surface); border: 1px solid var(--ink); border-top: 3px solid var(--forest); border-radius: 4px; padding: 28px; box-shadow: 6px 6px 0 var(--line-2); }
+.toolHead { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.toolLabel { font-family: var(--font-display); font-weight: 500; font-size: 1.35rem; color: var(--ink); }
+
+.segment { display: inline-flex; padding: 3px; background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-pill); gap: 2px; }
+.seg, .segOn { border: 0; background: transparent; font: inherit; font-size: 0.82rem; font-weight: 600; padding: 8px 14px; min-height: 36px; border-radius: var(--r-pill); cursor: pointer; color: var(--ink-2); }
+.seg:hover { color: var(--ink); }
+.segOn { background: var(--forest); color: #fff; }
+.seg:focus-visible, .segOn:focus-visible, .clear:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.inputWrap { position: relative; }
+.addrInput { min-height: 112px; width: 100%; resize: vertical; word-break: break-all; line-height: 1.55; background: var(--bg); }
+.inputMeta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; min-height: 24px; }
+.count { font-size: 0.78rem; color: var(--ink-3); letter-spacing: 0.04em; }
+.clear { border: 0; background: none; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--forest); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 4px 2px; }
+.clear:hover { color: var(--clay); }
+
+.result { margin-top: 16px; min-height: 56px; }
+.resultIdle { color: var(--ink-3); font-size: 0.95rem; margin: 0; font-style: italic; font-family: var(--font-display); }
+.resultCard { border-radius: 4px; padding: 18px 22px; border: 1px solid var(--line-2); border-left-width: 4px; }
+.resultOk { background: var(--forest-soft); border-color: #bcd2c2; border-left-color: var(--forest); }
+.resultBad { background: var(--danger-soft); border-color: var(--danger-line); border-left-color: var(--danger); }
+.resultBadgeOk, .resultBadgeBad { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; border-radius: 3px; }
+.resultBadgeOk { color: #fff; background: var(--forest); }
+.resultBadgeBad { color: #fff; background: var(--danger); }
+.resultMeta { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 8px 36px; margin: 16px 0 0; }
+.resultMeta dt { font-size: 0.72rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.12em; }
+.resultMeta dd { margin: 3px 0 0; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; color: var(--ink); }
+.resultReason { margin: 12px 0 0; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; color: var(--danger); line-height: 1.3; }
+.resultNote { margin: 10px 0 0; font-size: 0.95rem; color: var(--ink-2); line-height: 1.55; }
+.toolDisclaimer { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-3); line-height: 1.55; }
+
+@media (max-width: 520px) {
+  .tool { padding: 20px 16px; box-shadow: 4px 4px 0 var(--line-2); }
+  .resultMeta { grid-template-columns: 1fr; gap: 12px; }
+  .segment { width: 100%; }
+  .seg, .segOn { flex: 1; padding: 8px 6px; }
+}
+
+/* Restore height calculator */
+.rhTabs { margin-bottom: 18px; }
+.rhFieldLabel { display: block; font-family: var(--font-display); font-weight: 500; font-size: 1.1rem; color: var(--ink); margin-bottom: 8px; }
+.rhField { display: block; width: 100%; background: var(--bg); }
+.rhHint { margin: 8px 0 0; font-size: 0.82rem; color: var(--ink-3); line-height: 1.5; }
+.rhBig { margin: 14px 0 0; font-family: var(--font-mono); font-weight: 700; font-size: 2.1rem; line-height: 1.1; color: var(--forest); overflow-wrap: anywhere; }
+.rhRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.rhCopy { border: 1px solid var(--forest); background: var(--forest); color: #fff; font: inherit; font-size: 0.88rem; font-weight: 600; padding: 8px 16px; min-height: 40px; border-radius: var(--r-pill); cursor: pointer; }
+.rhCopy:hover { background: var(--ink); border-color: var(--ink); }
+.rhCopy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rhApprox { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
+.rhApprox b { font-family: var(--font-mono); color: var(--ink); }
+.rhDate { margin: 14px 0 0; font-family: var(--font-display); font-weight: 600; font-size: 1.7rem; line-height: 1.2; color: var(--forest); }
+
+@media (max-width: 520px) {
+  .rhBig { font-size: 1.6rem; }
+  .rhDate { font-size: 1.35rem; }
+}

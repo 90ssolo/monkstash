@@ -1,0 +1,9 @@
+# Onion service only. This machine relays nobody's traffic.
+SocksPort 0
+ExitRelay 0
+ExitPolicy reject *:*
+HiddenServiceDir /var/lib/tor/monkstash
+# Through Caddy's internal listener, so onion requests get the same rate limits as the rest.
+HiddenServicePort 80 172.30.77.10:8080
+# Proof-of-work defence against flooding (Tor 0.4.8+).
+HiddenServicePoWDefensesEnabled 1

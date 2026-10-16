@@ -1,0 +1,29 @@
+.wrap { padding: var(--s-7) 0 var(--s-9); }
+.card { max-width: 760px; margin: 0 auto; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: 10px 10px 0 var(--line-2); padding: var(--s-7); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); overflow-wrap: anywhere; }
+.kicker { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--clay-ink); font-weight: 650; font-size: var(--step--1); letter-spacing: 0.1em; text-transform: uppercase; }
+.kicker::before { content: ""; width: 32px; height: 2px; background: var(--clay); flex: none; }
+.title { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: clamp(2.2rem, 1.6rem + 3vw, 3.6rem); line-height: 1.05; letter-spacing: -0.02em; display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2); }
+.amount { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.unit { font-family: var(--font-sans); font-size: var(--step-1); font-weight: 600; color: var(--ink-2); }
+.sub { margin: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.note { margin: 0; font-size: var(--step-1); color: var(--ink); overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-6); align-items: start; margin-top: var(--s-3); padding-top: var(--s-5); border-top: 1px solid var(--line); }
+.qrBox { display: grid; gap: var(--s-2); justify-items: center; max-width: 230px; }
+.side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); min-width: 0; }
+/* Long shop names and domains wrap inside buttons instead of pushing the card wider. */
+.card :global(.btn) { white-space: normal; overflow-wrap: anywhere; text-align: center; height: auto; }
+.field { display: grid; gap: var(--s-2); margin-top: var(--s-2); }
+.label { font-size: var(--step--2); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--forest); }
+.addr { font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5; word-break: break-all; background: var(--surface-2); padding: var(--s-3); border-radius: var(--r-1); }
+.row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.small { margin: 0; font-size: var(--step--1); color: var(--ink-3); line-height: 1.5; }
+.muted { margin: 0; color: var(--ink-2); }
+.safety { margin-top: var(--s-3); padding: var(--s-4) var(--s-5); background: var(--forest-soft); border-left: 4px solid var(--forest); border-radius: 0 4px 4px 0; font-size: var(--step--1); color: var(--ink-2); }
+.safety strong { color: var(--forest); }
+.safety ul { margin: var(--s-2) 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
+@media (max-width: 640px) {
+  .wrap { padding-top: var(--s-5); }
+  .card { padding: var(--s-5) var(--s-4); box-shadow: none; }
+  .grid { grid-template-columns: minmax(0, 1fr); justify-items: stretch; }
+  .qrBox { justify-self: center; }
+}

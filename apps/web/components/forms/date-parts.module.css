@@ -1,0 +1,34 @@
+.field { border: 0; margin: 0 0 var(--s-5); padding: 0; min-width: 0; display: grid; gap: var(--s-2); }
+.legend { padding: 0; margin-bottom: var(--s-2); font-weight: 650; font-size: var(--step--1); letter-spacing: -0.01em; color: var(--ink); }
+
+/* One bordered control with segments, like the other inputs */
+.control { display: grid; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-2); overflow: hidden; transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+.two { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.three { grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr); }
+.control:focus-within { border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
+
+.part {
+  appearance: none; -webkit-appearance: none; min-width: 0; width: 100%; min-height: 50px;
+  padding: var(--s-3) 36px var(--s-3) var(--s-4); border: 0; border-left: 1px solid var(--line); border-radius: 0;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%231f4733' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m1 1.5 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px;
+  font: inherit; font-size: var(--step-0); color: var(--ink); cursor: pointer; text-overflow: ellipsis;
+}
+.part:first-child { border-left: 0; }
+.part:focus { outline: none; background-color: var(--surface-2); }
+.part:focus-visible { box-shadow: inset 0 -2px 0 var(--clay); }
+/* Placeholder state ("Month", "Year") reads as a prompt, not a value */
+.part:has(option[value=""]:checked) { color: var(--ink-3); }
+.part option { color: var(--ink); }
+
+.hint { margin: 0; font-size: var(--step--1); line-height: 1.55; color: var(--ink-3); }
+.summary { margin: 0; padding: var(--s-2) var(--s-3); font-size: var(--step--1); line-height: 1.5; color: var(--forest); background: var(--forest-soft); border-radius: var(--r-1); }
+.clear { justify-self: start; appearance: none; background: none; border: 0; padding: 4px 0; min-height: 44px; display: inline-flex; align-items: center; font: inherit; font-size: var(--step--1); color: var(--clay-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.clear:hover { color: var(--clay); }
+.clear:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; border-radius: 2px; }
+
+@media (max-width: 420px) {
+  .three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .three .part:nth-child(1) { grid-column: 1 / -1; }
+  .three .part:nth-child(2) { border-left: 0; border-top: 1px solid var(--line); }
+  .three .part:nth-child(3) { border-top: 1px solid var(--line); }
+}
