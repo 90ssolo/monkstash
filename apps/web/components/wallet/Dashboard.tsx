@@ -121,13 +121,24 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
   const runSync = useCallback(async () => {
     setSyncError(null);
-    try {
-      await wallet.sync((s) => setSync(s));
-      await refresh();
-      await wallet.startBackgroundSync();
-      onSynced?.();
-    } catch (e) {
-      setSyncError((e as Error).message || "Could not reach the Monero node.");
+    // Public nodes fail now and then. Try again quietly (after 5 s, then 15 s) before showing an
+    // error; progress already synced is kept between tries. A lock stops syncing on purpose.
+    const waits = [5_000, 15_000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await wallet.sync((s) => setSync(s));
+        await refresh();
+        await wallet.startBackgroundSync();
+        onSynced?.();
+        return;
+      } catch (e) {
+        const msg = (e as Error).message || "Could not reach the Monero node.";
+        if (msg === "Sync stopped." || attempt >= waits.length) {
+          if (msg !== "Sync stopped.") setSyncError(msg);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, waits[attempt]));
+      }
     }
   }, [wallet, refresh, onSynced]);
 
@@ -291,9 +302,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                     {!sync
                       ? "Connecting to the Monero network…"
                       : sync.height < pub.restoreHeight
-                        ? `Getting the block list ready: ${pct}%. This takes up to a minute after each unlock, then the scan carries on.`
+                        ? "Getting the block list ready. This can take a minute or two after each unlock, then the scan carries on."
                         : `Checking for your payments: block ${sync.height.toLocaleString()} of ${sync.endHeight.toLocaleString()}`}
-                    {longScan ? " Keep this tab open until the first scan finishes. Progress is saved as it goes." : ""}
+                    {longScan ? " Keep this tab open until the first scan finishes. Need to stop? Press Lock: the progress is saved and the scan carries on after you unlock." : ""}
                   </span>
                 </>
               )}

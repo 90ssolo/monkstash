@@ -45,6 +45,15 @@ async function readBody(req: NextRequest, max: number): Promise<Uint8Array<Array
   return out;
 }
 const TIMEOUT_MS = 60_000;
+/**
+ * Block downloads get far longer: one mainnet getblocks.bin batch can be tens of megabytes, and at
+ * a public node's pace that takes minutes. A 60 s limit cut those off, the relay moved on to the
+ * next node with the same result, and the wallet gave up mid-sync ("Exception in thread pool").
+ */
+// Kept under monero-ts's 180 s read timeout: the relay buffers a batch before passing it on, so the wallet
+// sees no bytes until the relay is done, and it must not give up first.
+const BULK_TIMEOUT_MS = 170_000;
+const BULK = new Set(["get_blocks.bin", "getblocks.bin", "get_blocks_by_height.bin", "getblocks_by_height.bin", "get_outs.bin", "get_output_distribution.bin", "get_hashes.bin", "gethashes.bin"]);
 
 /** Plain http is fine for a node on this machine, the private network or Tor; elsewhere it can be read and changed in transit. */
 const privateHttp = /^http:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|[^/:]+\.onion|[a-z0-9-]+(:|\/|$))/i;
@@ -78,6 +87,20 @@ function neverSent(e: unknown): boolean {
   return !!cause?.code && NEVER_SENT.has(cause.code);
 }
 
+/**
+ * Nodes that just failed (error, timeout or 5xx) go to the back of the queue for a while, so one
+ * broken public node cannot slow every request down until the wallet engine gives up. A failed
+ * node is still tried as a last resort, and one success clears its mark.
+ */
+const DOWN_FOR_MS = 120_000;
+const downUntil = new Map<string, number>();
+const markDown = (base: string) => downUntil.set(base, Date.now() + DOWN_FOR_MS);
+function healthyFirst(nodes: string[]): string[] {
+  const now = Date.now();
+  const isDown = (n: string) => (downUntil.get(n) ?? 0) > now;
+  return [...nodes.filter((n) => !isDown(n)), ...nodes.filter(isDown)];
+}
+
 async function forward(req: NextRequest, path: string[]): Promise<Response> {
   const endpoint = path.join("/");
   if (!allow("node", req, PER_MINUTE)) return tooMany();
@@ -92,7 +115,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   const body = req.method === "POST" ? await readBody(req, MAX_BODY) : undefined;
   if (body === null) return new Response("Request too large", { status: 413 });
 
-  const nodes = upstreams();
+  const nodes = healthyFirst(upstreams());
   if (nodes.length === 0) return new Response("No Monero node configured (MONERO_NODE_URLS)", { status: 503 });
 
   // A broadcast must reach the network at most once from here. If a node may have received it
@@ -106,11 +129,12 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
         method: req.method,
         headers: { "Content-Type": req.headers.get("content-type") ?? "application/octet-stream" },
         body,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(BULK.has(endpoint) ? BULK_TIMEOUT_MS : TIMEOUT_MS),
         cache: "no-store",
       });
       if (res.status >= 500) {
         lastError = `${base} returned ${res.status}`;
+        markDown(base);
         if (isSend) break;
         continue; // try the next node
       }
@@ -118,6 +142,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       // and a truncated block batch crashes the wallet engine. Buffering turns that into
       // a catchable error here, so we can retry on the next node.
       const payload = await res.arrayBuffer();
+      downUntil.delete(base);
       return new Response(payload, {
         status: res.status,
         headers: {
@@ -128,6 +153,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       });
     } catch (e) {
       lastError = `${base}: ${(e as Error).message}`;
+      markDown(base);
       if (isSend && !neverSent(e)) {
         console.warn("[node-proxy] broadcast outcome unknown, not retried:", lastError);
         return new Response("The node did not confirm the broadcast. The transaction may have been sent.", { status: 504 });

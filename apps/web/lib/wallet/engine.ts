@@ -283,6 +283,12 @@ export interface SyncHealth {
 /** During a long first sync, progress is saved this often (whichever comes first). */
 export const CHECKPOINT_BLOCKS = 2_000;
 export const CHECKPOINT_MS = 60_000;
+/**
+ * Mid-sync checkpoints are off. Stopping and restarting a sync works in Node, but in the browser
+ * (engine in a Web Worker) the restarted sync hung on mainnet (found 2026-10-17). Progress is
+ * still kept: idle auto-lock waits during a first sync, and a lock stops the sync and saves it.
+ */
+const CHECKPOINTS_ENABLED = false;
 
 export interface PreparedTx { fee: bigint; amount: bigint; metadata: string; address: string; hash?: string }
 
@@ -417,7 +423,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     primaryAddress,
     async sync(onProgress, onCheckpoint) {
       let last = { height: await w.getHeight(), at: performance.now() };
-      let checkpoint = onCheckpoint;
+      let checkpoint = CHECKPOINTS_ENABLED ? onCheckpoint : undefined;
       const listener = new (class extends lib.MoneroWalletListener {
         async onSyncProgress(height: number, startHeight: number, endHeight: number, percentDone: number) {
           // Progress is measured from the restore height, not from where this session resumed, so a
