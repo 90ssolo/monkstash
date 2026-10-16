@@ -104,6 +104,10 @@ The first build takes a few minutes. Then open `https://monkstash.com`. Caddy ge
 * `https://monkstash.com/donate` shows the live tracker (the first scan takes a minute or two).
 * Create a stagenet wallet in a private window and let it sync.
 
+## Tell search engines
+
+After a deploy that adds or changes pages, run `sh deploy/indexnow.sh`. It sends every URL in the live sitemap to IndexNow (Bing, Yandex, Seznam, Naver and others share it). Google uses Search Console and the sitemap instead.
+
 ## Updating
 
 Copy the new code (step 4), then:
