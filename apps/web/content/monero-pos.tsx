@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Point of Sale (POS): Free Browser Till",
   summary: "A free Monero point of sale in your browser: type a price in your currency, the customer scans, the screen turns green. No server, no account, no app store.",
   keyword: "monero point of sale",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 8,
   toc: [
     { id: "what", label: "What cashier mode is" },
@@ -139,9 +139,9 @@ export function Body() {
         device and saved there, so keep it somewhere safe.
       </p>
       <KeyFact label="Also selling online?">
-        Send a <Link href="/monero-payment-link">payment link</Link> for one-off orders today. Website checkout is coming:{" "}
+        Send a <Link href="/monero-payment-link">payment link</Link> for one-off orders today. Website checkout is in testing:{" "}
         <Link href="/monero-payment-gateway">MonkStash Pay</Link> and a{" "}
-        <Link href="/monero-woocommerce">Monero plugin for WooCommerce shops</Link> are built and tested on stagenet, but not released yet. Start with the full{" "}
+        <Link href="/monero-woocommerce">Monero plugin for WooCommerce shops</Link> are built and tested on stagenet, and their code is open source, but they are early versions. Start with the full{" "}
         <Link href="/accept-monero-payments">merchant guide</Link>.
       </KeyFact>
     </>

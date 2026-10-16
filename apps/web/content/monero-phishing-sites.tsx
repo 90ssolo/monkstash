@@ -3,7 +3,7 @@ import type { ArticleMeta } from "@/lib/content";
 import { Callout, Takeaways } from "@/components/article/parts";
 import { Figure } from "@/components/art/Figure";
 import { AddressBarFigure, EmergencyFlowFigure, SeedStaysFigure } from "@/components/art/MoneroPhishingSitesArt";
-import { walletAddressText, walletUrl } from "@/lib/site";
+import { repoUrl, walletAddressText, walletUrl } from "@/lib/site";
 
 export const meta: ArticleMeta = {
   slug: "monero-phishing-sites",
@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Wallet Phishing: How to Spot a Fake",
   summary: "Monero wallet phishing explained: how fake wallet sites and apps work, a 60-second check, and what to do if you already typed your seed words.",
   keyword: "monero wallet phishing",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 10,
   toc: [
     { id: "how", label: "How the scams work" },
@@ -221,7 +221,7 @@ export function Body() {
         <li><strong>We never ask for your words outside the wallet screen.</strong> Not by email, not in a chat, not on a support form. If anyone claiming to be us asks, it is not us.</li>
         <li><strong>Your keys stay on your device.</strong> The words are used locally and encrypted with your password. There are no accounts and no tracking on wallet pages.</li>
         <li><strong>No extension yet.</strong> A <Link href="/monero-chrome-extension">MonkStash browser extension</Link> is planned but not built, so any &quot;MonkStash&quot; extension in a store today is fake.</li>
-        <li><strong>The code will be published as open source</strong> after launch, so anyone can read what it does.</li>
+        <li><strong>The code is open source.</strong> Anyone can <a href={repoUrl} rel="noopener">read what it does</a> (BSD-3-Clause). Open code does not stop a copycat site from running a changed copy, so the address bar check still matters most.</li>
       </ul>
       <p>
         MonkStash is an early preview and has not been independently audited. That is another reason to start with a small amount.

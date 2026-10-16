@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
 import {
   HeroArt, SpectrumArt, CheckArt, ArrowIcon,
   TypeWeb, TypePhone, TypeDesktop, TypeHardware,
@@ -99,7 +99,7 @@ export default function WalletsPage() {
           name: "Best Monero Wallets",
           url: absoluteUrl("/monero-wallets"),
           description: "A plain-language comparison of Monero wallet types and popular options.",
-          dateModified: "2026-10-15",
+          dateModified: "2026-10-17",
           mainEntity: { "@type": "ItemList", itemListElement: itemList },
         },
         {
@@ -109,7 +109,7 @@ export default function WalletsPage() {
           description: "Compare Monero wallets by type, who holds your keys, and who each one fits.",
           mainEntityOfPage: absoluteUrl("/monero-wallets"),
           author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" }, image: absoluteUrl("/opengraph-image"),
-          dateModified: "2026-10-14",
+          dateModified: "2026-10-17",
         },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
@@ -343,7 +343,7 @@ export default function WalletsPage() {
               </div>
               <div className={styles.proofCol}>
                 <div className={styles.proofItem}><PfKey /><div><b>Non-custodial</b><p>Your keys are created and encrypted on your device and never sent to our servers.</p></div></div>
-                <div className={styles.proofItem}><PfCode /><div><b>Open source engine</b><p>Built on monero-ts, so the cryptography is code you can read, not our word.</p></div></div>
+                <div className={styles.proofItem}><PfCode /><div><b>Open source</b><p>Built on monero-ts, and our own code is open source too (BSD-3-Clause). <a href={repoUrl} rel="noopener">Read the code</a> instead of taking our word.</p></div></div>
                 <div className={styles.proofItem}><PfNoAccount /><div><b>No account</b><p>No email and no sign-up. A browser wallet means no install either.</p></div></div>
               </div>
             </div>

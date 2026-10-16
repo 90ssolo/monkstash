@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Cake Wallet Review: Monero Features and Safety",
   summary: "Cake Wallet review: an open source, non-custodial wallet for Monero and other coins on Android, iOS and desktop. Features, swaps, MyMonero and who it fits.",
   keyword: "Cake Wallet review",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 9,
   toc: [
     { id: "what", label: "What Cake Wallet is" },
@@ -229,7 +229,7 @@ export function Body() {
           <tr><td>Seed words</td><td>16 (Polyseed) or 25 (Legacy)</td><td>25</td></tr>
           <tr><td>Hardware wallet</td><td>Yes, per Cake&apos;s docs</td><td>Not supported</td></tr>
           <tr><td>Built-in swaps</td><td>Yes, via third parties</td><td>No</td></tr>
-          <tr><td>Open source</td><td>MIT</td><td>Built on open source monero-ts</td></tr>
+          <tr><td>Open source</td><td>MIT</td><td>BSD-3-Clause</td></tr>
           <tr><td>Independent audit</td><td>Check the project</td><td>Not yet (early preview)</td></tr>
         </tbody>
       </table>

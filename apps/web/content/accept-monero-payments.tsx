@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { merchant } from "@/lib/merchant";
 import type { ArticleMeta } from "@/lib/content";
 import { Callout, KeyFact, Steps } from "@/components/article/parts";
 import { ChapterHead, DeepDive, FactStrip, UseCases, YoullLearn } from "@/components/pillar/parts";
@@ -19,7 +20,7 @@ export const meta: ArticleMeta = {
   h1: { keyword: "How to accept Monero payments", sizzle: "Get paid privately, with nobody in the middle." },
   summary: "How to accept Monero payments in a shop, online or by invoice: the setups, confirmations, pricing in your currency, refunds and records, with no middleman.",
   keyword: "accept monero payments",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 17,
   toc: [
     { id: "how", label: "How accepting Monero works" },
@@ -50,7 +51,7 @@ export const meta: ArticleMeta = {
   related: ["receive-monero", "monero-subaddress", "monero-transaction-time", "monero-view-only-wallet", "is-monero-legal", "monero-transaction-fee"],
   faq: [
     { q: "How do I accept Monero payments?", a: "Give each customer a fresh subaddress and the exact amount, usually as a QR code, and wait for the payment to arrive in your wallet. MonkStash does this with payment links, a browser till for shops, or a self-hosted checkout for websites." },
-    { q: "How do I accept Monero on my website?", a: "Use a payment gateway that creates an invoice per order and tells your shop when it is paid. BTCPay Server with its Monero plugin works today. MonkStash Pay, a free, self-hosted option with a view-only wallet, is coming: it is built and tested on stagenet but not released yet." },
+    { q: "How do I accept Monero on my website?", a: "Use a payment gateway that creates an invoice per order and tells your shop when it is paid. BTCPay Server with its Monero plugin works today. MonkStash Pay, a free, self-hosted option with a view-only wallet, is in testing: its code is open source and it is built and tested on stagenet, but it has not had an independent security review yet." },
     { q: "How long does a Monero payment take for a merchant?", a: "Your wallet sees it within seconds, the first confirmation comes in about 2 minutes, and the money is spendable after 10 blocks, about 20 minutes. Small sums are often accepted as soon as they are seen." },
     { q: "Can a Monero payment be charged back?", a: "No. Once confirmed, a Monero payment cannot be reversed. Refunds are new payments from you to an address the customer gives you." },
     { q: "Do I pay fees to receive Monero?", a: "No. The network fee is paid by the sender and is usually around one or two cents. MonkStash adds no fee." },
@@ -158,7 +159,7 @@ export function Body() {
         <tbody>
           <tr><td><Link href="/monero-payment-link">Payment links</Link></td><td>Freelancers, creators, one-off invoices</td><td>Just the <Link href={walletUrl}>MonkStash wallet</Link></td><td>Your wallet</td></tr>
           <tr><td><Link href="/monero-pos">Cashier mode</Link></td><td>Shops, cafes, market stalls</td><td>A tablet or phone at the counter</td><td>The till device</td></tr>
-          <tr><td><Link href="/monero-payment-gateway">MonkStash Pay</Link></td><td>Online shops and apps (coming soon)</td><td>A small server you run (Docker or Node)</td><td>Your server</td></tr>
+          <tr><td><Link href="/monero-payment-gateway">MonkStash Pay</Link></td><td>Online shops and apps (in testing)</td><td>A small server you run (Docker or Node)</td><td>Your server</td></tr>
         </tbody>
       </table>
       <p>
@@ -184,8 +185,9 @@ export function Body() {
       <p>
         An online shop needs something that creates an invoice for every order and tells the shop when it is paid, even when you are
         asleep. That is what <Link href="/monero-payment-gateway">MonkStash Pay</Link> does: a small payment server you run yourself.
-        It is coming soon. It is built and tested on stagenet, Monero&apos;s test network, but not downloadable yet, and it will be released
-        as open source. Until then, BTCPay Server with its Monero plugin is the self-hosted option you can install today.
+        It is an early version: built and tested on stagenet, Monero&apos;s test network, with its{" "}
+        <a href={merchant.payRepoUrl} rel="noopener">code open source</a> for anyone to read and self-host. It has not had an independent
+        security review yet, so start with small amounts. If you want a mature self-hosted option today, BTCPay Server with its Monero plugin is it.
       </p>
       <ul>
         <li>Your shop asks it for an invoice. It returns a checkout link with a fresh address and a held price.</li>

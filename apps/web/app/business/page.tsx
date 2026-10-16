@@ -9,7 +9,7 @@ import { Adaptive } from "@/components/art/WhatIsMoneroNarrowArt";
 import { SaleFlowArt, SaleFlowNarrow, SetupPickerArt, SetupPickerNarrow } from "@/components/art/MerchantArt";
 import { articleByPath } from "@/lib/content";
 import { merchant } from "@/lib/merchant";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
 import styles from "./business.module.css";
 
 const DESCRIPTION =
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: ogFor({ type: "website", title: "MonkStash for business", description: DESCRIPTION, path: "/business" }),
 };
 
-type Status = "live" | "coming";
+type Status = "live" | "testing" | "coming";
 const PRODUCTS: { path: string; name: string; who: string; what: string; status: Status; cta: { href: string; label: string } }[] = [
   {
     path: "/monero-payment-link", name: "Payment links", who: "Freelancers, invoices, one-off sales",
@@ -37,12 +37,12 @@ const PRODUCTS: { path: string; name: string; who: string; what: string; status:
   {
     path: "/monero-payment-gateway", name: "Checkout for your website", who: "Online shops and developers",
     what: "MonkStash Pay runs on your own server with a watch-only wallet: invoices, a checkout page and signed webhooks.",
-    status: merchant.payRepoUrl ? "live" : "coming", cta: { href: "/monero-payment-gateway", label: "About MonkStash Pay" },
+    status: "testing", cta: { href: "/monero-payment-gateway", label: "About MonkStash Pay" },
   },
   {
     path: "/monero-woocommerce", name: "WooCommerce plugin", who: "WordPress shops",
     what: "Monero at checkout in WooCommerce, powered by your own MonkStash Pay server.",
-    status: merchant.wooPluginUrl ? "live" : "coming", cta: { href: "/monero-woocommerce", label: "About the plugin" },
+    status: merchant.wooPluginUrl ? "live" : "testing", cta: { href: "/monero-woocommerce", label: "About the plugin" },
   },
 ];
 
@@ -62,7 +62,8 @@ const FAQ = [
 ];
 
 function Badge({ status }: { status: Status }) {
-  return <span className={status === "live" ? styles.live : styles.coming}>{status === "live" ? "Live" : "Coming soon"}</span>;
+  const label = status === "live" ? "Live" : status === "testing" ? "In testing" : "Coming soon";
+  return <span className={status === "live" ? styles.live : styles.coming}>{label}</span>;
 }
 
 export default function BusinessPage() {
@@ -122,7 +123,7 @@ export default function BusinessPage() {
               ))}
             </ul>
             <p className={styles.note}>
-              Live today in the wallet: payment links and the till. Website checkout and the WooCommerce plugin are built and being tested; they will be published as open-source downloads.
+              Live today in the wallet: payment links and the till. Website checkout (MonkStash Pay) and the WooCommerce plugin are built and being tested on stagenet, and their code is already in our <a href={repoUrl} rel="noopener">open-source repository</a>. A ready-to-install plugin download comes after testing on a real WordPress shop.
             </p>
             <p className={styles.note}>
               Need one printed code for a sign, a menu or a donation page? Make it with the free <Link href="/tools/monero-qr-code-generator">Monero QR code generator</Link>.

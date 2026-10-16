@@ -16,6 +16,9 @@ export const site = {
   locale: "en",
 } as const;
 
+/** The public source code repository (BSD-3-Clause). The one place this URL is written. */
+export const repoUrl = "https://github.com/90ssolo/monkstash";
+
 /** Where "Open wallet" links go: the wallet origin's root, or /wallet when it has none. */
 export const walletUrl = walletOrigin ? `${walletOrigin}/` : "/wallet";
 

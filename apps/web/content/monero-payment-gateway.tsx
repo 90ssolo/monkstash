@@ -14,7 +14,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Payment Gateway: Self-Hosted and Private",
   summary: "A Monero payment gateway you run yourself: invoices, a checkout page and signed webhooks, with a view-only wallet that cannot spend. How it works and compares.",
   keyword: "monero payment gateway",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 10,
   toc: [
     { id: "what", label: "What a Monero payment gateway does" },
@@ -31,8 +31,8 @@ export const meta: ArticleMeta = {
     { q: "What is a Monero payment gateway?", a: "Software that creates an invoice for each order, shows the customer how to pay in XMR, watches the blockchain for the payment, and tells your shop when the order is paid." },
     { q: "Is MonkStash Pay custodial?", a: "No. It runs on your own server with a view-only wallet. It can see incoming payments but has no spend key, so it cannot move your money. Payments go straight from the customer to your wallet." },
     { q: "Do I need to run a Monero node?", a: "No. MonkStash Pay can use any node you trust. Running your own node is the most private option, because a remote node sees your server's IP address and its sync requests (never your keys)." },
-    { q: "Can I download MonkStash Pay now?", a: "Not yet. MonkStash Pay is built and tested on stagenet, Monero's test network, but it is not released. It will be published as open source with the MonkStash code release." },
-    { q: "Does MonkStash Pay charge a fee?", a: "No. It will be free, open-source software you run yourself. The only cost on a payment is the small Monero network fee, which the customer pays." },
+    { q: "Can I download MonkStash Pay now?", a: "Yes, as source code. MonkStash Pay is open source (BSD-3-Clause), so you can read the code and run it on your own server today. Version 0.1 is built and tested on stagenet, Monero's test network, and has not had an independent security review yet, so test it on stagenet first and start with small amounts." },
+    { q: "Does MonkStash Pay charge a fee?", a: "No. It is free, open-source software you run yourself. The only cost on a payment is the small Monero network fee, which the customer pays." },
     { q: "How does my shop know an order is paid?", a: "MonkStash Pay sends a webhook signed with HMAC-SHA256. Your shop checks the signature, and can also ask the API for the invoice status at any time." },
     { q: "Can I price products in euros or dollars?", a: "Yes. Send the price in your currency; MonkStash Pay converts it at a live rate (the middle of several exchanges) and holds that rate for 30 minutes by default." },
   ],
@@ -47,9 +47,10 @@ export function Body() {
         per order, a checkout page for the customer, and a message to your shop when the money arrives. <mark>MonkStash Pay</mark> is a
         free gateway you host yourself. It holds no money and has no spend key, so the only person who can move your funds is you.
       </p>
-      <Callout title="Coming soon">
-        MonkStash Pay is built and tested on stagenet, Monero&apos;s free test network, but it is not downloadable yet. It will be released
-        as open source. This guide explains how it works so you can decide whether it fits your shop.
+      <Callout title="Early version, in testing">
+        MonkStash Pay is open source, and you can <a href={repo} rel="noopener">read the code and run it yourself</a> today.
+        Version {merchant.payVersion} is built and tested on stagenet, Monero&apos;s free test network, and has not had an independent
+        security review yet. This guide explains how it works so you can decide whether it fits your shop.
       </Callout>
 
       <Takeaways items={[
@@ -158,14 +159,15 @@ Content-Type: application/json
       <p>
         Setup has three parts: fill in a settings file, build and run the server (with Docker or Node.js), and put it behind an HTTPS
         proxy such as Caddy or nginx. Test on stagenet, the free test network, before you take real money. The full guide, every
-        setting and copy-paste webhook code for Node.js and PHP will ship in the project&apos;s README.
+        setting and copy-paste webhook code for Node.js and PHP are in the project&apos;s{" "}
+        <a href={repo} rel="noopener">README</a>.
       </p>
 
       <h2 id="status">Status and limits</h2>
       <Callout title={`Version ${merchant.payVersion}: early, and honest about it`}>
         Here is exactly what has been tested on stagenet: a real invoice and its checkout page, and an expiry webhook delivered to a
         test shop with a valid signature. A paid order has not been tested end to end yet. It is new software that has not had an
-        independent security review, so test it yourself on stagenet and start with small amounts. {repo ? <>Get the code on <a href={repo} rel="noopener">the project page</a>.</> : <>It is not downloadable yet; it will be published as open source with the MonkStash code release.</>}
+        independent security review, so test it yourself on stagenet and start with small amounts. Get the code on <a href={repo} rel="noopener">the project page</a>.
       </Callout>
       <ul>
         <li>One wallet and one shop per server.</li>

@@ -3,7 +3,7 @@ import type { ArticleMeta } from "@/lib/content";
 import { Callout, Takeaways, KeyFact } from "@/components/article/parts";
 import { Figure } from "@/components/art/Figure";
 import { SecurityLadderFigure, OfflineSigningFigure } from "@/components/art/SafestMoneroWalletArt";
-import { walletUrl } from "@/lib/site";
+import { repoUrl, walletUrl } from "@/lib/site";
 
 export const meta: ArticleMeta = {
   slug: "safest-monero-wallet",
@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Safest Monero Wallet: Match It to Your Amount",
   summary: "The safest Monero wallet depends on how much you hold and who you worry about. A ladder from web wallet to hardware and offline signing, by amount.",
   keyword: "safest monero wallet",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 11,
   toc: [
     { id: "short", label: "The short answer" },
@@ -227,7 +227,8 @@ export function Body() {
       <p>
         <Link href={walletUrl}>MonkStash</Link> is a free, non-custodial browser wallet. Keys are created and encrypted on your device
         with your password, and nothing is sent to our servers. It is also an <strong>early preview and has not been independently audited</strong>.
-        It does not connect to a hardware wallet today.
+        It does not connect to a hardware wallet today. Its code is <a href={repoUrl} rel="noopener">open source</a> (BSD-3-Clause),
+        but signed, reproducible builds are not available yet, so you cannot yet prove that the site serves exactly that code.
       </p>
       <p>
         So it belongs on the bottom rung, for small everyday amounts. If you hold more, use a hardware wallet with the Monero GUI

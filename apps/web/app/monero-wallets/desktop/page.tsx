@@ -112,7 +112,7 @@ const data: PlatformData = {
     caption: "Table 1. Monero wallets for Windows, Mac and Linux",
     cols: ["Works on", "Open source", "Seed words", "Best for"],
     rows: [
-      { wallet: "MonkStash", us: true, cells: ["Any desktop browser", "Built on open source monero-ts", "25 words", "Small, everyday amounts"] },
+      { wallet: "MonkStash", us: true, cells: ["Any desktop browser", "Yes (BSD-3-Clause)", "25 words", "Small, everyday amounts"] },
       { wallet: "Monero GUI", cells: ["Windows, macOS, Linux", "Yes, official", "25 words", "Maximum control, own node"] },
       { wallet: "Monero CLI", cells: ["Windows, macOS, Linux, FreeBSD", "Yes, official", "25 words", "Advanced users, servers"] },
       { wallet: "Feather", cells: ["Windows, macOS, Linux, Tails", "Yes (BSD-3-Clause)", "16-word Polyseed; restores 14 and 25", "A light, fast everyday wallet"] },

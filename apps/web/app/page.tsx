@@ -13,7 +13,7 @@ import {
   ProofNonCustodial, ProofOpenSource, ProofNoAccounts, ProofNoTracking,
   FaqArt, SealArt,
 } from "@/components/home/HomeArt";
-import { absoluteUrl, site, walletUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, site, walletUrl } from "@/lib/site";
 import { ClusterLinks, PILLAR_COUNT_TEXT, PillarIndex } from "@/components/pillar/ClusterLibrary";
 import styles from "./home.module.css";
 
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 const faqs = [
-  { q: "Is MonkStash safe?", a: "Your keys never leave your device and are locked with your password. The wallet is non-custodial and built on the open-source monero-ts engine, so we can't touch your funds. As always, the biggest risk is your own backup, so keep your recovery words safe." },
+  { q: "Is MonkStash safe?", a: "Your keys never leave your device and are locked with your password. The wallet is non-custodial and built on the open-source monero-ts engine, so we can't touch your funds. MonkStash's own code is open source too (BSD-3-Clause), so anyone can read it. It has not had an independent security review yet, so start with small amounts. As always, the biggest risk is your own backup, so keep your recovery words safe." },
   { q: "Is it really free?", a: "Yes. Creating and using a MonkStash wallet is free. You only ever pay the small standard Monero network fee when you send, which goes to the network, not to us." },
   { q: "Do you store my keys or recovery phrase?", a: "No. They are created and encrypted on your device. We never receive, store, or back them up. That also means only you can recover your wallet, so your backup matters." },
   { q: "What is a seed phrase?", a: "It is a list of 25 words that is the master key to your wallet. Anyone with those words can access your funds, so write them down and keep them offline and private." },
@@ -409,8 +409,8 @@ export default function HomePage() {
               </div>
               <div className={styles.proofItem}>
                 <ProofOpenSource />
-                <b>Open-source engine</b>
-                <p>Built on monero-ts, which anyone can read. Our own code will be published as open source after launch, so you can check it instead of taking our word.</p>
+                <b>Open source</b>
+                <p>The engine is monero-ts, and our own code is open source too (BSD-3-Clause), so you can check it instead of taking our word. <a href={repoUrl} rel="noopener">Read the code</a>. Open code is not an audit: the independent review is still on the roadmap.</p>
               </div>
               <div className={styles.proofItem}>
                 <ProofNoAccounts />

@@ -8,10 +8,10 @@ import { getArticles } from "@/lib/content";
  * Articles use the `updated` field in their own meta.
  */
 const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" | "monthly"; priority: number }[] = [
-  { path: "/", updated: "2026-10-15", changeFrequency: "weekly", priority: 1 },
-  { path: "/faq", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/", updated: "2026-10-17", changeFrequency: "weekly", priority: 1 },
+  { path: "/faq", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.6 },
   { path: "/support", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.5 },
-  { path: "/about", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.5 },
+  { path: "/about", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.5 },
   { path: "/privacy", updated: "2026-10-16", changeFrequency: "monthly", priority: 0.3 },
   { path: "/tools", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
   { path: "/tools/monero-address-validator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
@@ -19,17 +19,17 @@ const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" |
   { path: "/tools/monero-fee-calculator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/tools/monero-qr-code-generator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/tools/monero-mining-calculator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/monero-wallets", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/monero-wallets/android", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/monero-wallets/iphone", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/monero-wallets/desktop", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/monero-wallets", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/monero-wallets/android", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/monero-wallets/iphone", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/monero-wallets/desktop", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.7 },
   { path: "/monero-wallets/hardware", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/monero-chrome-extension", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/mymonero-alternative", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/donate", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/donate", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.6 },
   // Library index pages. Only final URLs belong here (never redirected ones like /wallets).
   { path: "/learn", updated: "2026-10-15", changeFrequency: "weekly", priority: 0.6 },
-  { path: "/business", updated: "2026-10-15", changeFrequency: "weekly", priority: 0.6 },
+  { path: "/business", updated: "2026-10-17", changeFrequency: "weekly", priority: 0.6 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

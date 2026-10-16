@@ -14,7 +14,7 @@ import styles from "./page.module.css";
 
 const TITLE = "Donate to MonkStash: Fund Private Monero Tools";
 const DESCRIPTION =
-  "MonkStash is free. Help fund what comes next: open-source, verifiable builds, FCMP++ support, an independent security review and a browser extension.";
+  "MonkStash is free. Help fund what comes next: verifiable builds, FCMP++ support, an independent security review and a browser extension.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -45,7 +45,7 @@ export default function DonatePage() {
     <>
       <JsonLd
         data={[
-          { "@context": "https://schema.org", "@type": "WebPage", name: TITLE, description: DESCRIPTION, url: absoluteUrl("/donate"), dateModified: "2026-10-14", publisher: { "@type": "Organization", name: "MonkStash" } },
+          { "@context": "https://schema.org", "@type": "WebPage", name: TITLE, description: DESCRIPTION, url: absoluteUrl("/donate"), dateModified: "2026-10-17", publisher: { "@type": "Organization", name: "MonkStash" } },
           { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
             { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
             { "@type": "ListItem", position: 2, name: "Support the project", item: absoluteUrl("/donate") },

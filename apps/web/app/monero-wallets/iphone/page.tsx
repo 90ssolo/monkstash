@@ -100,7 +100,7 @@ const data: PlatformData = {
     caption: "Table 1. Monero wallets you can use on an iPhone",
     cols: ["Works on", "Open source", "Seed words", "Best for"],
     rows: [
-      { wallet: "MonkStash", us: true, cells: ["Phone browser, no install", "Built on open source monero-ts", "25 words", "Small, everyday amounts"] },
+      { wallet: "MonkStash", us: true, cells: ["Phone browser, no install", "Yes (BSD-3-Clause)", "25 words", "Small, everyday amounts"] },
       { wallet: "Cake Wallet", cells: ["iPhone, Android, Mac, Linux", "Yes (MIT)", "16-word Polyseed or 25-word", "Phone users, multi-coin holders"] },
       { wallet: "Monero.com", cells: ["iPhone, Android", "Yes", "Check on setup", "A focused Monero app"] },
       { wallet: "Stack Wallet", cells: ["iPhone, Android, desktop", "Yes (GPL-3.0)", "Check on setup", "Open source multi-coin users"] },

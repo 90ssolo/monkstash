@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero WooCommerce Plugin for WordPress",
   summary: "A Monero WordPress plugin for WooCommerce: a fresh address per order, prices in your shop currency, and orders that complete themselves.",
   keyword: "monero woocommerce",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 7,
   toc: [
     { id: "what", label: "What the plugin does" },
@@ -26,8 +26,8 @@ export const meta: ArticleMeta = {
   ],
   related: ["monero-payment-gateway", "accept-monero-payments", "monero-transaction-time", "monero-view-only-wallet"],
   faq: [
-    { q: "Is there a Monero WordPress plugin?", a: "For WooCommerce stores, yes: the older monerowp gateway exists today, and MonkStash Pay for WooCommerce is built and tested on stagenet but not released yet." },
-    { q: "Can I download the plugin now?", a: "Not yet. The plugin and MonkStash Pay are built and tested on stagenet but not released. They will be published as open source." },
+    { q: "Is there a Monero WordPress plugin?", a: "For WooCommerce stores, yes: the older monerowp gateway exists today, and MonkStash Pay for WooCommerce is built and tested on stagenet. Its code is open source; a ready-to-install download is not released yet." },
+    { q: "Can I download the plugin now?", a: "Not as a ready-to-install zip yet. The plugin code is already in the open-source MonkStash repository (BSD-3-Clause), next to MonkStash Pay, so you can read it today. The download comes after it has been tested on a real WordPress shop. MonkStash Pay itself is available to read and self-host now; it is built and tested on stagenet, has not had an independent security review yet, and you should start with small amounts." },
     { q: "How do I accept Monero on WooCommerce?", a: "Once it is released: run MonkStash Pay on your server, install the MonkStash Pay for WooCommerce plugin, and enter the server address, API key and webhook secret in WooCommerce, Settings, Payments." },
     { q: "Does it work with the WooCommerce block checkout?", a: "Yes. It supports both the block checkout (the default for new stores since WooCommerce 8.3) and the classic checkout, and WooCommerce's order tables (HPOS)." },
     { q: "Is the plugin custodial?", a: "No. Payments go straight to your wallet. The plugin only has an API key for your own MonkStash Pay server, which itself only has a view-only wallet." },
@@ -54,7 +54,8 @@ export function Body() {
       </p>
       <Callout title="Coming soon">
         The plugin and <Link href="/monero-payment-gateway">MonkStash Pay</Link> are built and tested on stagenet, Monero&apos;s free test
-        network, but neither is downloadable yet. Both will be released as open source.
+        network. The <a href={merchant.wooSourceUrl} rel="noopener">plugin code</a> is already in our open-source repository. A
+        ready-to-install download comes after testing on a real WordPress shop.
       </Callout>
 
       <Takeaways items={[
@@ -127,7 +128,7 @@ export function Body() {
       <Callout kind="warn" title={`Version ${merchant.wooVersion}: test before you rely on it`}>
         This is a first version. It has been written against current WooCommerce and WordPress and tested with MonkStash Pay on
         stagenet, but it has not yet been run on a live store. When it is released, install it on a staging copy and place a stagenet
-        test order first. {zip ? <><a href={zip} rel="noopener">Download the plugin</a>.</> : <>It is not downloadable yet; it will be published as open source with the MonkStash code release.</>}
+        test order first. {zip ? <><a href={zip} rel="noopener">Download the plugin</a>.</> : <>There is no ready-to-install download yet, but you can <a href={merchant.wooSourceUrl} rel="noopener">read the plugin code</a> today.</>}
       </Callout>
       <KeyFact label="No WordPress?">
         Any shop can call <Link href="/monero-payment-gateway">MonkStash Pay</Link>&apos;s API directly. Selling at a counter? Use{" "}

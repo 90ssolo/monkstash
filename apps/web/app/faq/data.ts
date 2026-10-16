@@ -1,3 +1,5 @@
+import { repoUrl } from "@/lib/site";
+
 export interface FaqLink { href: string; label: string }
 export interface FaqEntry {
   q: string;
@@ -96,9 +98,15 @@ export const faqCategories: FaqCategory[] = [
       },
       {
         q: "Has MonkStash been audited?",
-        a: "Not yet. MonkStash is an early preview. The wallet engine is monero-ts, an open-source WebAssembly build of Monero's own wallet code, but the app has not been independently audited yet. Security work runs from day one, and an independent audit is planned. Until it is done, use small amounts.",
+        a: "Not yet. MonkStash is an early preview. The wallet engine is monero-ts, an open-source WebAssembly build of Monero's own wallet code, and MonkStash's own code is open source too, but the app has not been independently audited yet. Security work runs from day one, and an independent audit is planned. Until it is done, use small amounts.",
         hl: "has not been independently audited",
         links: [{ href: "/about#status", label: "Our honest status" }, { href: "/donate", label: "Support the project" }],
+      },
+      {
+        q: "Is MonkStash open source?",
+        a: "Yes. The full MonkStash code (the web wallet, this website, MonkStash Pay and the WooCommerce plugin) is public under the BSD-3-Clause license, so anyone can read it, run it, or report a problem. Open code is not the same as an audit: an independent security review and signed, reproducible builds are still on the roadmap.",
+        hl: "BSD-3-Clause license",
+        links: [{ href: repoUrl, label: "Read the code" }, { href: "/donate#roadmap", label: "The roadmap" }],
       },
       {
         q: "What can the Monero node see?",

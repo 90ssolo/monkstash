@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Payment Link: Invoice in XMR or EUR",
   summary: "Create a Monero payment link or invoice in seconds: set an amount in XMR or your currency, share the link or QR, and see it marked paid. Private by design.",
   keyword: "monero payment link",
-  updated: "2026-10-15",
+  updated: "2026-10-17",
   readingMinutes: 7,
   toc: [
     { id: "what", label: "What a Monero payment link is" },
@@ -115,7 +115,7 @@ export function Body() {
       </p>
       <Callout title="One button, one address">
         A button always opens the same request and address. That is ideal for a tip jar, donations or a single product. For separate
-        orders, make a new request each time, or, once it is released, use <Link href="/monero-payment-gateway">MonkStash Pay</Link>, which
+        orders, make a new request each time, or use <Link href="/monero-payment-gateway">MonkStash Pay</Link> (an early, open-source version in testing), which
         creates a fresh address for every order automatically (with a{" "}
         <Link href="/monero-woocommerce">plugin for WordPress stores</Link>).
       </Callout>

@@ -44,8 +44,8 @@ export const donate = {
     {
       id: "verifiable-builds",
       title: "Proof the code is genuine",
-      outcome: "The code published as open source, plus signed, reproducible builds and a free checker, so you can verify the wallet you loaded is the published code.",
-      why: "A web wallet should never ask for blind trust. This makes every visit checkable.",
+      outcome: "Signed, reproducible builds and a free checker, so you can verify the wallet you loaded is the published code. The first half is done: the full code is already public as open source (BSD-3-Clause).",
+      why: "A web wallet should never ask for blind trust. Open code lets you read it; verifiable builds make every visit checkable.",
       status: "next",
     },
     {

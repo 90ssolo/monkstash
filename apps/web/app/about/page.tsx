@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { SealArt } from "@/components/home/HomeArt";
-import { absoluteUrl, site, walletUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, site, walletUrl } from "@/lib/site";
 import { KeysOnDeviceArt, StoryArt, BuildStackArt, StatusArt } from "../_trust/TrustArt";
 import styles from "../_trust/trust.module.css";
 
@@ -29,7 +29,7 @@ export default function AboutPage() {
       <JsonLd data={[
         {
           "@context": "https://schema.org", "@type": "AboutPage", name: "About MonkStash", url: absoluteUrl("/about"),
-          dateModified: "2026-10-14",
+          dateModified: "2026-10-17",
           publisher: { "@type": "Organization", name: site.name, url: site.url },
         },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
@@ -82,7 +82,7 @@ export default function AboutPage() {
               </div>
               <div className={styles.body}>
                 <p><b>Who we are.</b> We are the MonkStash team. We keep this site pseudonymous for now, and we will not invent names, credentials, or a history to look bigger than we are.</p>
-                <p><b>What that means for you.</b> You should not have to trust a face. Trust the design: the wallet cannot spend your money, and the engine underneath, monero-ts, is open source. Our own code will be published as open source after launch, so you can check it line by line.</p>
+                <p><b>What that means for you.</b> You should not have to trust a face. Trust the design: the wallet cannot spend your money, and the engine underneath, monero-ts, is open source. Our own code is open source too (BSD-3-Clause), so you can <a className={styles.inlineLink} href={repoUrl} rel="noopener">read it line by line</a>.</p>
               </div>
             </div>
             <div className={styles.stripFig}>
@@ -131,6 +131,7 @@ export default function AboutPage() {
                 <ul className={styles.buildList}>
                   <li><b>The real Monero code.</b> The wallet uses monero-ts, a WebAssembly build of Monero&apos;s own wallet code, so we are not inventing our own cryptography.</li>
                   <li><b>Keys on your device.</b> Recovery words and keys are encrypted locally and never transmitted. They are never sent to our servers, so we cannot spend your funds, freeze them, or hand them to anyone.</li>
+                  <li><b>Open source.</b> The whole MonkStash codebase is public under the BSD-3-Clause license. <a className={styles.inlineLink} href={repoUrl} rel="noopener">Read the code</a>. Open code lets anyone check it; it is not the same as an independent audit.</li>
                   <li><b>No accounts, no tracking on wallet pages.</b> There is no sign-up, and we do not run analytics on the wallet itself.</li>
                   <li><b>A replaceable node connection.</b> The wallet reads the blockchain through a Monero node, and you can point it at your own node in the wallet&apos;s settings. See <Link className={styles.inlineLink} href="/monero-node">what a node does</Link>.</li>
                 </ul>
@@ -146,7 +147,7 @@ export default function AboutPage() {
             <div>
               <p className="eyebrow">Honest status</p>
               <h2 id="statusH">Early preview. Not yet independently audited.</h2>
-              <p className={styles.statusBody}>MonkStash works with real Monero, but we recommend <mark>using small amounts</mark> until an independent security review is complete. It is step five on the <Link className={styles.inlineLink} href="/donate#roadmap">public roadmap</Link>, after open-source, verifiable builds and FCMP++ support, and donations pay for it.</p>
+              <p className={styles.statusBody}>MonkStash works with real Monero, but we recommend <mark>using small amounts</mark> until an independent security review is complete. It is step five on the <Link className={styles.inlineLink} href="/donate#roadmap">public roadmap</Link>, after verifiable builds and FCMP++ support, and donations pay for it.</p>
               <p className={styles.statusBody}>The wallet is free. The review and the browser extension depend on the people who use MonkStash, and anyone can count every coin that comes in.</p>
               <div className={styles.statusActions}>
                 <Link className="btn btn-clay" href="/donate">See the roadmap and fund the review</Link>
