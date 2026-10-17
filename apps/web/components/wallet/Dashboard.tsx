@@ -121,23 +121,26 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
   const runSync = useCallback(async () => {
     setSyncError(null);
-    // Public nodes fail now and then. Try again quietly (after 5 s, then 15 s) before showing an
-    // error; progress already synced is kept between tries. A lock stops syncing on purpose.
-    const waits = [5_000, 15_000];
-    for (let attempt = 0; ; attempt++) {
+    // Public nodes stall on large block downloads now and then ("Exception in thread pool"). The
+    // wallet keeps every block it already scanned, so carry on: keep retrying while each attempt
+    // makes progress, and show the error only after 3 failures in a row that got nowhere. A lock
+    // stops syncing on purpose and is not retried.
+    let reached = -1;
+    let stuck = 0;
+    let height = -1;
+    for (;;) {
       try {
-        await wallet.sync((s) => setSync(s));
+        await wallet.sync((s) => { height = s.height; setSync(s); });
         await refresh();
         await wallet.startBackgroundSync();
         onSynced?.();
         return;
       } catch (e) {
         const msg = (e as Error).message || "Could not reach the Monero node.";
-        if (msg === "Sync stopped." || attempt >= waits.length) {
-          if (msg !== "Sync stopped.") setSyncError(msg);
-          return;
-        }
-        await new Promise((r) => setTimeout(r, waits[attempt]));
+        if (msg === "Sync stopped.") return;
+        if (height > reached) { reached = height; stuck = 0; } else stuck++;
+        if (stuck >= 3) { setSyncError(msg); return; }
+        await new Promise((r) => setTimeout(r, [3_000, 10_000, 20_000][stuck] ?? 20_000));
       }
     }
   }, [wallet, refresh, onSynced]);

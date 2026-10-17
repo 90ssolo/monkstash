@@ -46,13 +46,14 @@ async function readBody(req: NextRequest, max: number): Promise<Uint8Array<Array
 }
 const TIMEOUT_MS = 60_000;
 /**
- * Block downloads get far longer: one mainnet getblocks.bin batch can be tens of megabytes, and at
- * a public node's pace that takes minutes. A 60 s limit cut those off, the relay moved on to the
- * next node with the same result, and the wallet gave up mid-sync ("Exception in thread pool").
+ * Block downloads are streamed. One mainnet getblocks.bin batch can be tens of megabytes and take
+ * minutes from a public node; collecting it first meant the wallet received nothing until the end,
+ * and its engine gave up on the silence ("Exception in thread pool"). Now bytes flow as they
+ * arrive. Limits: the node must start answering within FIRST_BYTE_MS, and a stream that goes quiet
+ * for IDLE_MS is cut (the wallet then retries; the relay marks the node as failing).
  */
-// Kept under monero-ts's 180 s read timeout: the relay buffers a batch before passing it on, so the wallet
-// sees no bytes until the relay is done, and it must not give up first.
-const BULK_TIMEOUT_MS = 170_000;
+const FIRST_BYTE_MS = 60_000;
+const IDLE_MS = 120_000;
 const BULK = new Set(["get_blocks.bin", "getblocks.bin", "get_blocks_by_height.bin", "getblocks_by_height.bin", "get_outs.bin", "get_output_distribution.bin", "get_hashes.bin", "gethashes.bin"]);
 
 /** Plain http is fine for a node on this machine, the private network or Tor; elsewhere it can be read and changed in transit. */
@@ -125,31 +126,58 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   let lastError = "unknown error";
   for (const base of nodes) {
     try {
-      const res = await fetch(`${base}/${endpoint}`, {
-        method: req.method,
-        headers: { "Content-Type": req.headers.get("content-type") ?? "application/octet-stream" },
-        body,
-        signal: AbortSignal.timeout(BULK.has(endpoint) ? BULK_TIMEOUT_MS : TIMEOUT_MS),
-        cache: "no-store",
-      });
+      const stream = BULK.has(endpoint);
+      const abort = new AbortController();
+      const firstByte = setTimeout(() => abort.abort(new Error("no answer in time")), stream ? FIRST_BYTE_MS : TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(`${base}/${endpoint}`, {
+          method: req.method,
+          headers: { "Content-Type": req.headers.get("content-type") ?? "application/octet-stream" },
+          body,
+          signal: abort.signal,
+          cache: "no-store",
+        });
+      } finally {
+        if (stream) clearTimeout(firstByte);
+      }
       if (res.status >= 500) {
+        clearTimeout(firstByte);
         lastError = `${base} returned ${res.status}`;
         markDown(base);
         if (isSend) break;
         continue; // try the next node
       }
-      // Buffer instead of streaming: public nodes sometimes drop the socket mid-response,
-      // and a truncated block batch crashes the wallet engine. Buffering turns that into
-      // a catchable error here, so we can retry on the next node.
+      const headers = {
+        "Content-Type": res.headers.get("content-type") ?? "application/octet-stream",
+        "Cache-Control": "no-store",
+        "X-MonkStash-Node": new URL(base).host,
+      };
+      if (stream && res.body) {
+        downUntil.delete(base);
+        // Pass bytes on as they arrive; cut the stream if the node goes quiet for too long.
+        let idle = setTimeout(() => abort.abort(new Error("node went quiet")), IDLE_MS);
+        const watchdog = new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, ctrl) {
+            clearTimeout(idle);
+            idle = setTimeout(() => abort.abort(new Error("node went quiet")), IDLE_MS);
+            ctrl.enqueue(chunk);
+          },
+          flush() { clearTimeout(idle); },
+        });
+        const node = base;
+        const body = res.body.pipeThrough(watchdog, { signal: abort.signal });
+        abort.signal.addEventListener("abort", () => { clearTimeout(idle); markDown(node); console.warn(`[node-proxy] stream from ${new URL(node).host} cut: ${String(abort.signal.reason?.message ?? "aborted")}`); });
+        return new Response(body, { status: res.status, headers });
+      }
+      // Small answers are collected first: a node that drops the socket mid-answer then fails
+      // here, where the next node can be tried, instead of reaching the wallet half-written.
       const payload = await res.arrayBuffer();
+      clearTimeout(firstByte);
       downUntil.delete(base);
       return new Response(payload, {
         status: res.status,
-        headers: {
-          "Content-Type": res.headers.get("content-type") ?? "application/octet-stream",
-          "Cache-Control": "no-store",
-          "X-MonkStash-Node": new URL(base).host,
-        },
+        headers,
       });
     } catch (e) {
       lastError = `${base}: ${(e as Error).message}`;
