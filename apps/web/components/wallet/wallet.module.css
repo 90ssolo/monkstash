@@ -99,7 +99,8 @@
 .seed li { display: flex; align-items: baseline; gap: var(--s-2); padding: var(--s-2) var(--s-3); background: var(--surface); border: 1px solid var(--line); border-bottom: 2px solid var(--line-2); border-radius: var(--r-1); }
 .seed li span { color: var(--clay-ink); font-family: var(--font-display); font-style: italic; min-width: 1.7em; font-variant-numeric: tabular-nums; user-select: none; font-size: 0.95rem; }
 .blurred { filter: blur(7px); user-select: none; pointer-events: none; }
-.reveal { position: absolute; inset: 0; margin: auto; width: max-content; height: 44px; }
+/* The button over the hidden words: centred, never wider than the grid, wraps instead of clipping. */
+.reveal { position: absolute; inset: 0; margin: auto; width: max-content; max-width: calc(100% - 2 * var(--s-4)); height: max-content; min-height: 44px; white-space: normal; text-align: center; }
 
 .loading { display: flex; align-items: center; gap: var(--s-3); color: var(--ink-2); padding: var(--s-4) 0; }
 .spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--clay); animation: spin 0.8s linear infinite; flex: none; }
@@ -186,7 +187,7 @@
 .inlineDetails[open] summary { margin-bottom: var(--s-3); }
 .inlineDetails ol { margin: 0 0 var(--s-2); padding-left: 1.2em; display: grid; gap: var(--s-2); }
 .inlineDetails .mono, .settingsForm .mono { word-break: break-all; }
-.reveal { display: grid; gap: var(--s-3); padding-bottom: var(--s-4); }
+.revealPanel { display: grid; gap: var(--s-3); padding-bottom: var(--s-4); }
 .wordGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
 .wordGrid li { display: flex; align-items: baseline; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); font-size: var(--step--1); min-width: 0; }
 .wordGrid li .mono { overflow-wrap: anywhere; }

@@ -20,7 +20,7 @@ import type { ContactStore } from "@/lib/wallet/contacts";
 import type { Contact } from "@quietmint/wallet-core";
 import { createSimWallet } from "@/lib/wallet/sim";
 import { loadStoredWallet, removeWallet, saveWallet, StorageUnavailableError, unlockWallet, updatePublic } from "@/lib/wallet/storage";
-import { DEV_TOOLS_ENABLED } from "@/lib/wallet/config";
+import { DEV_TOOLS_ENABLED, NETWORK } from "@/lib/wallet/config";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
 import { fetchTestWallets, type TestWallet } from "@/lib/wallet/testWallets";
 import { clearDemoSession, isDemo, pickRandom, preferredMode, setDemoSession, type TestMode } from "@/lib/wallet/demo";
@@ -102,9 +102,16 @@ type View =
   | { name: "welcome" }
   | { name: "onboard"; mode: "create" | "restore" | "view-only" }
   | { name: "locked"; record: StoredWallet }
+  | { name: "otherNetwork"; record: StoredWallet }
   | { name: "opening"; pub: WalletPublic }
   | { name: "open"; pub: WalletPublic; wallet: LiveWallet; mode: TestMode; fellBack: boolean }
   | { name: "fatal"; message: string };
+
+/** A wallet saved for another network (for example a stagenet test wallet on the mainnet site) cannot sync here. */
+function viewFor(rec: StoredWallet | null): View {
+  if (!rec) return { name: "welcome" };
+  return rec.pub.network !== NETWORK ? { name: "otherNetwork", record: rec } : { name: "locked", record: rec };
+}
 
 export function WalletApp() {
   const [view, setView] = useState<View>({ name: "boot" });
@@ -174,7 +181,7 @@ export function WalletApp() {
 
   useEffect(() => {
     const rec = loadStoredWallet();
-    setView(rec ? { name: "locked", record: rec } : { name: "welcome" });
+    setView(viewFor(rec));
     if (DEV_TOOLS_ENABLED) void fetchTestWallets().then((f) => f && setTestWallets(f.wallets));
     return () => { void live.current?.close(); };
   }, []);
@@ -549,7 +556,7 @@ export function WalletApp() {
     synced.current = false;
     await w?.close().catch(() => {});
     const rec = loadStoredWallet();
-    setView(rec ? { name: "locked", record: rec } : { name: "welcome" });
+    setView(viewFor(rec));
   }
 
   async function remove() {
@@ -619,6 +626,7 @@ export function WalletApp() {
           <Onboarding mode={view.mode} testWallets={testWallets} onCancel={() => setView({ name: "welcome" })} onDone={onboarded} />
         ) : null}
         {view.name === "locked" ? <Unlock record={view.record} onUnlocked={(pub, s) => open(pub, s)} onForget={remove} /> : null}
+        {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={remove} /> : null}
         {view.name === "opening" ? (
           <Stage tone="ink" kicker="Opening" sizzle={<>Waking the wallet <mark>on your device</mark>.</>} art={<ArtEngine />}>
             <Loading text="Starting the wallet engine. The first start downloads about 4 MB." />
@@ -769,6 +777,42 @@ function Unlock({ record, onUnlocked, onForget }: { record: StoredWallet; onUnlo
  * the guard is an explicit typed confirmation that spells out what is lost. The encrypted copy is
  * kept unless the person asks: if the password comes back to them, it is their only way in.
  */
+function OtherNetwork({ record, onRemove }: { record: StoredWallet; onRemove: () => void }) {
+  const [text, setText] = useState("");
+  const was = record.pub.network;
+  const testWallet = was !== "mainnet";
+  return (
+    <div className={`card ${styles.narrow}`}>
+      <h1 className="visually-hidden">MonkStash wallet</h1>
+      <h2>{testWallet ? "This is a test wallet" : "This wallet is for the real Monero network"}</h2>
+      {testWallet ? (
+        <>
+          <p className="muted">
+            It was made on {was}, Monero&apos;s test network, while MonkStash was being tested. Test wallets only ever hold free
+            practice coins, so there is nothing of value in it.
+          </p>
+          <p className="muted">
+            MonkStash now runs on the real Monero network, where a test wallet cannot sync. Remove it from this browser, then create
+            a new wallet or restore your real one.
+          </p>
+        </>
+      ) : (
+        <p className="muted">
+          This copy of MonkStash runs on {NETWORK} for testing, so it cannot open a real wallet. Open your wallet at
+          wallet.monkstash.com instead. If you remove it here, you need its recovery words to bring it back.
+        </p>
+      )}
+      <form onSubmit={(e) => { e.preventDefault(); if (text === "REMOVE") onRemove(); }}>
+        <div className="field">
+          <label htmlFor="othernet-confirm">Type REMOVE to remove this {testWallet ? "test " : ""}wallet from this browser</label>
+          <input id="othernet-confirm" className="input" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
+        </div>
+        <button type="submit" className="btn btn-danger btn-sm" disabled={text !== "REMOVE"}>Remove {testWallet ? "test " : ""}wallet</button>
+      </form>
+    </div>
+  );
+}
+
 function ForgotPassword({ kind, onForget }: { kind: WalletPublic["kind"]; onForget: () => void }) {
   const [text, setText] = useState("");
   return (

@@ -98,7 +98,7 @@ export function RevealWords({ actions }: { actions: SettingsActions }) {
 
   if (words) {
     return (
-      <div className={styles.reveal}>
+      <div className={styles.revealPanel}>
         <div className="notice notice-warn" role="alert">
           <span><strong>Anyone who sees these words can take your money.</strong> Check that nobody is watching and that your screen is not being shared or recorded.</span>
         </div>
