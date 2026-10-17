@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { CopyButton } from "@/components/wallet/CopyButton";
 import { Qr } from "@/components/wallet/Qr";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
 import { donate } from "@/lib/donate";
 import { LiveJar, RoadmapLadder } from "./Live";
 import { HeroArt, GapArt, LadderArt, JarCompareArt, ProofArt, SealArt } from "./Art";
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 const faqs = [
   { q: "Why donate if the wallet is free?", a: "Free to use is not free to build. Verifiable builds, FCMP++ support, a security review and a browser extension all cost real money and time. MonkStash has no ads on wallet pages, no tracking and no account fees, so community funding is how the next pieces get built." },
-  { q: "Can I check where the money goes?", a: "You can check every coin that comes in. We publish the donation wallet's view key, which lets anyone create a view-only copy of the wallet and see all incoming payments. A view key shows money coming in, not going out, so we will post a spending report with each release." },
+  { q: "Can I check where the money goes?", a: "You can check every coin that comes in: we publish the donation wallet's view key, so anyone can make a view-only copy of the wallet and see every incoming payment. What the money builds is public too. Every change is in the open-source code on GitHub, and the roadmap on this page moves as each item ships." },
   { q: "Is there a funding target?", a: donate.spendingPolicy },
   { q: "Can I donate anonymously?", a: "Yes. Monero is private by default, so a donation does not reveal who you are. Being listed as a founding supporter is optional, and a pseudonym is fine." },
   { q: "Do I get anything in return?", a: "You can be credited as a founding supporter if you want to be. There are no rewards, tokens, discounts or equity, and nothing financial. A donation is a gift to the project, and it cannot be refunded." },
@@ -165,13 +165,13 @@ export default function DonatePage() {
                     <li><span>ii</span><p>Create a view-only wallet using the donation address and the view key above.</p></li>
                     <li><span>iii</span><p>Let it sync. Every incoming payment now shows up in your own wallet, checked by you.</p></li>
                   </ol>
-                  <p className={styles.caveat}>Be precise about what this proves. A view key shows what comes <b>in</b>. It cannot show what goes out, so we will post a spending report with each release.</p>
+                  <p className={styles.caveat}>This shows every donation that comes <b>in</b>. What it pays for shows up in the work itself: every change is public in the <a href={repoUrl} rel="noopener">open-source code</a>, and the roadmap below moves as items ship.</p>
                 </>
               ) : (
                 <>
                   <p className={styles.body}>Most projects ask you to trust that the money is used well. We would rather give you a way to check. Monero has a tool for it: the <b>view key</b>. <mark>It lets anyone watch a wallet without being able to spend from it.</mark></p>
                   <p className={styles.body}>We will publish the donation wallet&apos;s view key right here when donations open. Then you can create a view-only wallet in any Monero wallet (for example Monero GUI or Feather) or in MonkStash&apos;s watch-only option, and see every incoming payment yourself.</p>
-                  <p className={styles.caveat}>A view key shows what comes <b>in</b>. It cannot show what goes out, so we will also post a spending report with each release.</p>
+                  <p className={styles.caveat}>A view key shows every donation that comes <b>in</b>. What it pays for shows up in the work itself: the code is public and the roadmap moves as items ship.</p>
                 </>
               )}
               <p className={styles.darkLink}>Not sure what a view key is? Read <Link href="/how-monero-works">how Monero works</Link>.</p>
@@ -267,12 +267,12 @@ export default function DonatePage() {
                 <p>{donate.spendingPolicy}</p>
               </article>
               <article className={styles.policy}>
-                <h3>A report with each release</h3>
-                <p>With each release we will post what came in, what we spent and what it bought, so the view key and the spending tell one story.</p>
+                <h3>The work is public</h3>
+                <p>Every change to MonkStash is in the <a href={repoUrl} rel="noopener">open-source code</a>. <mark>You can see what your donation built</mark>, line by line.</p>
               </article>
               <article className={styles.policy}>
-                <h3>Spending is published</h3>
-                <p>A view key only shows incoming coins, so we publish outgoing payments ourselves. <mark>If it is not in a report, we did not spend it.</mark></p>
+                <h3>Progress you can watch</h3>
+                <p>The roadmap on this page shows what is live, what is being built and what comes next. It changes when the work does.</p>
               </article>
               <article className={styles.policy}>
                 <h3>No refunds</h3>
