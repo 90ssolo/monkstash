@@ -6,7 +6,8 @@
  *
  * Everything here is best effort: if IndexedDB is unavailable (private mode, blocked site
  * data, quota), reads return null and writes are skipped. The wallet still works; it just
- * syncs from the restore height as it did before.
+ * syncs from the restore height as it did before. saveSyncState reports the outcome so the
+ * wallet can say when progress is not being kept.
  */
 import type { SealedBlob } from "@quietmint/wallet-core";
 
@@ -54,8 +55,30 @@ export async function loadSyncState(walletId: string): Promise<SealedBlob | null
   return (await run<SealedBlob>("readonly", (s) => s.get(walletId))) ?? null;
 }
 
-export async function saveSyncState(walletId: string, blob: SealedBlob): Promise<void> {
-  await run("readwrite", (s) => s.put(blob, walletId));
+/** How a sync-state save ended: stored, refused because storage is full, or storage unavailable. */
+export type SyncSaveResult = "saved" | "full" | "unavailable";
+
+/**
+ * Saves the sealed sync state. Still best effort (the wallet works without it), but the caller
+ * learns whether the write was committed, so it never treats a lost write as saved.
+ */
+export async function saveSyncState(walletId: string, blob: SealedBlob): Promise<SyncSaveResult> {
+  const db = await openDb();
+  if (!db) return "unavailable";
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(blob, walletId);
+      tx.oncomplete = () => { db.close(); resolve("saved"); };
+      tx.onerror = tx.onabort = () => {
+        db.close();
+        resolve(tx.error?.name === "QuotaExceededError" ? "full" : "unavailable");
+      };
+    } catch {
+      db.close();
+      resolve("unavailable");
+    }
+  });
 }
 
 export async function deleteSyncState(walletId: string): Promise<void> {

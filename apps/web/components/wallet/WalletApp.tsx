@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createTotpSecret, openBytes, packParts, sealBytes, totpUri, unpackParts, verifyTotp, VaultError, type NodeConfig, type StoredWallet, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
-import { NodeTestError, openWallet, testNode, type EngineState, type LiveWallet } from "@/lib/wallet/engine";
+import { NodeTestError, openWallet, testNode, warmEngine, type EngineState, type LiveWallet } from "@/lib/wallet/engine";
 import { recordHandedOut, type HandedOut, type HandedOutStore } from "@/lib/wallet/addresses";
 import { clearSyncStates, deleteSyncState, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "@/lib/wallet/stateStore";
 import type { PaymentRequest, RequestStore } from "@/lib/wallet/requests";
@@ -122,6 +122,8 @@ export function WalletApp() {
   /** True once the first sync of this session finished (saving earlier would block on it). */
   const synced = useRef(false);
   const savedHeight = useRef(0);
+  /** Set when the browser refused to keep the scan progress (shown once as a notice). */
+  const [saveProblem, setSaveProblem] = useState<"full" | "unavailable" | null>(null);
   /** True while the session's first (catch-up) sync runs: idle auto-lock waits for it. */
   const syncBusy = useRef(false);
   /** Bumped by every open, lock and remove: an open() that was overtaken stops and closes its engine. */
@@ -138,8 +140,14 @@ export function WalletApp() {
       const { state, height } = await w.exportState();
       if (live.current !== w || height < savedHeight.current || (!force && height === savedHeight.current)) return;
       const blob = await sealBytes(packParts([utf8.encode(state.password), state.keysData, state.cacheData]), sealSecretOf(s.secrets), sealContextOf(s.pub));
-      await saveSyncState(s.pub.id, blob);
+      const result = await saveSyncState(s.pub.id, blob);
+      if (result !== "saved") {
+        // Not marked as saved: the next save tries again even without new blocks.
+        setSaveProblem(result);
+        return;
+      }
       savedHeight.current = height;
+      setSaveProblem(null);
     } catch {
       /* best effort: the next save or a normal sync covers it */
     }
@@ -195,6 +203,7 @@ export function WalletApp() {
     session.current = { pub, secrets };
     synced.current = false;
     savedHeight.current = 0;
+    setSaveProblem(null);
     const want: TestMode = mode ?? (isDemo ? preferredMode() : "stagenet");
     setView({ name: "opening", pub });
     await live.current?.close().catch(() => {});
@@ -632,6 +641,15 @@ export function WalletApp() {
             <Loading text="Starting the wallet engine. The first start downloads about 4 MB." />
           </Stage>
         ) : null}
+        {view.name === "open" && saveProblem ? (
+          <div className="notice notice-warn" role="status">
+            <span>
+              {saveProblem === "full"
+                ? "This browser's storage is full, so the wallet cannot save how far it has scanned. It still works, but after you close it the scan starts again. Free some space and it saves again on its own."
+                : "This browser is not letting the wallet save how far it has scanned (a private window, or site data is blocked). It still works, but each unlock scans again from the start."}
+            </span>
+          </div>
+        ) : null}
         {view.name === "open" ? (
           <Dashboard
             pub={view.pub}
@@ -681,6 +699,9 @@ function Unlock({ record, onUnlocked, onForget }: { record: StoredWallet; onUnlo
   const [busy, setBusy] = useState(false);
   const [needsCode, setNeedsCode] = useState(false);
   const [secrets, setSecrets] = useState<Awaited<ReturnType<typeof unlockWallet>> | null>(null);
+
+  // Start the wallet engine while the password is typed, so the wallet opens sooner after Unlock.
+  useEffect(() => { void warmEngine(); }, []);
 
   // The decrypted keys wait here only while the code is asked for: two minutes at most, then the
   // password is needed again.

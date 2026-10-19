@@ -24,6 +24,21 @@ export function loadEngine(): Promise<MoneroTs> {
   return libPromise;
 }
 
+/**
+ * Starts the engine (its Web Worker and WebAssembly) ahead of time, for example while the user
+ * types the unlock password, so opening the wallet does not wait for it. Errors are ignored:
+ * the real open reports them.
+ */
+export async function warmEngine(): Promise<void> {
+  try {
+    const lib = await loadEngine();
+    // The first message to the worker loads the WebAssembly engine inside it.
+    await lib.LibraryUtils.getWasmMemoryUsed().catch(() => {});
+  } catch {
+    /* the open that follows will show any problem */
+  }
+}
+
 /** Node endpoints are served at our origin root (see rewrites in next.config.ts). */
 function serverUri(): string {
   return window.location.origin;
@@ -419,6 +434,9 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
   let pausing = false;
   let closed = false;
   let bgTimer: ReturnType<typeof setTimeout> | null = null;
+  let bgStarted = false;
+  let bgTicking = false;
+  let onVisibility: (() => void) | null = null;
   const health: SyncHealth = { lastOk: null, lastError: null };
   const ok = () => { health.lastOk = Date.now(); health.lastError = null; };
   const failed = (e: unknown) => { health.lastError = (e as Error)?.message || "The node did not answer."; };
@@ -498,18 +516,31 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     },
     // Our own loop instead of the engine's startSyncing(): that one swallows errors, so a node
     // outage after the first sync would still look "Up to date". This one records every result.
+    // It pauses while the tab is hidden (nobody is looking, and the tab auto-locks soon) and
+    // checks at once when the tab is shown again.
     async startBackgroundSync(periodMs = 20_000) {
-      if (bgTimer || closed) return;
+      if (bgStarted || closed) return;
+      bgStarted = true;
+      const schedule = (ms: number) => {
+        if (bgTimer) clearTimeout(bgTimer);
+        bgTimer = closed || document.hidden ? null : setTimeout(() => void tick(), ms);
+      };
       const tick = async () => {
-        if (closed) return;
+        bgTimer = null;
+        if (closed || document.hidden || bgTicking) return;
+        bgTicking = true;
         try {
           if (!running) { await w.sync(); ok(); }
         } catch (e) {
           failed(e);
+        } finally {
+          bgTicking = false;
         }
-        if (!closed) bgTimer = setTimeout(() => void tick(), periodMs);
+        schedule(periodMs);
       };
-      bgTimer = setTimeout(() => void tick(), periodMs);
+      onVisibility = () => { if (!document.hidden) schedule(0); };
+      document.addEventListener("visibilitychange", onVisibility);
+      schedule(periodMs);
     },
     health() {
       return { ...health };
@@ -660,6 +691,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     async close() {
       closed = true;
       if (bgTimer) clearTimeout(bgTimer);
+      if (onVisibility) document.removeEventListener("visibilitychange", onVisibility);
       await w.close(false);
     },
   };
