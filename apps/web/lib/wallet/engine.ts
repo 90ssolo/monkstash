@@ -280,15 +280,20 @@ export interface SyncHealth {
   lastError: string | null;
 }
 
-/** During a long first sync, progress is saved this often (whichever comes first). */
-export const CHECKPOINT_BLOCKS = 2_000;
+/**
+ * During a long first sync, progress is saved this often (whichever comes first): about once a
+ * minute in a browser. Each save pauses the scan for 2 to 4 s (measured 2026-10-19 on mainnet).
+ */
+export const CHECKPOINT_BLOCKS = 3_000;
 export const CHECKPOINT_MS = 60_000;
 /**
- * Mid-sync checkpoints are off. Stopping and restarting a sync works in Node, but in the browser
- * (engine in a Web Worker) the restarted sync hung on mainnet (found 2026-10-17). Progress is
- * still kept: idle auto-lock waits during a first sync, and a lock stops the sync and saves it.
+ * Mid-sync checkpoints. They were off after a restarted sync hung in the browser (2026-10-17):
+ * a stop only takes effect after the node's current answer is processed, and answers of ~450
+ * blocks took longer than the stop budget. With the relay asking for 100 blocks per answer, a
+ * stop takes about 2 s; 8 checkpoints and a closed tab in one mainnet scan all resumed cleanly.
+ * A wallet on the user's own node still gets large answers, so its pauses can take longer.
  */
-const CHECKPOINTS_ENABLED = false;
+const CHECKPOINTS_ENABLED = true;
 
 export interface PreparedTx { fee: bigint; amount: bigint; metadata: string; address: string; hash?: string }
 

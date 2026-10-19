@@ -305,9 +305,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                     {!sync
                       ? "Connecting to the Monero network…"
                       : sync.height < pub.restoreHeight
-                        ? "Getting the block list ready. This can take a minute or two after each unlock, then the scan carries on."
+                        ? "Getting the block list ready, then the scan carries on."
                         : `Checking for your payments: block ${sync.height.toLocaleString()} of ${sync.endHeight.toLocaleString()}`}
-                    {longScan ? " Keep this tab open until the first scan finishes. Need to stop? Press Lock: the progress is saved and the scan carries on after you unlock." : ""}
+                    {longScan ? " Progress is saved about once a minute, so you can close this tab or press Lock and carry on later." : ""}
                   </span>
                 </>
               )}
