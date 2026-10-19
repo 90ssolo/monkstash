@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capBlockBatch } from "../lib/server/blockBatch";
+import { capBlockBatch } from "../src/blockBatch";
 
 // A real getblocks.bin request from monero-ts 0.11.20 (throwaway stagenet wallet): block_ids,
 // client, prune, requested_info, start_height.

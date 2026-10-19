@@ -14,6 +14,11 @@
  * forwards a request it may have broken.
  */
 
+/** Blocks per answer: a browser processes 100 recent mainnet blocks in about 2 s (measured 2026-10-19). */
+export const BLOCKS_PER_ANSWER = 100;
+/** The node endpoints that return block batches (both spellings monerod accepts). */
+export const BLOCK_ENDPOINTS: ReadonlySet<string> = new Set(["get_blocks.bin", "getblocks.bin"]);
+
 const SIGNATURE = [0x01, 0x11, 0x01, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01] as const; // signature A, B, version 1
 const HEADER_SIZE = SIGNATURE.length;
 const TYPE_UINT64 = 5;

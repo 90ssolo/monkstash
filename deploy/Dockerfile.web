@@ -5,6 +5,7 @@ WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/wallet-core packages/wallet-core
+COPY packages/node-client packages/node-client
 COPY apps/web apps/web
 RUN pnpm install --frozen-lockfile --filter @quietmint/web...
 # Public settings are baked into the pages at build time.

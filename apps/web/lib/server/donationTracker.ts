@@ -4,12 +4,17 @@
  * the published view key, so it can see incoming donations but can never spend.
  *
  * Sync progress is saved to DONATIONS_STATE_DIR between runs, so each refresh only scans the
- * new blocks. Without a writable directory (some serverless hosts) it still works, it just
- * rescans from the wallet's restore height each time.
+ * new blocks. A run that hits its time limit or fails partway still saves how far it got, so a
+ * long first catch-up finishes over several runs. Without a writable directory (some serverless
+ * hosts) it still works, it just rescans from the wallet's restore height each time.
+ *
+ * The engine reaches the node through a local forwarder that asks for small block batches: in
+ * Node.js the engine cannot process the node's largest answers (packages/node-client).
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { startCappedNode } from "@quietmint/node-client";
 import { donate } from "@/lib/donate";
 
 export interface DonationEntry {
@@ -35,6 +40,8 @@ export interface DonationStats {
 
 const STATE_DIR = process.env.DONATIONS_STATE_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), ".data", "donations");
 const SYNC_TIMEOUT_MS = 240_000;
+/** After the time limit, how long the engine may take to finish its current batch and stop. */
+const STOP_GRACE_MS = 60_000;
 
 let running: Promise<DonationStats> | null = null;
 
@@ -81,25 +88,54 @@ async function measure(): Promise<DonationStats> {
   const networkType = lib.MoneroNetworkType.MAINNET;
   const saved = await readState();
   const password = saved?.password ?? randomBytes(24).toString("hex");
+  const forwarder = await startCappedNode(node);
+  try {
+    return await measureWith(lib, forwarder.uri, networkType, password, saved);
+  } finally {
+    await forwarder.close();
+  }
+}
 
-  let wallet = saved
+type MoneroTs = typeof import("monero-ts").default;
+
+async function measureWith(lib: MoneroTs, node: string, networkType: number, password: string, saved: Awaited<ReturnType<typeof readState>>): Promise<DonationStats> {
+  let found = saved
     ? await lib.openWalletFull({ networkType, password, keysData: saved.keys, cacheData: saved.cache, server: { uri: node } } as never).catch(() => null)
     : null;
   // Saved state must belong to the configured wallet; otherwise start fresh.
-  if (wallet && (await wallet.getPrimaryAddress()) !== donate.address) {
-    await wallet.close().catch(() => {});
-    wallet = null;
+  if (found && (await found.getPrimaryAddress()) !== donate.address) {
+    await found.close().catch(() => {});
+    found = null;
   }
-  wallet ??= await lib.createWalletFull({
-    networkType, password, primaryAddress: donate.address, privateViewKey: donate.viewKey,
-    restoreHeight: donate.restoreHeight, server: { uri: node },
+  // measure() has checked that the donation wallet is configured.
+  const wallet = found ?? await lib.createWalletFull({
+    networkType, password, primaryAddress: donate.address!, privateViewKey: donate.viewKey!,
+    restoreHeight: donate.restoreHeight!, server: { uri: node },
   });
 
+  const saveProgress = async () => {
+    const data = await wallet.getData();
+    await writeState(password, toBytes(data[0]), toBytes(data[1]));
+  };
+  const sleep = (ms: number) => new Promise<"late">((r) => setTimeout(() => r("late"), ms));
+
   try {
-    await Promise.race([
-      wallet.sync(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("sync timeout")), SYNC_TIMEOUT_MS)),
-    ]);
+    // A failed or overlong sync keeps what it scanned: stop at the next batch, save, report the error.
+    const syncing = wallet.sync().then(() => "done" as const);
+    syncing.catch(() => {});
+    let outcome: "done" | "late";
+    try {
+      outcome = await Promise.race([syncing, sleep(SYNC_TIMEOUT_MS)]);
+    } catch (err) {
+      await saveProgress().catch(() => {});
+      throw err;
+    }
+    if (outcome === "late") {
+      await wallet.stopSyncing().catch(() => {});
+      const stopped = await Promise.race([syncing.then(() => "done" as const, () => "done" as const), sleep(STOP_GRACE_MS)]);
+      if (stopped === "done") await saveProgress().catch(() => {});
+      throw new Error(`sync timeout at block ${await wallet.getHeight().catch(() => "?")}${stopped === "done" ? ", progress saved" : ""}`);
+    }
     const height = await wallet.getHeight();
     const txs = await wallet.getTxs({ isIncoming: true } as never);
 
@@ -120,8 +156,7 @@ async function measure(): Promise<DonationStats> {
     }
     entries.sort((a, b) => (b.timestamp ?? Number.MAX_SAFE_INTEGER) - (a.timestamp ?? Number.MAX_SAFE_INTEGER));
 
-    const data = await wallet.getData();
-    await writeState(password, toBytes(data[0]), toBytes(data[1]));
+    await saveProgress();
 
     return {
       ok: true,

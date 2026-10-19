@@ -9,7 +9,7 @@
 import { NextRequest } from "next/server";
 import { NODE_ENDPOINTS } from "@/lib/nodeEndpoints";
 import { allow, tooMany } from "@/lib/server/rateLimit";
-import { capBlockBatch } from "@/lib/server/blockBatch";
+import { BLOCK_ENDPOINTS, BLOCKS_PER_ANSWER, capBlockBatch } from "@quietmint/node-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +24,6 @@ const MAX_BODY = 2 * 1024 * 1024; // 2 MB; wallet requests are small, responses 
 const PER_MINUTE = 900;
 const SENDS_PER_MINUTE = 20;
 const SEND_ENDPOINTS = new Set(["send_raw_transaction", "sendrawtransaction"]);
-// Blocks per getblocks.bin answer (see lib/server/blockBatch.ts). The wallet can only stop and save
-// between answers; at 100 a browser processes one in about 2 s instead of about 10 (measured 2026-10-19).
-const BLOCKS_PER_ANSWER = 100;
-const BLOCK_ENDPOINTS = new Set(["get_blocks.bin", "getblocks.bin"]);
 
 /** Reads at most `max` bytes of the body; null when it is larger (without buffering the rest). */
 async function readBody(req: NextRequest, max: number): Promise<Uint8Array<ArrayBuffer> | null> {
@@ -120,6 +116,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
 
   const raw = req.method === "POST" ? await readBody(req, MAX_BODY) : undefined;
   if (raw === null) return new Response("Request too large", { status: 413 });
+  // Small block batches, so a wallet can stop and save every few seconds (packages/node-client).
   const body = raw && BLOCK_ENDPOINTS.has(endpoint) ? capBlockBatch(raw, BLOCKS_PER_ANSWER) : raw;
 
   const nodes = healthyFirst(upstreams());

@@ -8,6 +8,7 @@ WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/wallet-core packages/wallet-core
+COPY packages/node-client packages/node-client
 COPY apps/pay apps/pay
 RUN pnpm install --frozen-lockfile --filter @quietmint/pay... \
  && pnpm --filter @quietmint/pay build \

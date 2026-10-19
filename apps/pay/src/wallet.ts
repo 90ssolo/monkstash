@@ -6,6 +6,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { startCappedNode, type CappedNode } from "@quietmint/node-client";
 import type { PayConfig } from "./config";
 
 export interface IncomingPayment {
@@ -46,11 +47,23 @@ const toBytes = (d: unknown): Uint8Array =>
  * to them would be missed.
  */
 export async function openWatcher(cfg: PayConfig, highestIndexes: Record<number, number> = {}): Promise<Watcher> {
+  // The engine reaches the node through a local forwarder that asks for small block batches: in
+  // Node.js the engine cannot process the node's largest answers (see packages/node-client).
+  const forwarder = await startCappedNode(cfg.nodeUrl);
+  try {
+    return await openVia(cfg, highestIndexes, forwarder);
+  } catch (err) {
+    await forwarder.close();
+    throw err;
+  }
+}
+
+async function openVia(cfg: PayConfig, highestIndexes: Record<number, number>, forwarder: CappedNode): Promise<Watcher> {
   const lib = (await import("monero-ts")).default;
   const networkType = lib.MoneroNetworkType[cfg.network.toUpperCase() as "MAINNET" | "STAGENET" | "TESTNET"];
   const dir = path.join(cfg.dataDir, "wallet");
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-  const server = { uri: cfg.nodeUrl, ...(cfg.nodeUsername ? { username: cfg.nodeUsername, password: cfg.nodePassword ?? "" } : {}) };
+  const server = { uri: forwarder.uri, ...(cfg.nodeUsername ? { username: cfg.nodeUsername, password: cfg.nodePassword ?? "" } : {}) };
 
   // The engine's file password only protects files in our own data directory; the view key in
   // them is already in this server's environment, so it adds little, but it costs nothing.
@@ -146,6 +159,7 @@ export async function openWatcher(cfg: PayConfig, highestIndexes: Record<number,
     async close() {
       await save().catch(() => {});
       await w.close(false).catch(() => {});
+      await forwarder.close();
     },
   };
 }
