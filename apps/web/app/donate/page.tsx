@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { CopyButton } from "@/components/wallet/CopyButton";
-import { Qr } from "@/components/wallet/Qr";
+import { StaticQr } from "@/components/StaticQr";
 import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
 import { donate } from "@/lib/donate";
 import { LiveJar, RoadmapLadder } from "./Live";
@@ -232,7 +232,7 @@ export default function DonatePage() {
             {address ? (
               <div className={styles.giveCard}>
                 <div className={styles.qrWrap}>
-                  <Qr value={`monero:${address}`} label="QR code for the MonkStash donation address" size={216} />
+                  <StaticQr value={`monero:${address}`} label="QR code for the MonkStash donation address" size={216} />
                   <span className={styles.qrCap}>Scan with your wallet</span>
                 </div>
                 <div className={styles.addrCol}>
