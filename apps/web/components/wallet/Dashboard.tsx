@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Credentials, NodeSettings, RescanFrom, RevealWords, type SettingsActions } from "./WalletSettings";
+import { Credentials, LoadMoveFile, NodeSettings, RescanFrom, RevealWords, SaveMoveFile, type SettingsActions } from "./WalletSettings";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
 import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, type WalletPublic } from "@quietmint/wallet-core";
@@ -450,10 +450,20 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 </dl>
                 <CopyButton value={pub.primaryAddress} label="Copy main address" />
                 {settings ? (
-                  <details className={styles.danger}>
-                    <summary>Scan again from an earlier date</summary>
-                    <RescanFrom actions={settings} />
-                  </details>
+                  <>
+                    <details className={styles.danger}>
+                      <summary>Scan again from an earlier date</summary>
+                      <RescanFrom actions={settings} />
+                    </details>
+                    <details className={styles.danger}>
+                      <summary>Move to another device</summary>
+                      <SaveMoveFile actions={settings} />
+                    </details>
+                    <details className={styles.danger}>
+                      <summary>Load a move file</summary>
+                      <LoadMoveFile actions={settings} />
+                    </details>
+                  </>
                 ) : null}
               </section>
 

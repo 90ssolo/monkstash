@@ -359,6 +359,8 @@ export interface LiveWallet {
   relay(metadata: string): Promise<string>;
   /** Exports the engine state plus the height it is synced to, for sealed local saving. */
   exportState?(): Promise<{ state: EngineState; height: number }>;
+  /** Block height the engine is synced to. */
+  height?(): Promise<number>;
   close(): Promise<void>;
 }
 
@@ -683,6 +685,9 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     },
     async relay(metadata) {
       return w.relayTx(metadata);
+    },
+    async height() {
+      return w.getHeight();
     },
     async exportState() {
       const [keysData, cacheData] = await w.getData();

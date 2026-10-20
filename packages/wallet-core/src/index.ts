@@ -16,3 +16,4 @@ export * from "./csv";
 export * from "./exodus";
 export * from "./contacts";
 export * from "./proofs";
+export * from "./move";

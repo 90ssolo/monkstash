@@ -10,8 +10,8 @@
  */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createTotpSecret, openBytes, packParts, sealBytes, totpUri, unpackParts, verifyTotp, VaultError, type NodeConfig, type StoredWallet, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
-import { NodeTestError, openWallet, testNode, warmEngine, type EngineState, type LiveWallet } from "@/lib/wallet/engine";
+import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, type NodeConfig, type StoredWallet, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
+import { normalizeSeed, NodeTestError, openWallet, testNode, warmEngine, type EngineState, type LiveWallet } from "@/lib/wallet/engine";
 import { recordHandedOut, type HandedOut, type HandedOutStore } from "@/lib/wallet/addresses";
 import { clearSyncStates, deleteSyncState, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "@/lib/wallet/stateStore";
 import type { PaymentRequest, RequestStore } from "@/lib/wallet/requests";
@@ -76,6 +76,18 @@ function handedOutStore(pub: WalletPublic, secrets: Secrets): HandedOutStore {
     },
   };
 }
+/**
+ * The secret a move file is sealed with. It carries the engine's keys file, which can spend for a
+ * full wallet, so a full wallet's file needs the recovery phrase; a watch-only file the view key.
+ */
+function moveSecretOf(kind: WalletPublic["kind"], s: Secrets): string {
+  if (kind === "full") {
+    if (!s.seed) throw new Error("This wallet has no recovery words stored, so it cannot make a move file.");
+    return normalizeSeed(s.seed);
+  }
+  return s.privateViewKey.trim().toLowerCase();
+}
+
 /** Binds a saved state to one wallet, so it can never be opened as another wallet's. */
 const sealContextOf = (pub: WalletPublic) => `wallet-state|${pub.id}|${pub.primaryAddress}`;
 
@@ -515,6 +527,80 @@ export function WalletApp() {
       await w?.close().catch(() => {});
       await deleteSyncState(next.id);
       await open(next, s);
+    },
+    async exportMove(password, code) {
+      const { rec, s } = await verifyAccess(password, code);
+      const w = live.current;
+      if (!w?.exportState) throw new Error("Open the wallet first.");
+      if (w.syncing?.()) throw new Error("The wallet is still scanning. Try again when it says Up to date.");
+      const { state, height } = await w.exportState();
+      const [addresses, requests, contacts, cashier] = await Promise.all([
+        handedOutStore(rec.pub, s).load(),
+        requestStore(rec.pub)?.load(),
+        contactStore(rec.pub)?.load(),
+        cashierStore(rec.pub)?.load(),
+      ]);
+      const bytes = await sealMoveFile({
+        primaryAddress: rec.pub.primaryAddress, network: rec.pub.network, kind: rec.pub.kind,
+        restoreHeight: rec.pub.restoreHeight, height, engine: state,
+        records: { ...(addresses ? { addresses } : {}), ...(requests?.length ? { requests } : {}), ...(contacts?.length ? { contacts } : {}), ...(cashier && (cashier.config || cashier.sales.length) ? { cashier } : {}) },
+      }, moveSecretOf(rec.pub.kind, s));
+      const day = new Date().toISOString().slice(0, 10);
+      return { bytes, filename: `monkstash-move-${rec.pub.network}-${day}.monkstash`, height };
+    },
+    async importMove(file, password, code) {
+      const { rec, s } = await verifyAccess(password, code);
+      const pub = rec.pub;
+      const moved = await openMoveFile(file, moveSecretOf(pub.kind, s), { primaryAddress: pub.primaryAddress, network: pub.network, kind: pub.kind });
+      const added: string[] = [];
+
+      // Address counters: the higher index wins, so no address handed out on either device is reused.
+      const addressStore = handedOutStore(pub, s);
+      const merged = mergeHandedOut(await addressStore.load(), moved.records.addresses as HandedOut | undefined);
+      if (merged) await addressStore.save(merged);
+      // Lists fill in only where this device has none, so nothing here is overwritten.
+      const reqs = requestStore(pub);
+      if (reqs && Array.isArray(moved.records.requests) && moved.records.requests.length && !(await reqs.load()).length) {
+        await reqs.save(moved.records.requests as PaymentRequest[]);
+        added.push("payment requests");
+      }
+      const cons = contactStore(pub);
+      if (cons && Array.isArray(moved.records.contacts) && moved.records.contacts.length && !(await cons.load()).length) {
+        await cons.save(moved.records.contacts as Contact[]);
+        added.push("contacts");
+      }
+      const till = cashierStore(pub);
+      const tillHere = till ? await till.load() : null;
+      if (till && tillHere && moved.records.cashier && !tillHere.config && !tillHere.sales.length) {
+        await till.save(moved.records.cashier as CashierData);
+        added.push("till settings and sales");
+      }
+
+      // Scan progress: only when the file is further along than this device. A running scan is
+      // paused first (it stops between answers, a few seconds): the engine answers nothing else
+      // while it scans.
+      const current = live.current;
+      const paused = !!current?.syncing?.();
+      if (paused) await withTimeout(current!.haltSync?.() ?? Promise.resolve(), 30_000);
+      const here = Math.max(savedHeight.current, current && !current.syncing?.() ? ((await current.height?.().catch(() => 0)) ?? 0) : 0);
+      if (moved.height <= here) {
+        if (paused) {
+          // Keep what this device scanned, then carry on scanning.
+          await withTimeout(persistState(true), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
+          await open(pub, s);
+        }
+        return { height: moved.height, scanReplaced: false, added };
+      }
+      openGen.current++;
+      const w = live.current;
+      live.current = null;
+      await w?.close().catch(() => {});
+      const blob = await sealBytes(packParts([utf8.encode(moved.engine.password), moved.engine.keysData, moved.engine.cacheData]), sealSecretOf(s), sealContextOf(pub));
+      const saved = await saveSyncState(pub.id, blob);
+      const next = moved.restoreHeight < pub.restoreHeight ? updatePublic(rec, { restoreHeight: moved.restoreHeight }).pub : pub;
+      await open(next, s);
+      if (saved !== "saved") throw new Error("This browser did not let the wallet save the moved scan progress, so it scans on its own instead.");
+      return { height: moved.height, scanReplaced: true, added };
     },
     async saveNode(node: NodeConfig | null, password, code) {
       const { rec, s } = await verifyAccess(password, code);
