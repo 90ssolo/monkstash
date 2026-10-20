@@ -28,6 +28,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     links: [
       { href: "/tools/monero-address-validator", label: "Address validator" },
       { href: "/tools/monero-restore-height-calculator", label: "Restore height" },
+      { href: "/tools/monero-seed-doctor", label: "Seed doctor" },
       { href: "/tools/monero-fee-calculator", label: "Fee calculator" },
       { href: "/tools/monero-qr-code-generator", label: "QR code generator" },
       { href: "/tools/monero-mining-calculator", label: "Mining calculator" },

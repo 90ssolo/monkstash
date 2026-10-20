@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  checkAddressFormat, estimateHeightAt, exodusPhraseProblem, isHexKey, MyMoneroPhraseError, type NetworkType, type TotpConfig, type WalletKind,
+  checkAddressFormat, checkMoneroWords, estimateHeightAt, exodusPhraseProblem, isHexKey, MyMoneroPhraseError, type NetworkType, type SeedCheck, type TotpConfig, type WalletKind,
 } from "@quietmint/wallet-core";
+import { siteHref } from "@/lib/site";
 import { exodusToMoneroSeed, generateWallet, inspectSeed, normalizeSeed, validateAddress, viewKeyMatches } from "@/lib/wallet/engine";
 import { NETWORK } from "@/lib/wallet/config";
 import { isDemo } from "@/lib/wallet/demo";
@@ -359,12 +360,19 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const count = seed.trim() ? normalizeSeed(seed).split(" ").length : 0;
+  // Word-level help for 24 and 25 English words: unknown words, the check word, a missing 25th.
+  const check = checkMoneroWords(seed);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (check.kind === "unknown-words") return setError(wordProblem(check));
+    if (check.kind === "bad-checksum") return setError("The 25th word does not match the other 24. Monero's last word is a check word, so one of the words is probably wrong or in the wrong place. Compare each word with your backup.");
+    if (check.kind === "missing-checksum") return setError(`You entered 24 words. The 25th is a check word made from the other 24: it should be "${check.word}". Add it at the end (or use the button below), then continue.`);
     if (count === 16) return setError("16 words are a Polyseed phrase (Feather and Cake Wallet use it). MonkStash cannot restore Polyseed yet. Meanwhile you can follow this wallet here as watch-only, with its address and private view key, and keep spending from your current wallet.");
-    if (count !== 25 && count !== 13 && count !== 12) return setError(`Recovery words come in sets of 25 (13 from MyMonero, 12 from Exodus). You entered ${count}.`);
+    if (count === 14) return setError("14 words come from Feather before version 2.0. MonkStash cannot restore them yet. Feather still restores them; see our seed doctor for the way to move this wallet.");
+    if (count === 24) return setError("24 words that are not Monero words are usually a hardware wallet's phrase (restore it with the device in Monero GUI or Feather) or a 24-word BIP39 wallet from Cake Wallet (restore it in Cake). MonkStash cannot restore those.");
+    if (count !== 25 && count !== 13 && count !== 12) return setError(`Recovery words come in sets of 25 (13 from MyMonero, 12 from Exodus). You entered ${count}. Not sure what you have? Our seed doctor helps without asking for your words.`);
     if (count === 12) {
       const problem = exodusPhraseProblem(seed);
       if (problem) return setError(`${problem} If these are not Exodus words, check which wallet they came from.`);
@@ -419,12 +427,30 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
             : count === 12 ? "12 words: an Exodus phrase. We turn it into the standard 25-word Monero seed for the same wallet (see it later in Settings). After restoring, check the address matches the Monero address Exodus showed you."
             : `${count} of 25 words`}
         </span>
+        {check.kind === "unknown-words" ? <p className="small" role="status" style={{ margin: "var(--s-2) 0 0" }}>{wordProblem(check)}</p> : null}
+        {check.kind === "ok" ? <p className="small muted" style={{ margin: "var(--s-2) 0 0" }}>All 25 words are Monero words and the check word matches.</p> : null}
+        {check.kind === "missing-checksum" ? (
+          <p className="small" role="status" style={{ margin: "var(--s-2) 0 0" }}>
+            24 words: the 25th, a check word made from the others, is missing. It should be <strong className="mono">{check.word}</strong>.{" "}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setSeed(`${normalizeSeed(seed)} ${check.word}`); setError(null); }}>Add it</button>
+          </p>
+        ) : null}
       </div>
       <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="restore" />
       {error ? <p id="seed-err" className="error small" role="alert">{error}</p> : null}
+      <p className="small muted">Not sure what kind of phrase you have? The <a href={siteHref("/tools/monero-seed-doctor")}>seed doctor</a> tells you, without asking for your words.</p>
       <button className="btn btn-primary btn-block" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
     </form>
   );
+}
+
+/** Plain words for unknown seed words, with the closest Monero words. */
+function wordProblem(check: Extract<SeedCheck, { kind: "unknown-words" }>): string {
+  const parts = check.unknown.slice(0, 3).map((u) =>
+    `word ${u.position}, "${u.word}", is not a Monero word${u.suggestions.length ? ` (did you mean ${u.suggestions.map((w) => `"${w}"`).join(" or ")}?)` : ""}`);
+  const more = check.unknown.length > 3 ? ` ${check.unknown.length - 3} more words are not Monero words either.` : "";
+  const text = parts.join("; ");
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.${more} Only the first 3 letters of each word count.`;
 }
 
 /* ---------------- View-only ---------------- */

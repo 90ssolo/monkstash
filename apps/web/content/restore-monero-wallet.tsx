@@ -78,7 +78,7 @@ export function Body() {
       <p>
         <mark>You need your 25 recovery words</mark>, written in the right order. That is it. You do not need your old device, your old
         password, or any account. The password only protected the copy on your old device, so you will set a new one during the
-        restore. If your words came from MyMonero, see <Link href="/restore-mymonero-seed">how to restore a MyMonero seed</Link>. Coming from Exodus? Exodus ended Monero support in August 2025, and if you have its 12 words you can enter them as they are: MonkStash turns them into the standard 25-word seed for the same wallet. Our guide to <Link href="/exodus-monero">getting your Monero back from Exodus</Link> covers the whole move.
+        restore. Not sure what kind of phrase you have? The <Link href="/tools/monero-seed-doctor">seed doctor</Link> tells you without asking for the words. If your words came from MyMonero, see <Link href="/restore-mymonero-seed">how to restore a MyMonero seed</Link>. Coming from Exodus? Exodus ended Monero support in August 2025, and if you have its 12 words you can enter them as they are: MonkStash turns them into the standard 25-word seed for the same wallet. Our guide to <Link href="/exodus-monero">getting your Monero back from Exodus</Link> covers the whole move.
       </p>
       <Figure caption="Your written recovery words are all you need to bring a wallet back.">
         <IlloBackup />

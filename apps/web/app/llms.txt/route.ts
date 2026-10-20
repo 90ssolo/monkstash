@@ -36,6 +36,7 @@ export function GET() {
     `- [Monero wallet Chrome extension](${absoluteUrl("/monero-chrome-extension")})`,
     `- [Monero address validator](${absoluteUrl("/tools/monero-address-validator")})`,
     `- [Monero restore height calculator](${absoluteUrl("/tools/monero-restore-height-calculator")})`,
+    `- [Monero seed doctor](${absoluteUrl("/tools/monero-seed-doctor")}): which recovery phrase format you have (25, 16, 14, 13, 12 or 24 words) and where it restores, without entering the words`,
     `- [Monero fee calculator](${absoluteUrl("/tools/monero-fee-calculator")})`,
     `- [Monero QR code generator](${absoluteUrl("/tools/monero-qr-code-generator")}): monero: payment URI and QR code, made in the browser`,
     `- [Monero mining calculator](${absoluteUrl("/tools/monero-mining-calculator")}): estimated earnings from live network difficulty`,

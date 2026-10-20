@@ -10,16 +10,16 @@ import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "Monero Tools",
-  description: "Free Monero tools that run in your browser: check an address, see the fee now, find a restore height, make a payment QR code and estimate mining earnings.",
+  description: "Free Monero tools that run in your browser: check an address, identify a recovery phrase, find a restore height, see the fee now, make a payment QR code and estimate mining earnings.",
   alternates: { canonical: "/tools" },
-  openGraph: ogFor({ title: "Monero Tools", description: "Free Monero tools that run in your browser: check an address, see the fee now, find a restore height, make a payment QR code and estimate mining earnings.", path: "/tools" }),
+  openGraph: ogFor({ title: "Monero Tools", description: "Free Monero tools that run in your browser: check an address, identify a recovery phrase, find a restore height, see the fee now, make a payment QR code and estimate mining earnings.", path: "/tools" }),
 };
 
 export default function ToolsPage() {
   return (
     <>
       <JsonLd data={[
-        { "@context": "https://schema.org", "@type": "CollectionPage", name: "Monero Tools", url: absoluteUrl("/tools"), dateModified: "2026-10-15" },
+        { "@context": "https://schema.org", "@type": "CollectionPage", name: "Monero Tools", url: absoluteUrl("/tools"), dateModified: "2026-10-20" },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
           { "@type": "ListItem", position: 2, name: "Tools", item: absoluteUrl("/tools") },
@@ -105,6 +105,31 @@ export default function ToolsPage() {
                   <div className={styles.pvResult}>
                     <span className={styles.pvBadge}>Restore height</span>
                     <span className={styles.pvMeta}>Block height with a 7 day margin</span>
+                  </div>
+                </div>
+                <p className={styles.pvCap}>A preview of the result. The real tool is one click away.</p>
+              </div>
+            </article>
+
+            <article className={styles.feature} style={{ marginTop: 28 }}>
+              <div className={styles.featureBody}>
+                <span className={styles.live}>Live</span>
+                <h3>Monero seed doctor</h3>
+                <p>25, 16, 13, 12 or 24 words? Find out what your recovery phrase is and where it restores, <mark>without typing a single word of it</mark>.</p>
+                <ul className={styles.ticks}>
+                  <li>Every Monero phrase format, by word count and app</li>
+                  <li>Where it restores, including honestly whether MonkStash can</li>
+                  <li>Why a restore can show 0, and a safe restore height</li>
+                </ul>
+                <Link className="btn btn-primary btn-lg" href="/tools/monero-seed-doctor">Open the seed doctor</Link>
+              </div>
+              <div className={styles.previewWrap} aria-hidden="true">
+                <div className={styles.preview}>
+                  <span className={styles.pvLabel}>How many words does your backup have?</span>
+                  <div className={styles.pvSeg}><span>25</span><span className={styles.on}>16</span><span>13</span><span>12</span></div>
+                  <div className={styles.pvResult}>
+                    <span className={styles.pvBadge}>A 16-word Polyseed</span>
+                    <span className={styles.pvMeta}>Restores in Feather and Cake Wallet</span>
                   </div>
                 </div>
                 <p className={styles.pvCap}>A preview of the result. The real tool is one click away.</p>

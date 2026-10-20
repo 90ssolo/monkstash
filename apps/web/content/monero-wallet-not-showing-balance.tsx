@@ -176,6 +176,11 @@ export function Body() {
         on the blockchain, tied to your Exodus recovery words. See{" "}
         <Link href="/exodus-monero">how to get your Monero back from Exodus</Link>.
       </p>
+      <p>
+        Not sure which kind of phrase you have, or which app can restore it? The{" "}
+        <Link href="/tools/monero-seed-doctor">Monero seed doctor</Link> tells you from the number of words and the app that made
+        them, without asking for the words.
+      </p>
 
       <h2 id="account">Another subaddress or account</h2>
       <p>

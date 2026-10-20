@@ -203,6 +203,10 @@ export function Body() {
           <tr><th>12</th><td>Exodus phrase, or a BIP39-style option in Cake Wallet</td><td>Exodus (one phrase for all coins; Monero support ended in 2025), Cake Wallet as an option</td><td>MonkStash for Exodus phrases; Cake&apos;s option only in wallets that support it</td><td>Depends on the wallet</td></tr>
         </tbody>
       </table>
+      <p>
+        Not sure which one you have, or which app restores it? The <Link href="/tools/monero-seed-doctor">seed doctor</Link> tells
+        you in two questions, without asking for your words.
+      </p>
       <h3>16 words: Polyseed</h3>
       <p>
         <a href="https://github.com/tevador/polyseed" rel="noopener">Polyseed</a> is a newer format with 16 words. Its big idea

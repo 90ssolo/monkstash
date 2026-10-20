@@ -56,3 +56,15 @@
   .rhBig { font-size: 1.6rem; }
   .rhDate { font-size: 1.35rem; }
 }
+
+/* Seed doctor */
+.sdStep { border: 0; margin: 0 0 18px; padding: 0; min-width: 0; }
+.sdChoices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sdChoices .seg, .sdChoices .segOn { border: 1px solid var(--line-strong); border-radius: 4px; padding: 7px 12px; }
+.sdChoices .segOn { border-color: var(--forest); }
+.sdSteps { margin: 10px 0 0; padding-left: 1.2em; font-size: 0.95rem; color: var(--ink-2); line-height: 1.5; }
+.sdSteps li + li { margin-top: 4px; }
+.sdZero { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 0.95rem; }
+.sdZero summary { cursor: pointer; font-weight: 600; }
+.sdZero ol { margin: 10px 0 0; padding-left: 1.2em; color: var(--ink-2); line-height: 1.5; }
+.sdZero li + li { margin-top: 6px; }

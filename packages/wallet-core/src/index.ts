@@ -17,3 +17,4 @@ export * from "./exodus";
 export * from "./contacts";
 export * from "./proofs";
 export * from "./move";
+export * from "./seedcheck";
