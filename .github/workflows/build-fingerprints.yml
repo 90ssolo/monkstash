@@ -1,0 +1,71 @@
+# Builds the browser extension (Chrome and Firefox) and the website with wallet on one runner and
+# reports their build fingerprints. Called by reproducible-builds.yml, once per CPU architecture.
+name: Build fingerprints
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+    outputs:
+      chrome:
+        value: ${{ jobs.build.outputs.chrome }}
+      firefox:
+        value: ${{ jobs.build.outputs.firefox }}
+      web:
+        value: ${{ jobs.build.outputs.web }}
+      arch:
+        value: ${{ jobs.build.outputs.arch }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 40
+    outputs:
+      chrome: ${{ steps.ext.outputs.chrome }}
+      firefox: ${{ steps.ext.outputs.firefox }}
+      web: ${{ steps.web.outputs.web }}
+      arch: ${{ steps.arch.outputs.arch }}
+    env:
+      # The same Node image as deploy/Dockerfile.web, pinned by digest. It is a multi-arch index,
+      # so each runner gets that release of Node for its own CPU.
+      NODE_IMAGE: node:24.18.0-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+      BUILD_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - id: arch
+        run: echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the extension (Chrome and Firefox)
+        id: ext
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src -e BUILD_COMMIT "$NODE_IMAGE" sh -c '
+            corepack enable &&
+            COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --filter "@quietmint/extension..." &&
+            node apps/extension/scripts/build.mjs &&
+            node apps/extension/scripts/build.mjs --firefox'
+          fp() { node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).fingerprint)' "$1"; }
+          echo "chrome=$(fp apps/extension/dist/chrome/build.json)" >> "$GITHUB_OUTPUT"
+          echo "firefox=$(fp apps/extension/dist/firefox/build.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the website and wallet (production settings)
+        id: web
+        run: |
+          docker build --target build \
+            --build-arg NODE_IMAGE="$NODE_IMAGE" \
+            --build-arg NEXT_PUBLIC_SITE_URL=https://monkstash.com \
+            --build-arg NEXT_PUBLIC_WALLET_URL=https://wallet.monkstash.com \
+            --build-arg NEXT_PUBLIC_MONERO_NETWORK=mainnet \
+            --build-arg BUILD_COMMIT="$BUILD_COMMIT" \
+            -f deploy/Dockerfile.web -t monkstash-web-check .
+          id=$(docker create monkstash-web-check)
+          docker cp "$id:/src/apps/web/public/build.json" web-build.json
+          docker rm "$id" > /dev/null
+          echo "web=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("web-build.json", "utf8")).fingerprint)')" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,56 @@
+# Checks that the extension and the website with wallet build to the same files on x86-64 and on
+# ARM64 Linux. The fingerprints are the ones in each build's build.json: the extension shows its
+# own in Settings, and the live site serves its at https://wallet.monkstash.com/build.json once
+# this commit is deployed. See /verify on monkstash.com.
+name: Reproducible builds
+
+on:
+  push:
+    branches: [main]
+    tags: ["extension-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  x64:
+    uses: ./.github/workflows/build-fingerprints.yml
+    with:
+      runner: ubuntu-24.04
+  arm64:
+    uses: ./.github/workflows/build-fingerprints.yml
+    with:
+      runner: ubuntu-24.04-arm
+
+  compare:
+    needs: [x64, arm64]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Compare fingerprints
+        env:
+          X_ARCH: ${{ needs.x64.outputs.arch }}
+          A_ARCH: ${{ needs.arm64.outputs.arch }}
+          X_CHROME: ${{ needs.x64.outputs.chrome }}
+          A_CHROME: ${{ needs.arm64.outputs.chrome }}
+          X_FIREFOX: ${{ needs.x64.outputs.firefox }}
+          A_FIREFOX: ${{ needs.arm64.outputs.firefox }}
+          X_WEB: ${{ needs.x64.outputs.web }}
+          A_WEB: ${{ needs.arm64.outputs.web }}
+        run: |
+          status=0
+          {
+            echo "## Build fingerprints of ${GITHUB_SHA}"
+            echo
+            echo "| Build | ${X_ARCH} | ${A_ARCH} | Same |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          row() {
+            if [ -n "$2" ] && [ "$2" = "$3" ]; then same=yes; else same=NO; status=1; fi
+            echo "| $1 | \`$2\` | \`$3\` | $same |" >> "$GITHUB_STEP_SUMMARY"
+            echo "$1: $2 / $3 ($same)"
+          }
+          row "Extension, Chrome" "$X_CHROME" "$A_CHROME"
+          row "Extension, Firefox" "$X_FIREFOX" "$A_FIREFOX"
+          row "Website and wallet" "$X_WEB" "$A_WEB"
+          exit $status
