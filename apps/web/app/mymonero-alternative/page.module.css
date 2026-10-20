@@ -6,7 +6,7 @@
 .secHead .lede { margin-bottom: 0; }
 .secHead :global(.eyebrow) { margin-bottom: 20px; }
 .inlineLink { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.inlineLink:hover { color: var(--clay); }
+.inlineLink:hover { color: var(--clay-ink); }
 .small { font-size: 0.95rem; color: var(--ink-2); }
 .dark { background: var(--ink); color: #e7eadf; }
 .dark h2, .dark h3 { color: #f6f5ec; }
@@ -29,7 +29,7 @@
 .figBox { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 18px; box-shadow: 0 30px 60px -34px rgba(27, 42, 34, 0.45), 0 2px 0 var(--line); }
 .figBox svg { display: block; width: 100%; height: auto; }
 .figCap { font-size: 0.78rem; line-height: 1.4; font-weight: 500; color: var(--ink-3); letter-spacing: 0.04em; margin: 10px 4px 0; display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
-.figCap b { color: var(--clay); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; }
+.figCap b { color: var(--clay-ink); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; }
 
 /* Safety band */
 .safety { background: var(--clay-soft); border-bottom: 1px solid var(--clay-line); padding: 72px 0; }
@@ -66,7 +66,7 @@
 .numBig { display: flex; align-items: baseline; justify-content: center; gap: 14px; font-family: var(--font-display); }
 .numBig span { font-size: clamp(3.6rem, 7vw, 6rem); font-weight: 500; line-height: 1; letter-spacing: -0.04em; color: var(--ink-3); }
 .numBig span:last-child { color: var(--forest); }
-.numBig i { font-size: 1.3rem; color: var(--clay); }
+.numBig i { font-size: 1.3rem; color: var(--clay-ink); }
 
 /* Outcomes */
 .outGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-bottom: 30px; }
@@ -96,7 +96,7 @@
 .faq details:last-of-type { border-bottom: 1px solid var(--line-2); }
 .faq summary { list-style: none; cursor: pointer; display: flex; gap: 18px; align-items: baseline; padding: 22px 4px; font-family: var(--font-display); font-size: 1.3rem; font-weight: 500; line-height: 1.25; }
 .faq summary::-webkit-details-marker { display: none; }
-.fn { font-style: italic; font-size: 1rem; color: var(--clay); flex: none; width: 26px; }
+.fn { font-style: italic; font-size: 1rem; color: var(--clay-ink); flex: none; width: 26px; }
 .pm { margin-left: auto; flex: none; width: 22px; height: 22px; position: relative; }
 .pm::before, .pm::after { content: ""; position: absolute; left: 3px; right: 3px; top: 10px; height: 2px; background: var(--forest); transition: transform 0.2s; }
 .pm::after { transform: rotate(90deg); }

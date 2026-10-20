@@ -6,7 +6,7 @@
 .secHead :global(.eyebrow) { margin-bottom: 20px; }
 .secHead :global(.lede) { margin-bottom: 0; }
 .inlineLink { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.inlineLink:hover { color: var(--clay); }
+.inlineLink:hover { color: var(--clay-ink); }
 
 .crumb { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.85rem; color: var(--ink-3); padding: 22px 0 0; }
 .crumb a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
@@ -44,7 +44,7 @@
 .faq details:last-of-type { border-bottom: 1px solid var(--line-2); }
 .faq summary { list-style: none; cursor: pointer; display: flex; gap: 18px; align-items: baseline; padding: 22px 4px; font-family: var(--font-display); font-size: 1.3rem; font-weight: 500; line-height: 1.25; }
 .faq summary::-webkit-details-marker { display: none; }
-.fn { font-style: italic; font-size: 1rem; color: var(--clay); flex: none; width: 26px; }
+.fn { font-style: italic; font-size: 1rem; color: var(--clay-ink); flex: none; width: 26px; }
 .pm { margin-left: auto; flex: none; width: 22px; height: 22px; position: relative; }
 .pm::before, .pm::after { content: ""; position: absolute; left: 3px; right: 3px; top: 10px; height: 2px; background: var(--forest); transition: transform 0.2s; }
 .pm::after { transform: rotate(90deg); }
@@ -57,8 +57,8 @@
 .relGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--line-2); }
 .rel { display: block; text-decoration: none; color: var(--ink); padding: 24px 22px 26px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); background: var(--bg); transition: background 0.2s; }
 .rel:hover { background: #fff; }
-.rel:hover h3 { color: var(--clay); }
-.relTag { font-size: 0.7rem; line-height: 1; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay); display: inline-block; padding: 6px 9px; border: 1px solid var(--clay); border-radius: 3px; margin-bottom: 16px; }
+.rel:hover h3 { color: var(--clay-ink); }
+.relTag { font-size: 0.7rem; line-height: 1; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay-ink); display: inline-block; padding: 6px 9px; border: 1px solid var(--clay); border-radius: 3px; margin-bottom: 16px; }
 .rel h3 { font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 8px; transition: color 0.2s; }
 .rel p { color: var(--ink-2); font-size: 0.95rem; margin: 0 0 12px; }
 .go { font-weight: 600; font-size: 0.9rem; color: var(--forest); }

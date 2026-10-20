@@ -5,7 +5,7 @@
 .secHead h2 { margin-bottom: 16px; font-size: clamp(1.9rem, 3.6vw, 3rem); line-height: 1.1; }
 .secHead :global(.eyebrow) { margin-bottom: 20px; }
 .inlineLink { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.inlineLink:hover { color: var(--clay); }
+.inlineLink:hover { color: var(--clay-ink); }
 
 .crumb { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.85rem; color: var(--ink-3); padding: 22px 0 0; }
 .crumb a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
@@ -25,7 +25,7 @@
 .figBox { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 18px; box-shadow: 0 30px 60px -34px rgba(27, 42, 34, 0.45), 0 2px 0 var(--line); }
 .figBox svg { display: block; width: 100%; height: auto; min-width: 0 !important; }
 .figCap { font-size: 0.78rem; line-height: 1.4; font-weight: 500; color: var(--ink-3); letter-spacing: 0.04em; margin: 10px 4px 0; display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
-.figCap b { color: var(--clay); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; }
+.figCap b { color: var(--clay-ink); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; }
 
 /* Featured live tool */
 .feature { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border: 1px solid var(--ink); border-top: 3px solid var(--forest); border-radius: 4px; box-shadow: 6px 6px 0 var(--line-2); }
@@ -56,7 +56,7 @@
 .planned h3 { font-family: var(--font-display); font-size: 1.4rem; margin: 0; }
 .planned p { color: var(--ink-2); font-size: 0.98rem; margin: 0; }
 .planned p a { color: var(--forest); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-.planned p a:hover { color: var(--clay); }
+.planned p a:hover { color: var(--clay-ink); }
 
 /* Why band (dark) */
 .dark { background: var(--ink); color: #e7eadf; }

@@ -6,7 +6,8 @@
     "dev": "pnpm --filter @quietmint/web dev",
     "build": "pnpm --filter @quietmint/web build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "e2e": "pnpm --filter @quietmint/e2e e2e"
   },
   "engines": {
     "node": ">=22"

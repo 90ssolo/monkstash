@@ -7,7 +7,7 @@
 .secHead .lede { margin-bottom: 0; }
 .secHead :global(.eyebrow) { margin-bottom: 20px; }
 .inlineLink { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.inlineLink:hover { color: var(--clay); }
+.inlineLink:hover { color: var(--clay-ink); }
 .sec > div, .hero > div { min-width: 0; }
 
 .dark { background: var(--ink); color: #e7eadf; }
@@ -23,7 +23,7 @@
 .hero { padding: 40px 0 80px; border-bottom: 1px solid var(--line-2); }
 .crumb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.86rem; color: var(--ink-3); margin-bottom: 36px; }
 .crumb a { color: var(--ink-3); text-decoration: none; }
-.crumb a:hover { color: var(--clay); }
+.crumb a:hover { color: var(--clay-ink); }
 .heroGrid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
 .heroGrid > * { min-width: 0; }
 .h1 { font-size: clamp(2.4rem, 5.2vw, 4.3rem); letter-spacing: -0.03em; font-weight: 500; line-height: 1.08; margin-bottom: 24px; }
@@ -39,7 +39,7 @@
 .figBox svg { display: block; width: 100%; height: auto; }
 .figDark { background: #22342a; border-color: #38503f; box-shadow: none; }
 .figCap { font-size: 0.78rem; line-height: 1.4; font-weight: 500; color: var(--ink-3); letter-spacing: 0.04em; margin: 10px 4px 0; display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
-.figCap b { color: var(--clay); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; flex: none; }
+.figCap b { color: var(--clay-ink); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; flex: none; }
 .dark .figCap { border-top-color: #38503f; color: #9fb0a2; }
 .dark .figCap b { color: var(--clay-dim); }
 
@@ -96,8 +96,8 @@
 .contactGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--line-2); }
 .lcard { display: block; text-decoration: none; color: var(--ink); padding: 26px 26px 28px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); background: var(--bg); transition: background 0.2s; }
 .lcard:hover { background: #fff; }
-.lcard:hover h3 { color: var(--clay); }
-.tag { font-size: 0.7rem; line-height: 1; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay); display: inline-block; padding: 6px 9px; border: 1px solid var(--clay); border-radius: 3px; margin-bottom: 16px; }
+.lcard:hover h3 { color: var(--clay-ink); }
+.tag { font-size: 0.7rem; line-height: 1; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay-ink); display: inline-block; padding: 6px 9px; border: 1px solid var(--clay); border-radius: 3px; margin-bottom: 16px; }
 .lcard h3 { font-size: 1.4rem; margin-bottom: 8px; transition: color 0.2s; font-family: var(--font-display); }
 .lcard p { color: var(--ink-2); margin: 0 0 14px; font-size: 0.98rem; }
 .go { font-weight: 600; font-size: 0.9rem; color: var(--forest); }
@@ -125,7 +125,7 @@
 .faq details:last-of-type { border-bottom: 1px solid var(--line-2); }
 .faq summary { list-style: none; cursor: pointer; display: flex; gap: 18px; align-items: baseline; padding: 22px 4px; font-family: var(--font-display); font-size: 1.3rem; font-weight: 500; line-height: 1.25; }
 .faq summary::-webkit-details-marker { display: none; }
-.fn { font-style: italic; font-weight: 500; font-size: 1rem; font-family: var(--font-display); color: var(--clay); flex: none; width: 26px; }
+.fn { font-style: italic; font-weight: 500; font-size: 1rem; font-family: var(--font-display); color: var(--clay-ink); flex: none; width: 26px; }
 .pm { margin-left: auto; flex: none; width: 22px; height: 22px; position: relative; align-self: center; }
 .pm::before, .pm::after { content: ""; position: absolute; left: 3px; right: 3px; top: 10px; height: 2px; background: var(--forest); transition: transform 0.2s; }
 .pm::after { transform: rotate(90deg); }
@@ -140,7 +140,7 @@
 .symptoms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--line-2); }
 .scard { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); padding: 26px 24px 26px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); background: var(--bg); transition: background 0.2s; }
 .scard:hover { background: #fff; }
-.scard:hover h3 { color: var(--clay); }
+.scard:hover h3 { color: var(--clay-ink); }
 .scardNum { font-style: italic; font-family: var(--font-display); color: var(--clay); font-size: 1.1rem; margin-bottom: 8px; }
 .scard h3 { font-size: 1.3rem; margin-bottom: 8px; transition: color 0.2s; font-family: var(--font-display); line-height: 1.2; }
 .scard p { color: var(--ink-2); font-size: 0.96rem; margin: 0 0 16px; }

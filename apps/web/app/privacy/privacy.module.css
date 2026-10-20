@@ -1,10 +1,10 @@
 /* Privacy policy: a readable document with a sticky table of contents on wide screens. */
 .layout { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 760px); gap: 64px; padding-block: 64px 96px; }
 .toc { position: sticky; top: 96px; align-self: start; font-size: 0.92rem; }
-.tocHead { margin: 0 0 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); }
+.tocHead { margin: 0 0 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay-ink); }
 .toc ol { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--line-2); display: grid; gap: 10px; }
 .toc a { color: var(--ink-2); text-decoration: none; }
-.toc a:hover { color: var(--clay); }
+.toc a:hover { color: var(--clay-ink); }
 
 .doc { font-size: 1.06rem; line-height: 1.7; color: var(--ink-2); }
 .doc section { scroll-margin-top: 96px; padding-bottom: 40px; margin-bottom: 40px; border-bottom: 1px solid var(--line); }

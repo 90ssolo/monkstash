@@ -62,7 +62,7 @@
 .sources { margin-top: var(--s-9); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line-2); }
 .sources summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); padding: var(--s-4) 2px; font-size: var(--step--2); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); }
 .sources summary::-webkit-details-marker { display: none; }
-.sources summary::after { content: "+"; font-size: 1.3rem; font-weight: 400; letter-spacing: 0; color: var(--clay); }
+.sources summary::after { content: "+"; font-size: 1.3rem; font-weight: 400; letter-spacing: 0; color: var(--clay-ink); }
 .sources[open] summary::after { content: "\2212"; }
 .sources summary:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
 .sources > p { color: var(--ink-2); font-size: var(--step--1); margin-top: 0; }

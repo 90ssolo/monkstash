@@ -90,12 +90,14 @@ export function LiveJar() {
   const total = stats?.ok ? xmr(stats.confirmed) : 0;
   const shown = useCountUp(total);
   return (
-    <div className={styles.jar} aria-live="polite">
+    <div className={styles.jar}>
       <div className={styles.jarHead}>
         <span className={`${styles.liveDot} ${stats?.ok ? styles.liveOn : ""}`} aria-hidden="true" />
         <span className={styles.jarLabel}>{stats === null ? "Checking the donation wallet…" : stats.ok ? "Live from the Monero network" : "Live totals are unavailable right now"}</span>
       </div>
-      <p className={styles.jarTotal}>
+      {/* Screen readers hear the final total once, not every step of the count-up. */}
+      <p className="visually-hidden" aria-live="polite">{stats?.ok ? `${fmt(total, 4)} XMR raised` : ""}</p>
+      <p className={styles.jarTotal} aria-hidden="true">
         <span className={styles.jarNum}>{fmt(shown, 4)}</span> <span className={styles.jarUnit}>XMR raised</span>
       </p>
       {stats?.ok && stats.count > 0 ? (

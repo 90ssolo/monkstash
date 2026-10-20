@@ -184,9 +184,11 @@
 /* ---------- Live jar ---------- */
 .jar { margin-top: var(--s-5); padding: var(--s-5); background: var(--ink); color: #dbe2d6; border-radius: 6px; box-shadow: 8px 8px 0 var(--line-2); display: grid; gap: var(--s-3); }
 .jarHead { display: flex; align-items: center; gap: 8px; }
-.liveDot { width: 9px; height: 9px; border-radius: 50%; background: #6b7a70; flex: none; }
-.liveOn { background: #8fd3a8; box-shadow: 0 0 0 0 rgba(143, 211, 168, 0.6); animation: livePulse 2s ease-out infinite; }
-@keyframes livePulse { 70% { box-shadow: 0 0 0 8px rgba(143, 211, 168, 0); } 100% { box-shadow: 0 0 0 0 rgba(143, 211, 168, 0); } }
+.liveDot { position: relative; width: 9px; height: 9px; border-radius: 50%; background: #6b7a70; flex: none; }
+.liveOn { background: #8fd3a8; }
+/* The ring grows with transform and opacity only, so the browser animates it without recalculating the page. */
+.liveOn::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgba(143, 211, 168, 0.6); animation: livePulse 2s ease-out infinite; }
+@keyframes livePulse { from { transform: scale(1); opacity: 0.6; } 70%, to { transform: scale(2.8); opacity: 0; } }
 .jarLabel { font-size: var(--step--2); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay-dim); }
 .jarTotal { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2); }
 .jarNum { font-family: var(--font-display); font-size: clamp(2.4rem, 1.8rem + 2.6vw, 3.6rem); line-height: 1; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
@@ -201,4 +203,4 @@
 .feedState { font-size: 0.72rem; font-weight: 650; padding: 2px 8px; border-radius: 999px; background: rgba(143, 211, 168, 0.16); color: #bfe8cc; white-space: nowrap; }
 .feedWait { background: rgba(233, 160, 122, 0.18); color: #ffd9c2; }
 @media (max-width: 480px) { .feed li { grid-template-columns: minmax(0, 1fr) auto; } .feedWhen { grid-column: 1; grid-row: 2; font-size: 0.78rem; } .feedState { grid-row: 1 / span 2; } }
-@media (prefers-reduced-motion: reduce) { .liveOn { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .liveOn::after { animation: none; display: none; } }

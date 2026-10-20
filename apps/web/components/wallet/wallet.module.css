@@ -55,7 +55,7 @@
 .ctxInk .railItem.done { color: #cfd8cb; }
 .ctxInk .railItem.done .railDot { background: var(--forest-2); border-color: #5f8d72; }
 .railItem.now { color: var(--ink); font-weight: 650; }
-.railItem.now .railDot { border-color: var(--clay); color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
+.railItem.now .railDot { border-color: var(--clay); color: var(--clay-ink); box-shadow: 0 0 0 3px var(--clay-soft); }
 .ctxInk .railItem.now { color: #f6f5ec; }
 .ctxInk .railItem.now .railDot { border-color: var(--clay-dim); color: var(--clay-dim); box-shadow: 0 0 0 3px rgba(233, 160, 122, 0.16); }
 
@@ -90,7 +90,7 @@
 .choiceBody strong { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; letter-spacing: -0.01em; }
 .choiceBody span { color: var(--ink-2); font-size: var(--step--1); line-height: 1.45; }
 .choiceGo { color: var(--forest); font-weight: 700; font-size: 1.2rem; transition: transform var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
-.choice:hover .choiceGo { transform: translateX(3px); color: var(--clay); }
+.choice:hover .choiceGo { transform: translateX(3px); color: var(--clay-ink); }
 @media (max-width: 480px) { .choice { grid-template-columns: 44px minmax(0, 1fr); padding: var(--s-4); } .choiceIc svg { width: 44px; height: 44px; } .choiceGo { display: none; } }
 
 /* ---------- Recovery words ---------- */

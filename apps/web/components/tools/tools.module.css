@@ -14,7 +14,7 @@
 .inputMeta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; min-height: 24px; }
 .count { font-size: 0.78rem; color: var(--ink-3); letter-spacing: 0.04em; }
 .clear { border: 0; background: none; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--forest); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 4px 2px; }
-.clear:hover { color: var(--clay); }
+.clear:hover { color: var(--clay-ink); }
 
 .result { margin-top: 16px; min-height: 56px; }
 .resultIdle { color: var(--ink-3); font-size: 0.95rem; margin: 0; font-style: italic; font-family: var(--font-display); }
