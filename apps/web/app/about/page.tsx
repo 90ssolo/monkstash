@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { SealArt } from "@/components/home/HomeArt";
-import { absoluteUrl, repoUrl, site, walletUrl } from "@/lib/site";
+import { absoluteUrl, officialProfiles, repoUrl, site, walletUrl } from "@/lib/site";
 import { KeysOnDeviceArt, StoryArt, BuildStackArt, StatusArt } from "../_trust/TrustArt";
 import styles from "../_trust/trust.module.css";
 
@@ -30,7 +30,7 @@ export default function AboutPage() {
         {
           "@context": "https://schema.org", "@type": "AboutPage", name: "About MonkStash", url: absoluteUrl("/about"),
           dateModified: "2026-10-17",
-          publisher: { "@type": "Organization", name: site.name, url: site.url },
+          publisher: { "@type": "Organization", name: site.name, url: site.url, sameAs: [...officialProfiles] },
         },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },

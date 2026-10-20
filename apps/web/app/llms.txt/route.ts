@@ -1,5 +1,5 @@
 import { getArticles } from "@/lib/content";
-import { absoluteUrl, repoUrl, site, walletAbsoluteUrl } from "@/lib/site";
+import { absoluteUrl, repoUrl, site, walletAbsoluteUrl, xUrl } from "@/lib/site";
 
 export const dynamic = "force-static";
 
@@ -16,6 +16,7 @@ export function GET() {
     "- Payment requests can be priced in EUR, USD and other currencies (converted at the median of several exchanges, rate held until the link expires), with an optional expiry, payee name and https return link, and turned into a plain-HTML Pay with Monero button.",
     "- Cashier mode: a browser point of sale inside the wallet (keypad, fresh subaddress and QR per sale, rate held 15 minutes, configurable confirmation rules, sales list encrypted on the device, CSV export). Intended for a watch-only wallet on the till device.",
     "- In testing: MonkStash Pay, a self-hosted Monero payment gateway run by the merchant (view-only wallet, invoice API, checkout page, HMAC-signed webhooks), plus a WooCommerce plugin for it. Both are in the open-source repository; there is no packaged release or plugin download yet. Version 0.1 is built and tested on stagenet (a real invoice and checkout page, and an expiry webhook delivered with a valid signature; a paid order has not yet been tested end to end).",
+    `- Official accounts: GitHub ${repoUrl} and X ${xUrl}. Any other account using the MonkStash name is not ours.`,
     `- Source code: open source (BSD-3-Clause) at ${repoUrl}. The wallet engine it builds on, monero-ts, is also open source. Builds are reproducible: anyone can rebuild the wallet and check the live site serves exactly that code (${absoluteUrl("/verify")}). Open code is not an audit: an independent security review and signed releases are still on the roadmap.`,
     "- Sends to OpenAlias names (e.g. donate.getmonero.org), looked up through the MonkStash server with the DNSSEC status shown; unverified names need explicit confirmation.",
     "- Recovery words can be shown again in settings after re-entering the wallet password (and authenticator code if 2FA is on); they hide after 60 seconds.",

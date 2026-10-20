@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, site } from "./site";
+import { absoluteUrl, site, xHandle } from "./site";
 
 type OpenGraph = NonNullable<Metadata["openGraph"]>;
 
@@ -23,4 +23,4 @@ export function ogFor(p: { path: string; title: string; description: string; typ
 }
 
 /** Twitter card to match (X reads og: tags too, but an explicit image avoids a blank card). */
-export const twitterCard: NonNullable<Metadata["twitter"]> = { card: "summary_large_image", images: [DEFAULT_IMAGE.url] };
+export const twitterCard: NonNullable<Metadata["twitter"]> = { card: "summary_large_image", site: `@${xHandle}`, images: [DEFAULT_IMAGE.url] };

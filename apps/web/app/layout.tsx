@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { site } from "@/lib/site";
+import { site, xHandle } from "@/lib/site";
 import { ResponsiveTables } from "@/components/ResponsiveTables";
 
 // next/font downloads these at build time and serves them from our own origin.
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   applicationName: site.name,
   alternates: { canonical: "/" },
   openGraph: { type: "website", siteName: site.name, locale: "en_US" },
-  twitter: { card: "summary_large_image" },
+  twitter: { card: "summary_large_image", site: `@${xHandle}` },
   robots: { index: true, follow: true },
   icons: { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icon.svg", type: "image/svg+xml" }], apple: "/favicon.svg" },
   formatDetection: { telephone: false, address: false, email: false },

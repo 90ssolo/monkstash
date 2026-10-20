@@ -19,6 +19,13 @@ export const site = {
 /** The public source code repository (BSD-3-Clause). The one place this URL is written. */
 export const repoUrl = "https://github.com/90ssolo/monkstash";
 
+/** Our official account on X. The one place this URL is written. */
+export const xHandle = "monkstash";
+export const xUrl = `https://x.com/${xHandle}`;
+
+/** Our official profiles elsewhere, for Organization.sameAs. */
+export const officialProfiles = [repoUrl, xUrl] as const;
+
 /** Public questions and answers (GitHub Discussions, "Help & Support"). */
 export const helpDiscussionsUrl = `${repoUrl}/discussions/categories/help-support`;
 

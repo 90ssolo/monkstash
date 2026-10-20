@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { absoluteUrl, helpDiscussionsUrl, repoUrl, walletUrl } from "@/lib/site";
+import { extensionRelease as rel } from "@/lib/extensionRelease";
 import {
   RiskPermissions, RiskFake, RiskUpdate, RiskSeed,
   StepOpenTab, StepSetUp, StepBookmark, EmptyShelf,
@@ -24,7 +25,8 @@ export const metadata: Metadata = {
 };
 
 const faqs = [
-  { q: "Is the MonkStash extension available?", a: "It is built for Chrome and Firefox and its code is public. It is on its way to the Chrome Web Store and Firefox Add-ons, where it goes through review, and we link the official listings on this page the day they are approved. Until then, any store listing called MonkStash is not ours, and the web wallet does the same job in a normal tab." },
+  { q: "Is the MonkStash extension available?", a: "It is built for Chrome and Firefox and its code is public. The Chrome Web Store and Firefox Add-ons are reviewing it, and we link the official listings on this page the day they are approved. Until then, any store listing called MonkStash is not ours. You can install it yourself from our official GitHub release (see the steps on this page), or use the web wallet, which does the same job in a normal tab." },
+  { q: "Is it safe to install the extension from a zip file?", a: "Only from our official release, linked on this page, and only after checking that the file's SHA-256 matches the one shown here. We never send extension files by email or chat. A wallet extension offered anywhere else, or sent to you directly, is not ours." },
   { q: "How do I know a MonkStash extension is real?", a: "Install it only from a link on this page, on monkstash.com. Check that the publisher is MonkStash and that the listing links back to monkstash.com. In the extension, Settings shows a build fingerprint you can check against the public source code." },
   { q: "Can the extension read the websites I visit?", a: "No. It has no content scripts and no access to web pages, and no website can talk to it. It connects only to our relay at wallet.monkstash.com, or to your own node if you add one." },
   { q: "Where are my keys kept?", a: "On your device, in the extension's own storage, encrypted with your password. While the wallet is unlocked the keys are held only in memory, and they are gone when it locks: after idle time, when your computer locks, and when the browser closes." },
@@ -92,8 +94,8 @@ export default function ChromeExtensionPage() {
                 </h1>
                 <p className={styles.sub}>MonkStash in your browser toolbar: check your balance, send and receive XMR without opening a tab. Your keys are made and kept on your device, and the code is public.</p>
                 <div className={styles.statusCard} role="status">
-                  <p><strong>Store listings are on their way.</strong> The extension is built and on its way to the Chrome Web Store and Firefox Add-ons, where it goes through review. We link the official listings here the day they are approved.</p>
-                  <p>Until then, a store listing called MonkStash is not ours. The <Link className={styles.inlineLink} href={walletUrl}>web wallet</Link> is the same wallet, today.</p>
+                  <p><strong>Store listings are on their way.</strong> The Chrome Web Store and Firefox Add-ons are reviewing it. We link the official listings here the day they are approved; until then, a store listing called MonkStash is not ours.</p>
+                  <p>Want it now? <a className={styles.inlineLink} href="#install">Install it yourself</a> from our official release, or use the <Link className={styles.inlineLink} href={walletUrl}>web wallet</Link>, which is the same wallet.</p>
                 </div>
                 <div className={styles.ctaRow}>
                   <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the web wallet <ArrowIcon /></Link>
@@ -152,6 +154,50 @@ export default function ChromeExtensionPage() {
                 <figcaption className={`${styles.figCap} ${styles.darkCap}`}><span><b>Figure 3</b></span><span>The same wallet expanded to a tab.</span></figcaption>
               </figure>
             </div>
+          </div>
+        </section>
+
+        {/* 3b. INSTALL IT YOURSELF */}
+        <section className={`${styles.sec} ${styles.alt}`} id="install" aria-labelledby="installH">
+          <div className="container-wide">
+            <div className={styles.secHead}>
+              <p className="eyebrow">Before the store listings</p>
+              <h2 id="installH">Install it yourself, from the <mark>official release</mark>.</h2>
+              <p className="lede">The release files are on GitHub, built from the public source. It takes about two minutes. In Chrome, Edge and Brave it stays installed; Firefox only allows a temporary install until its listing is approved.</p>
+            </div>
+            <div className={styles.installNote} role="note">
+              <p><strong>Only from this link:</strong> <a className={styles.inlineLink} href={rel.url} rel="noopener">github.com/90ssolo/monkstash, release {rel.tag}</a>. We never send extension files by email, chat or anywhere else, and no other site offers them. Check the file before you install it.</p>
+            </div>
+            <div className={styles.installGrid}>
+              <article className={styles.installCol}>
+                <h3>Chrome, Edge and Brave</h3>
+                <ol className={styles.installSteps}>
+                  <li>From the <a className={styles.inlineLink} href={rel.url} rel="noopener">release</a>, download <code>{rel.chrome.file}</code>.</li>
+                  <li>Check it. The SHA-256 must be <code className={styles.hash}>{rel.chrome.sha256}</code>
+                    <span className={styles.cmdLabel}>Windows (Command Prompt):</span><code className={styles.cmd}>certutil -hashfile {rel.chrome.file} SHA256</code>
+                    <span className={styles.cmdLabel}>macOS or Linux (Terminal):</span><code className={styles.cmd}>shasum -a 256 {rel.chrome.file}</code></li>
+                  <li>Unzip it into a folder you keep. Deleting the folder removes the extension.</li>
+                  <li>Open <code>chrome://extensions</code> (in Edge <code>edge://extensions</code>), turn on <b>Developer mode</b>, click <b>Load unpacked</b> and choose that folder.</li>
+                  <li>Pin MonkStash to the toolbar. In its Settings, the app build should start with <code>{rel.chrome.fingerprint.slice(0, 12)}</code>.</li>
+                </ol>
+              </article>
+              <article className={styles.installCol}>
+                <h3>Firefox (to try it)</h3>
+                <ol className={styles.installSteps}>
+                  <li>From the <a className={styles.inlineLink} href={rel.url} rel="noopener">release</a>, download <code>{rel.firefox.file}</code>.</li>
+                  <li>Check it. The SHA-256 must be <code className={styles.hash}>{rel.firefox.sha256}</code> (same commands as for Chrome).</li>
+                  <li>Open <code>about:debugging#/runtime/this-firefox</code>, click <b>Load Temporary Add-on</b> and choose the zip file.</li>
+                  <li>In its Settings, the app build should start with <code>{rel.firefox.fingerprint.slice(0, 12)}</code>.</li>
+                </ol>
+                <p className={styles.installWarn}><b>Temporary means temporary:</b> Firefox removes the add-on, and the wallet in it, when it closes. Use it to look around, with a watch-only wallet or a new empty one, and keep your recovery words.</p>
+              </article>
+            </div>
+            <ul className={styles.futList} style={{ marginTop: 28 }}>
+              <li><b>No automatic updates.</b> A self-installed copy stays on this version. New releases are listed here and on GitHub.</li>
+              <li><b>A separate install from the store version.</b> When the store listing is live, install it from there, bring your wallet in with your recovery words or a move file, then remove this copy.</li>
+              <li><b>Chrome may remind you about developer-mode extensions.</b> That is normal for any extension you install yourself.</li>
+              <li><b>Early preview.</b> Use small amounts until the public security review is complete.</li>
+            </ul>
           </div>
         </section>
 

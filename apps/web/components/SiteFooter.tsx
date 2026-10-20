@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "./BrandMark";
-import { site, walletAddressText, walletUrl } from "@/lib/site";
+import { repoUrl, site, walletAddressText, walletUrl, xHandle, xUrl } from "@/lib/site";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -97,6 +97,7 @@ export function SiteFooter() {
           <p><span>Say hello</span> <a href="mailto:hello@monkstash.com">hello@monkstash.com</a></p>
           <p><span>Need help</span> <a href="mailto:support@monkstash.com">support@monkstash.com</a></p>
           <p><span>Report a vulnerability</span> <a href="mailto:security@monkstash.com">security@monkstash.com</a></p>
+          <p><span>Follow us</span> <a href={xUrl} rel="me noopener">@{xHandle} on X</a> <a href={repoUrl} rel="me noopener">GitHub</a></p>
         </div>
 
         <div className="footer-bottom">
