@@ -8,8 +8,9 @@
  * If the server cannot be reached, the offset stays unknown and the device clock is used.
  */
 import { useEffect, useState } from "react";
+import { apiUrl } from "./config";
 
-const TIME_URL = "/api/node/time";
+const TIME_URL = apiUrl("/api/node/time");
 /** Measurements slower than this are too imprecise to trust. */
 const MAX_RTT_MS = 10_000;
 const RECHECK_MS = 10 * 60 * 1000;

@@ -10,6 +10,7 @@ import { recordRequestSeen, statusOf, type PaymentRequest, type RequestStatus, t
 import type { Balances, IncomingEntry, LiveWallet, SyncHealth, SyncState, TxSummary, TxWhere } from "@/lib/wallet/engine";
 import { ACCOUNT_NAME, CHECKPOINT_BLOCKS } from "@/lib/wallet/engine";
 import { checkClock, clockWarning, serverNow, useClockOffset } from "@/lib/wallet/clock";
+import { apiUrl } from "@/lib/wallet/config";
 import { validateAddress } from "@/lib/wallet/engine";
 import { downloadCsv, historyCsv, requestsCsv } from "@/lib/wallet/exports";
 import Link from "next/link";
@@ -59,18 +60,41 @@ const RAIL_MORE: Section[] = ["contacts", "checkup", "settings"];
 /** Phone bottom bar: five slots; "More" holds the rest. */
 const BAR: Section[] = ["home", "send", "receive", "paid", "more"];
 const MORE_LIST: Section[] = ["activity", "contacts", "checkup", "settings"];
+/**
+ * Compact view (the browser extension's popup): only quick everyday tasks. Everything else opens
+ * in the full view, at that section, instead of being squeezed into a small window.
+ */
+const COMPACT: Section[] = ["home", "send", "receive", "activity", "more"];
+const COMPACT_BAR: Section[] = ["home", "send", "receive", "activity", "more"];
+const COMPACT_MORE: Section[] = ["paid", "contacts", "checkup", "settings"];
+const SECTIONS = Object.keys(LABEL) as Section[];
+
+/** A section asked for in the address (#section=settings), as the extension's full view opens it. */
+function sectionFromHash(): Section | null {
+  if (typeof window === "undefined") return null;
+  const m = /^#section=([a-z]+)$/.exec(window.location.hash);
+  const s = m?.[1] as Section | undefined;
+  if (!s || !SECTIONS.includes(s)) return null;
+  history.replaceState(null, "", window.location.pathname);
+  return s;
+}
+
+/** Set by the extension's popup: quick tasks here, the rest opens in the full view. */
+export interface CompactView {
+  openFull(section: string): void;
+}
 
 function NavIcon({ s }: { s: Section }) {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{ICONS[s]}</svg>;
 }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo }) {
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab" }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
   const [txs, setTxs] = useState<TxSummary[]>([]);
   const [incoming, setIncoming] = useState<IncomingEntry[]>([]);
-  const [section, setSection] = useState<Section>("home");
+  const [section, setSection] = useState<Section>(() => sectionFromHash() ?? "home");
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [tillOpen, setTillOpen] = useState(false);
   // Privacy screen: hide amounts in public or while sharing a screen. A per-device preference.
@@ -201,6 +225,10 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
   const score = checkupScore(items);
 
   const go = (s: Section) => {
+    if (compact && !COMPACT.includes(s)) {
+      compact.openFull(s);
+      return;
+    }
     setSection(s);
     // Start each section at its top (phones would otherwise keep the old scroll position).
     requestAnimationFrame(() => {
@@ -210,7 +238,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
       mainRef.current?.querySelector<HTMLElement>(":scope > section:not([hidden]) h2[tabindex]")?.focus({ preventScroll: true });
     });
   };
-  const active = (s: Section) => section === s || (s === "more" && MORE_LIST.includes(section));
+  const active = (s: Section) => section === s || (s === "more" && (compact ? COMPACT_MORE : MORE_LIST).includes(section));
+  const bar = compact ? COMPACT_BAR : BAR;
+  const moreList = compact ? COMPACT_MORE : MORE_LIST;
   const balanceText = hidden ? "••••" : bal && synced ? `${formatXmr(bal.total, 4)} XMR` : "…";
 
   let openRequests = 0;
@@ -365,10 +395,11 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 <span className={styles.homeCardTop}><NavIcon s="checkup" /> Checkup: {score.done} of {score.total}</span>
                 <span className="small muted">{score.next ? `Next: ${score.next.action?.label ?? score.next.title}` : "All done. Nice work."}</span>
               </button>
-              <button type="button" className={styles.homeCard} onClick={() => go("paid")}>
+              {/* The compact popup keeps Home short: this card only when requests are waiting. */}
+              {!compact || openRequests ? <button type="button" className={styles.homeCard} onClick={() => go("paid")}>
                 <span className={styles.homeCardTop}><NavIcon s="paid" /> {openRequests ? `${openRequests} open payment request${openRequests === 1 ? "" : "s"}` : "Get paid"}</span>
                 <span className="small muted">{openRequests || paidToday ? `${paidToday} paid today` : "Payment links and a till for your counter"}</span>
-              </button>
+              </button> : null}
             </div>
 
             <div className={styles.panel}>
@@ -429,9 +460,10 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
           <section hidden={section !== "more"} aria-labelledby="more-h" className={styles.section}>
             <h2 id="more-h" className={styles.panelH} tabIndex={-1}>More</h2>
             <ul className={styles.moreList}>
-              {MORE_LIST.map((s) => (
+              {moreList.map((s) => (
                 <li key={s}><button type="button" onClick={() => go(s)}><NavIcon s={s} /><span>{LABEL[s]}</span>
                   {s === "checkup" ? <span className="small muted">{score.done} of {score.total}</span> : null}
+                  {compact ? <span className="small muted">Opens in a tab</span> : null}
                 </button></li>
               ))}
             </ul>
@@ -472,7 +504,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 <h3 id="set-security">Security</h3>
                 <div className={styles.autolock}>
                   <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M5.2 7V5a2.8 2.8 0 015.6 0v2" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
-                  <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after you leave this tab.</p>
+                  <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after {leaveText}.</p>
                 </div>
                 {settings ? (
                   <>
@@ -519,7 +551,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
       </div>
 
       <nav className={styles.bottomBar} aria-label="Wallet sections" inert={tillOpen || undefined}>
-        {BAR.map((s) => (
+        {bar.map((s) => (
           <button key={s} type="button" className={active(s) ? styles.barOn : undefined} aria-current={active(s) ? "page" : undefined} onClick={() => go(s)}>
             <NavIcon s={s} /><span>{LABEL[s]}</span>
           </button>
@@ -899,7 +931,7 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
     let alive = true;
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/openalias?name=${encodeURIComponent(fqdn)}`);
+        const res = await fetch(apiUrl(`/api/openalias?name=${encodeURIComponent(fqdn)}`));
         const data = (await res.json()) as { ok: boolean; error?: string; fqdn?: string; address?: string; name?: string; description?: string; dnssec?: boolean };
         if (!alive) return;
         if (data.ok && data.address && data.fqdn === fqdn) {

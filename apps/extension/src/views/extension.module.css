@@ -1,0 +1,16 @@
+/* Sizes and the small toolbar for the three extension surfaces. Everything else is the website's own design system. */
+.popup { width: 380px; min-height: 600px; }
+.side { min-width: 0; }
+.tab { }
+
+.bar { gap: var(--s-3); }
+.actions { display: inline-flex; gap: var(--s-1); margin-left: auto; }
+.iconBtn {
+  display: inline-grid; place-items: center;
+  width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.iconBtn:hover { color: var(--ink); border-color: var(--line-2); }
+.iconBtn:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.iconBtn svg { width: 16px; height: 16px; }

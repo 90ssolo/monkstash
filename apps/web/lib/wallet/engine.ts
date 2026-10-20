@@ -8,6 +8,7 @@
  */
 import type { NetworkType, NodeConfig, WalletKind } from "@quietmint/wallet-core";
 import { encodePrimaryAddress, exodusSpendKey, isMyMoneroPhrase, myMoneroKeys, type PaymentProof } from "@quietmint/wallet-core";
+import { API_ORIGIN } from "./config";
 
 type MoneroTs = typeof import("monero-ts").default;
 type MoneroWalletFull = import("monero-ts").MoneroWalletFull;
@@ -39,9 +40,34 @@ export async function warmEngine(): Promise<void> {
   }
 }
 
+/**
+ * Whether anyone can see the wallet. Background checks pause while nobody can (saves the node and
+ * the battery) and run at once when someone looks again. A web page asks the tab; the browser
+ * extension's host page has no screen of its own, so it reports whether any of its views is open.
+ */
+export interface Visibility {
+  hidden(): boolean;
+  /** Calls `cb` whenever `hidden()` may have changed. Returns the unsubscribe function. */
+  watch(cb: () => void): () => void;
+}
+
+const pageVisibility: Visibility = {
+  hidden: () => document.hidden,
+  watch(cb) {
+    document.addEventListener("visibilitychange", cb);
+    return () => document.removeEventListener("visibilitychange", cb);
+  },
+};
+let visibility: Visibility = pageVisibility;
+
+/** Replaces the tab-visibility check (the extension host calls this once, before opening a wallet). */
+export function setVisibility(v: Visibility): void {
+  visibility = v;
+}
+
 /** Node endpoints are served at our origin root (see rewrites in next.config.ts). */
 function serverUri(): string {
-  return window.location.origin;
+  return API_ORIGIN || window.location.origin;
 }
 
 /**
@@ -438,7 +464,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
   let bgTimer: ReturnType<typeof setTimeout> | null = null;
   let bgStarted = false;
   let bgTicking = false;
-  let onVisibility: (() => void) | null = null;
+  let unwatch: (() => void) | null = null;
   const health: SyncHealth = { lastOk: null, lastError: null };
   const ok = () => { health.lastOk = Date.now(); health.lastError = null; };
   const failed = (e: unknown) => { health.lastError = (e as Error)?.message || "The node did not answer."; };
@@ -525,11 +551,11 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       bgStarted = true;
       const schedule = (ms: number) => {
         if (bgTimer) clearTimeout(bgTimer);
-        bgTimer = closed || document.hidden ? null : setTimeout(() => void tick(), ms);
+        bgTimer = closed || visibility.hidden() ? null : setTimeout(() => void tick(), ms);
       };
       const tick = async () => {
         bgTimer = null;
-        if (closed || document.hidden || bgTicking) return;
+        if (closed || visibility.hidden() || bgTicking) return;
         bgTicking = true;
         try {
           if (!running) { await w.sync(); ok(); }
@@ -540,8 +566,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
         }
         schedule(periodMs);
       };
-      onVisibility = () => { if (!document.hidden) schedule(0); };
-      document.addEventListener("visibilitychange", onVisibility);
+      unwatch = visibility.watch(() => { if (!visibility.hidden()) schedule(0); });
       schedule(periodMs);
     },
     health() {
@@ -696,7 +721,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     async close() {
       closed = true;
       if (bgTimer) clearTimeout(bgTimer);
-      if (onVisibility) document.removeEventListener("visibilitychange", onVisibility);
+      unwatch?.();
       await w.close(false);
     },
   };

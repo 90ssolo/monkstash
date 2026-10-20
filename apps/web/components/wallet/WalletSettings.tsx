@@ -42,6 +42,11 @@ export interface SettingsActions {
    * progress is used when it is further along than this device's, and the wallet then reopens.
    */
   importMove(file: Uint8Array, password: string, code: string): Promise<{ height: number; scanReplaced: boolean; added: string[] }>;
+  /**
+   * Set where files cannot be saved or picked here (the extension's popup and side panel close
+   * when a file dialog opens): move files then offer to open the full view instead.
+   */
+  openFullView?: () => void;
 }
 
 const REVEAL_SECONDS = 60;
@@ -132,6 +137,22 @@ export function RevealWords({ actions }: { actions: SettingsActions }) {
 }
 
 export function NodeSettings({ actions }: { actions: SettingsActions }) {
+  // The extension asks for access to the node in a browser prompt, which would close its popup.
+  if (actions.openFullView) {
+    return (
+      <div className={styles.settingsForm}>
+        <p className="small">
+          <strong>Now using:</strong>{" "}
+          {actions.node ? <>your own node, <span className="mono">{actions.node.replace(/^https?:\/\//, "")}</span></> : <>the MonkStash relay</>}
+        </p>
+        <FilesInFullView open={actions.openFullView} what="change the node" note="Your browser asks for access to the node, and that prompt would close this small window." />
+      </div>
+    );
+  }
+  return <NodeSettingsForm actions={actions} />;
+}
+
+function NodeSettingsForm({ actions }: { actions: SettingsActions }) {
   const [uri, setUri] = useState("");
   const [user, setUser] = useState("");
   const [nodePw, setNodePw] = useState("");
@@ -263,6 +284,21 @@ export function RescanFrom({ actions }: { actions: SettingsActions }) {
 
 /** Saves a move file, so another device restored with the same wallet can skip the long first scan. */
 export function SaveMoveFile({ actions }: { actions: SettingsActions }) {
+  if (actions.openFullView) return <FilesInFullView open={actions.openFullView} what="save a move file" />;
+  return <SaveMoveFileForm actions={actions} />;
+}
+
+/** Popup and side panel: file dialogs close them, so files are handled in a full tab. */
+function FilesInFullView({ open, what, note = "A file dialog would close this small window." }: { open: () => void; what: string; note?: string }) {
+  return (
+    <div className={styles.settingsForm}>
+      <p className="small muted">To {what}, open MonkStash in a tab. {note}</p>
+      <button type="button" className="btn btn-secondary btn-block" onClick={open}>Open in a tab</button>
+    </div>
+  );
+}
+
+function SaveMoveFileForm({ actions }: { actions: SettingsActions }) {
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -312,6 +348,11 @@ export function SaveMoveFile({ actions }: { actions: SettingsActions }) {
 
 /** Loads a move file made on another device for this same wallet. */
 export function LoadMoveFile({ actions }: { actions: SettingsActions }) {
+  if (actions.openFullView) return <FilesInFullView open={actions.openFullView} what="load a move file" />;
+  return <LoadMoveFileForm actions={actions} />;
+}
+
+function LoadMoveFileForm({ actions }: { actions: SettingsActions }) {
   const [file, setFile] = useState<Uint8Array | null>(null);
   const [info, setInfo] = useState<MoveHeader | null>(null);
   const [pw, setPw] = useState("");

@@ -1,286 +1,53 @@
 "use client";
 /**
- * Wallet controller: decides which screen to show and owns the decrypted secrets while
- * the wallet is unlocked. Locking closes the engine and drops secrets from memory.
- *
- * Demo mode (local dev + stagenet only, via DEV_TOOLS_ENABLED): onboarding shows sample
- * words that are clearly disclosed as NOT a recovery seed, then assigns a configured
- * stagenet test wallet (opened from its own real seed). Simulation mode replaces the node
- * with canned data, and is also the automatic fallback when the node is unreachable.
+ * The web wallet's page: renders whichever screen the wallet controller (lib/wallet/session.ts)
+ * is on. The controller owns the decrypted secrets; this file adds what only a web page needs:
+ * the one-tab rule and auto-lock on idle or a hidden tab.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, type NodeConfig, type StoredWallet, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
-import { normalizeSeed, NodeTestError, openWallet, testNode, warmEngine, type EngineState, type LiveWallet } from "@/lib/wallet/engine";
-import { recordHandedOut, type HandedOut, type HandedOutStore } from "@/lib/wallet/addresses";
-import { clearSyncStates, deleteSyncState, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "@/lib/wallet/stateStore";
-import type { PaymentRequest, RequestStore } from "@/lib/wallet/requests";
-import { EMPTY_CASHIER, type CashierData, type CashierStore } from "@/lib/wallet/cashier";
-import type { ContactStore } from "@/lib/wallet/contacts";
-import type { Contact } from "@quietmint/wallet-core";
-import { createSimWallet } from "@/lib/wallet/sim";
-import { loadStoredWallet, removeWallet, saveWallet, StorageUnavailableError, unlockWallet, updatePublic } from "@/lib/wallet/storage";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { StoredWallet, WalletPublic } from "@quietmint/wallet-core";
+import { warmEngine } from "@/lib/wallet/engine";
+import { CODE_EXPIRED, CODE_TOO_MANY, CODE_WAIT_MS, STATE_SAVE_EVERY_MS, WalletController, type SaveProblem, type View } from "@/lib/wallet/session";
 import { DEV_TOOLS_ENABLED, NETWORK } from "@/lib/wallet/config";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
-import { fetchTestWallets, type TestWallet } from "@/lib/wallet/testWallets";
-import { clearDemoSession, isDemo, pickRandom, preferredMode, setDemoSession, type TestMode } from "@/lib/wallet/demo";
+import { fetchTestWallets } from "@/lib/wallet/testWallets";
+import { isDemo } from "@/lib/wallet/demo";
 import { BrandMark } from "@/components/BrandMark";
 import { Dashboard } from "./Dashboard";
-import type { SettingsActions } from "./WalletSettings";
-import { Loading, Onboarding, Welcome, type OnboardingResult } from "./Onboarding";
+import { Loading, Onboarding, Welcome } from "./Onboarding";
 import { Stage } from "./Stage";
 import { ArtEngine, ArtLock } from "./WalletArt";
 import styles from "./wallet.module.css";
 import { siteHref } from "@/lib/site";
 import { useSingleTab } from "@/lib/wallet/tabLock";
 
-type Secrets = WalletSecrets;
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
 
-/** Saving over a list that could not be read would erase it: refuse, and say what to do. */
-const UNREADABLE = (what: string) => new StorageError(`Your saved ${what} could not be read in this browser, so nothing was saved (to avoid overwriting them). Reload the page and try again.`);
-
-/** Codes depend on the time: a phone or computer clock that is off makes good codes fail. */
-const WRONG_CODE = "Wrong code. Try the newest one from your authenticator app, and check that the clock on this device and your phone is set to automatic time.";
-
-const ACTIVITY_EVENTS =["pointerdown", "keydown", "wheel", "touchstart"] as const;
-
-// Saved sync state (sealed with wallet-core sealBytes): lets an unlock resume from the last
-// synced block instead of rescanning everything since the restore height.
-const STATE_SAVE_EVERY_MS = 2 * 60 * 1000;
-const STATE_SAVE_ON_LOCK_TIMEOUT_MS = 5_000;
-const utf8 = new TextEncoder();
-/** The secret the saved state is sealed with: the seed, or the view key for watch-only wallets. */
-const sealSecretOf = (s: Secrets) => s.seed ?? s.privateViewKey;
-
-/**
- * Highest subaddress index handed out per account (Receive, requests, till sales), sealed like the
- * other per-wallet lists. Read and write failures throw, so an unrecorded address is never shown.
- */
-function handedOutStore(pub: WalletPublic, secrets: Secrets): HandedOutStore {
-  const key = `addresses|${pub.id}`;
-  const context = `addresses|${pub.id}|${pub.primaryAddress}`;
-  return {
-    async load() {
-      const blob = await loadSealedBlob(key);
-      // No record: the wallet was restored (or made before records existed), so its earlier
-      // addresses are unknown. recordHandedOut then starts above a safety margin.
-      if (!blob) return null;
-      try {
-        return JSON.parse(new TextDecoder().decode(await openBytes(blob, sealSecretOf(secrets), context))) as HandedOut;
-      } catch {
-        throw UNREADABLE("address list");
-      }
-    },
-    async save(record) {
-      await saveSealedBlob(key, await sealBytes(utf8.encode(JSON.stringify(record)), sealSecretOf(secrets), context));
-    },
-  };
-}
-/**
- * The secret a move file is sealed with. It carries the engine's keys file, which can spend for a
- * full wallet, so a full wallet's file needs the recovery phrase; a watch-only file the view key.
- */
-function moveSecretOf(kind: WalletPublic["kind"], s: Secrets): string {
-  if (kind === "full") {
-    if (!s.seed) throw new Error("This wallet has no recovery words stored, so it cannot make a move file.");
-    return normalizeSeed(s.seed);
-  }
-  return s.privateViewKey.trim().toLowerCase();
-}
-
-/** Binds a saved state to one wallet, so it can never be opened as another wallet's. */
-const sealContextOf = (pub: WalletPublic) => `wallet-state|${pub.id}|${pub.primaryAddress}`;
-
-/** Loads and opens the saved state. Unreadable state is discarded (the wallet then syncs normally). */
-async function loadSavedState(pub: WalletPublic, secrets: Secrets): Promise<EngineState | null> {
-  try {
-    const blob = await loadSyncState(pub.id);
-    if (!blob) return null;
-    const [password, keysData, cacheData] = unpackParts(await openBytes(blob, sealSecretOf(secrets), sealContextOf(pub)));
-    if (!password || !keysData || !cacheData) throw new Error("incomplete");
-    return { password: new TextDecoder().decode(password), keysData, cacheData };
-  } catch {
-    await deleteSyncState(pub.id);
-    return null;
-  }
-}
-
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
-  return Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
-}
-
-type View =
-  | { name: "boot" }
-  | { name: "welcome" }
-  | { name: "onboard"; mode: "create" | "restore" | "view-only" }
-  | { name: "locked"; record: StoredWallet }
-  | { name: "otherNetwork"; record: StoredWallet }
-  | { name: "opening"; pub: WalletPublic }
-  | { name: "open"; pub: WalletPublic; wallet: LiveWallet; mode: TestMode; fellBack: boolean }
-  | { name: "fatal"; message: string };
-
-/** A wallet saved for another network (for example a stagenet test wallet on the mainnet site) cannot sync here. */
-function viewFor(rec: StoredWallet | null): View {
-  if (!rec) return { name: "welcome" };
-  return rec.pub.network !== NETWORK ? { name: "otherNetwork", record: rec } : { name: "locked", record: rec };
+/** Re-renders on every change of the controller's view or notices. */
+function useController(c: WalletController): { view: View; saveProblem: SaveProblem } {
+  const view = useSyncExternalStore((fn) => c.subscribe(fn), () => c.view, () => c.view);
+  const saveProblem = useSyncExternalStore((fn) => c.subscribe(fn), () => c.saveProblem, () => c.saveProblem);
+  return { view, saveProblem };
 }
 
 export function WalletApp() {
-  const [view, setView] = useState<View>({ name: "boot" });
+  const controller = useMemo(() => new WalletController(), []);
+  const { view, saveProblem } = useController(controller);
   const tab = useSingleTab();
-  const [testWallets, setTestWallets] = useState<TestWallet[]>([]);
-  const live = useRef<LiveWallet | null>(null);
-  const session = useRef<{ pub: WalletPublic; secrets: Secrets } | null>(null);
-  /** True once the first sync of this session finished (saving earlier would block on it). */
-  const synced = useRef(false);
-  const savedHeight = useRef(0);
-  /** Set when the browser refused to keep the scan progress (shown once as a notice). */
-  const [saveProblem, setSaveProblem] = useState<"full" | "unavailable" | null>(null);
-  /** True while the session's first (catch-up) sync runs: idle auto-lock waits for it. */
-  const syncBusy = useRef(false);
-  /** Bumped by every open, lock and remove: an open() that was overtaken stops and closes its engine. */
-  const openGen = useRef(0);
-
-  /** Seals and saves the engine state if new blocks were synced since the last save. Best effort. */
-  // `force` saves even without new blocks: used right after a new subaddress is created, so a
-  // restart can never hand the same address to a second request or sale.
-  const persistState = useCallback(async (force = false) => {
-    const w = live.current;
-    const s = session.current;
-    if (!w?.exportState || !s || (!synced.current && !force)) return;
-    try {
-      const { state, height } = await w.exportState();
-      if (live.current !== w || height < savedHeight.current || (!force && height === savedHeight.current)) return;
-      const blob = await sealBytes(packParts([utf8.encode(state.password), state.keysData, state.cacheData]), sealSecretOf(s.secrets), sealContextOf(s.pub));
-      const result = await saveSyncState(s.pub.id, blob);
-      if (result !== "saved") {
-        // Not marked as saved: the next save tries again even without new blocks.
-        setSaveProblem(result);
-        return;
-      }
-      savedHeight.current = height;
-      setSaveProblem(null);
-    } catch {
-      /* best effort: the next save or a normal sync covers it */
-    }
-  }, []);
-
-  /** Wraps the wallet so every new subaddress is recorded and saved before it is used. */
-  const saveAfterNewAddress = useCallback((w: LiveWallet) => {
-    const s = session.current;
-    if (s) recordHandedOut(w, handedOutStore(s.pub, s.secrets));
-    const create = w.newRequestAddress.bind(w);
-    w.newRequestAddress = async (label, expected, account) => {
-      const sub = await create(label, expected, account);
-      await withTimeout(persistState(true), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      return sub;
-    };
-    const plain = w.newSubaddress.bind(w);
-    w.newSubaddress = async (label) => {
-      const address = await plain(label);
-      await withTimeout(persistState(true), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      return address;
-    };
-    // A long first sync saves its progress as it goes (every few thousand blocks or a minute),
-    // so a lock, a crash or a closed tab never throws hours of scanning away.
-    const sync = w.sync.bind(w);
-    w.sync = async (onProgress, onCheckpoint) => {
-      syncBusy.current = true;
-      try {
-        await sync(onProgress, onCheckpoint ?? (() => persistState(true)));
-      } finally {
-        syncBusy.current = false;
-      }
-    };
-  }, [persistState]);
-
-  const onSynced = useCallback(() => {
-    synced.current = true;
-    void persistState();
-  }, [persistState]);
+  const [testWalletCount, setTestWalletCount] = useState(0);
+  const [tillShown, setTillShown] = useState(false);
 
   useEffect(() => {
-    const rec = loadStoredWallet();
-    setView(viewFor(rec));
-    if (DEV_TOOLS_ENABLED) void fetchTestWallets().then((f) => f && setTestWallets(f.wallets));
-    return () => { void live.current?.close(); };
-  }, []);
-
-  /** Opens a wallet in the chosen mode. In demo, a node failure falls back to simulation. */
-  const open = useCallback(async (pub: WalletPublic, secrets: Secrets, mode?: TestMode) => {
-    // A lock, a removal, a tab takeover or a newer open() during the awaits below wins: this one
-    // then closes whatever engine it started and leaves the screen alone.
-    const gen = ++openGen.current;
-    const stale = () => openGen.current !== gen;
-    session.current = { pub, secrets };
-    synced.current = false;
-    savedHeight.current = 0;
-    setSaveProblem(null);
-    const want: TestMode = mode ?? (isDemo ? preferredMode() : "stagenet");
-    setView({ name: "opening", pub });
-    await live.current?.close().catch(() => {});
-    live.current = null;
-    if (stale()) return;
-
-    try {
-      if (isDemo && want === "simulation") {
-        const wallet = createSimWallet(pub.primaryAddress);
-        saveAfterNewAddress(wallet);
-        live.current = wallet;
-        if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "simulation" });
-        setView({ name: "open", pub, wallet, mode: "simulation", fellBack: false });
-        return;
-      }
-      try {
-        const params = {
-          kind: pub.kind, network: pub.network, restoreHeight: pub.restoreHeight,
-          seed: secrets.seed, primaryAddress: pub.primaryAddress, privateViewKey: secrets.privateViewKey, node: secrets.node,
-        };
-        const saved = await loadSavedState(pub, secrets);
-        if (stale()) return;
-        let wallet: LiveWallet;
-        try {
-          wallet = await openWallet({ ...params, saved: saved ?? undefined });
-        } catch (e) {
-          if (!saved || stale()) throw e;
-          // Saved state could not be used: open fresh. Only discard the save once that worked,
-          // so a passing network error never throws away a good save.
-          wallet = await openWallet(params);
-          if (!stale()) await deleteSyncState(pub.id);
-        }
-        if (stale()) {
-          await wallet.close().catch(() => {});
-          return;
-        }
-        saveAfterNewAddress(wallet);
-        live.current = wallet;
-        if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "stagenet" });
-        setView({ name: "open", pub, wallet, mode: "stagenet", fellBack: false });
-      } catch (e) {
-        if (!isDemo || stale()) throw e;
-        // Node unreachable: fall back to simulation so the demo keeps working.
-        const wallet = createSimWallet(pub.primaryAddress);
-        saveAfterNewAddress(wallet);
-        live.current = wallet;
-        setDemoSession({ assignedLabel: pub.name, mode: "stagenet", fellBackToSim: true });
-        setView({ name: "open", pub, wallet, mode: "simulation", fellBack: true });
-      }
-    } catch (e) {
-      if (stale()) return;
-      setView({ name: "fatal", message: `The wallet engine could not start: ${(e as Error).message}` });
-    }
-  }, []);
+    controller.start();
+    if (DEV_TOOLS_ENABLED) void fetchTestWallets().then((f) => { if (f) { controller.testWallets = f.wallets; setTestWalletCount(f.wallets.length); } });
+    return () => controller.dispose();
+  }, [controller]);
 
   // Auto-lock: while the wallet is open, lock it (close the engine, drop secrets from memory)
   // after AUTO_LOCK_IDLE_MS without interaction, or once the tab has been hidden for
   // AUTO_LOCK_HIDDEN_MS. Uses timestamps, not a single long timer, because browsers throttle
   // timers in background tabs; the check also runs the moment the tab becomes visible again.
-  const lockRef = useRef<() => Promise<void>>(async () => {});
-  // A watch-only wallet in cashier mode stays open all shift: it cannot spend, and a till that
-  // locks between customers is unusable. Full wallets keep the normal auto-lock.
-  const cashierOn = useRef(false);
-  const [tillShown, setTillShown] = useState(false);
-  const setCashierOn = useCallback((on: boolean) => { cashierOn.current = on; setTillShown(on); }, []);
   const isOpen = view.name === "open";
   useEffect(() => {
     if (!isOpen) return;
@@ -292,14 +59,16 @@ export function WalletApp() {
     const lockNow = () => {
       if (locking) return;
       locking = true;
-      void lockRef.current();
+      void controller.lock();
     };
     const check = () => {
-      if (cashierOn.current && session.current?.pub.kind === "view-only") return;
+      // A watch-only wallet in cashier mode stays open all shift: it cannot spend, and a till that
+      // locks between customers is unusable. Full wallets keep the normal auto-lock.
+      if (controller.cashierOn && controller.view.name === "open" && controller.view.pub.kind === "view-only") return;
       const now = clock();
       // While the first scan runs in a visible tab, waiting is not idleness: locking would stop
       // the scan. Leaving the tab still locks (progress is saved on the way out).
-      if (syncBusy.current && !document.hidden) lastActive = now;
+      if (controller.syncBusy && !document.hidden) lastActive = now;
       if (now - lastActive >= AUTO_LOCK_IDLE_MS) lockNow();
       else if (hiddenSince !== null && now - hiddenSince >= AUTO_LOCK_HIDDEN_MS) lockNow();
     };
@@ -321,365 +90,21 @@ export function WalletApp() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(timer);
     };
-  }, [isOpen]);
-
-  const switchMode = useCallback((mode: TestMode) => {
-    if (session.current) void open(session.current.pub, session.current.secrets, mode);
-  }, [open]);
-
-  async function onboarded(r: OnboardingResult) {
-    if (isDemo && r.origin === "create") {
-      // Demo create flow: the sample words are discarded (disclosed as non-recovery).
-      // Restores and watch-only imports are real, so they open exactly what the user entered.
-      // Assign one configured stagenet test wallet and open it from its own real seed.
-      const w = pickRandom(testWallets);
-      if (!w) {
-        setView({ name: "fatal", message: "No stagenet test wallets are configured. Run scripts/gen-test-wallets.mjs." });
-        return;
-      }
-      const pub: WalletPublic = {
-        id: crypto.randomUUID(), name: `Demo ${w.label}`, kind: "full", network: "stagenet",
-        primaryAddress: w.primaryAddress, restoreHeight: w.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
-      };
-      try {
-        await saveWallet(pub, { seed: w.seed, privateViewKey: w.privateViewKey, totp: r.totp }, r.password);
-      } catch (e) {
-        if (e instanceof StorageUnavailableError) throw e;
-        throw new Error("Could not save the wallet on this device.");
-      }
-      await open(pub, { seed: w.seed, privateViewKey: w.privateViewKey });
-      return;
-    }
-
-    const pub: WalletPublic = {
-      id: crypto.randomUUID(), name: "Wallet", kind: r.kind, network: r.network, primaryAddress: r.primaryAddress,
-      restoreHeight: r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
-    };
-    try {
-      await saveWallet(pub, { seed: r.seed, privateViewKey: r.privateViewKey, totp: r.totp }, r.password);
-    } catch (e) {
-      if (e instanceof StorageUnavailableError) throw e;
-      throw new Error("Could not save the wallet on this device.");
-    }
-    // A brand new wallet has handed out no addresses anywhere: an empty record says so. Restored
-    // wallets get none, so their first new address starts above a safety margin (addresses.ts).
-    if (r.origin === "create") {
-      await handedOutStore(pub, { seed: r.seed, privateViewKey: r.privateViewKey }).save({}).catch(() => {});
-    }
-    await open(pub, { seed: r.seed, privateViewKey: r.privateViewKey });
-  }
-
-  /**
-   * Re-checks the wallet password (and authenticator code when 2FA is on) against the stored
-   * vault, even though the wallet is unlocked, before any settings action that touches secrets.
-   */
-  async function verifyAccess(password: string, code: string) {
-    const rec = loadStoredWallet();
-    if (!rec) throw new Error("This wallet is no longer stored in this browser.");
-    let s: WalletSecrets;
-    try {
-      s = await unlockWallet(rec, password);
-    } catch (err) {
-      throw new Error(err instanceof VaultError && err.code === "WRONG_PASSWORD" ? "Wrong password." : "The password could not be checked.");
-    }
-    // The encrypted vault decides whether a code is needed, not the readable flag next to it:
-    // editing browser storage must never switch the second lock off.
-    if (s.totp ? !verifyTotp(s.totp, code) : rec.pub.totpEnabled) {
-      throw new Error(WRONG_CODE);
-    }
-    return { rec, s };
-  }
-
-  /** Saves a changed vault and keeps the open session and screens in step with it. */
-  async function rewriteVault(pub: WalletPublic, secrets: WalletSecrets, password: string) {
-    await saveWallet(pub, secrets, password);
-    if (session.current) session.current = { pub, secrets };
-    setView((v) => (v.name === "open" ? { ...v, pub } : v));
-  }
-
-  /** Payment requests, sealed with this wallet's secret (readable only while unlocked). */
-  const requestStore = (pub: WalletPublic): RequestStore | undefined => {
-    const secrets = session.current?.secrets;
-    if (!secrets) return undefined;
-    const key = `requests|${pub.id}`;
-    const context = `requests|${pub.id}|${pub.primaryAddress}`;
-    let unreadable = false;
-    return {
-      async load() {
-        try {
-          const blob = await loadSealedBlob(key);
-          unreadable = false;
-          if (!blob) return [];
-          return JSON.parse(new TextDecoder().decode(await openBytes(blob, sealSecretOf(secrets), context))) as PaymentRequest[];
-        } catch {
-          unreadable = true;
-          return [];
-        }
-      },
-      async save(list) {
-        if (unreadable) throw UNREADABLE("payment requests");
-        await saveSealedBlob(key, await sealBytes(utf8.encode(JSON.stringify(list)), sealSecretOf(secrets), context));
-      },
-    };
-  };
-
-  /** Contacts (who you pay), sealed like payment requests. */
-  const contactStore = (pub: WalletPublic): ContactStore | undefined => {
-    const secrets = session.current?.secrets;
-    if (!secrets) return undefined;
-    const key = `contacts|${pub.id}`;
-    const context = `contacts|${pub.id}|${pub.primaryAddress}`;
-    let unreadable = false;
-    return {
-      async load() {
-        try {
-          const blob = await loadSealedBlob(key);
-          unreadable = false;
-          if (!blob) return [];
-          return JSON.parse(new TextDecoder().decode(await openBytes(blob, sealSecretOf(secrets), context))) as Contact[];
-        } catch {
-          unreadable = true;
-          return [];
-        }
-      },
-      async save(list) {
-        if (unreadable) throw UNREADABLE("contacts");
-        await saveSealedBlob(key, await sealBytes(utf8.encode(JSON.stringify(list)), sealSecretOf(secrets), context));
-      },
-    };
-  };
-
-  /** Cashier mode settings and sales, sealed like payment requests. */
-  const cashierStore = (pub: WalletPublic): CashierStore | undefined => {
-    const secrets = session.current?.secrets;
-    if (!secrets) return undefined;
-    const key = `cashier|${pub.id}`;
-    const context = `cashier|${pub.id}|${pub.primaryAddress}`;
-    let unreadable = false;
-    return {
-      async load() {
-        try {
-          const blob = await loadSealedBlob(key);
-          unreadable = false;
-          if (!blob) return EMPTY_CASHIER;
-          return JSON.parse(new TextDecoder().decode(await openBytes(blob, sealSecretOf(secrets), context))) as CashierData;
-        } catch {
-          unreadable = true;
-          return EMPTY_CASHIER;
-        }
-      },
-      async save(data) {
-        if (unreadable) throw UNREADABLE("sales");
-        await saveSealedBlob(key, await sealBytes(utf8.encode(JSON.stringify(data)), sealSecretOf(secrets), context));
-      },
-    };
-  };
-
-  const settings = (pub: WalletPublic): SettingsActions => ({
-    kind: pub.kind,
-    network: pub.network,
-    totpEnabled: pub.totpEnabled,
-    node: session.current?.secrets.node?.uri ?? null,
-    async revealSeed(password, code) {
-      const { s } = await verifyAccess(password, code);
-      if (!s.seed) throw new Error("This wallet has no recovery words.");
-      return s.seed;
-    },
-    async checkAccess(password, code) {
-      await verifyAccess(password, code);
-    },
-    async changePassword(password, code, newPassword) {
-      const { rec, s } = await verifyAccess(password, code);
-      await rewriteVault(rec.pub, s, newPassword);
-    },
-    newTotp() {
-      const config = createTotpSecret();
-      return { config, uri: totpUri(config, `MonkStash ${pub.primaryAddress.slice(0, 6)}`) };
-    },
-    async enableTotp(config, newCode, password) {
-      if (!verifyTotp(config, newCode)) throw new Error("That code does not match. Check the time on your phone and try the newest code.");
-      const { rec, s } = await verifyAccess(password, "");
-      await rewriteVault({ ...rec.pub, totpEnabled: true }, { ...s, totp: config }, password);
-    },
-    async disableTotp(password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      const next: WalletSecrets = { ...s };
-      delete next.totp;
-      await rewriteVault({ ...rec.pub, totpEnabled: false }, next, password);
-    },
-    async watchOnlyKeys(password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      return { address: rec.pub.primaryAddress, viewKey: s.privateViewKey, restoreHeight: rec.pub.restoreHeight };
-    },
-    restoreHeight: pub.restoreHeight,
-    async rescanFrom(height, password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      if (!Number.isInteger(height) || height < 0) throw new Error("Choose a valid date or block height.");
-      if (height >= rec.pub.restoreHeight) {
-        throw new Error(`Choose a date or height earlier than where the wallet starts now (block ${rec.pub.restoreHeight.toLocaleString()}).`);
-      }
-      const next = updatePublic(rec, { restoreHeight: height }).pub;
-      // Stop this engine first, so it cannot save its state again, then drop only this wallet's
-      // sync progress. Contacts, requests, sales and the address record are kept.
-      openGen.current++;
-      const w = live.current;
-      live.current = null;
-      await w?.close().catch(() => {});
-      await deleteSyncState(next.id);
-      await open(next, s);
-    },
-    async exportMove(password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      const w = live.current;
-      if (!w?.exportState) throw new Error("Open the wallet first.");
-      if (w.syncing?.()) throw new Error("The wallet is still scanning. Try again when it says Up to date.");
-      const { state, height } = await w.exportState();
-      const [addresses, requests, contacts, cashier] = await Promise.all([
-        handedOutStore(rec.pub, s).load(),
-        requestStore(rec.pub)?.load(),
-        contactStore(rec.pub)?.load(),
-        cashierStore(rec.pub)?.load(),
-      ]);
-      const bytes = await sealMoveFile({
-        primaryAddress: rec.pub.primaryAddress, network: rec.pub.network, kind: rec.pub.kind,
-        restoreHeight: rec.pub.restoreHeight, height, engine: state,
-        records: { ...(addresses ? { addresses } : {}), ...(requests?.length ? { requests } : {}), ...(contacts?.length ? { contacts } : {}), ...(cashier && (cashier.config || cashier.sales.length) ? { cashier } : {}) },
-      }, moveSecretOf(rec.pub.kind, s));
-      const day = new Date().toISOString().slice(0, 10);
-      return { bytes, filename: `monkstash-move-${rec.pub.network}-${day}.monkstash`, height };
-    },
-    async importMove(file, password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      const pub = rec.pub;
-      const moved = await openMoveFile(file, moveSecretOf(pub.kind, s), { primaryAddress: pub.primaryAddress, network: pub.network, kind: pub.kind });
-      const added: string[] = [];
-
-      // Address counters: the higher index wins, so no address handed out on either device is reused.
-      const addressStore = handedOutStore(pub, s);
-      const merged = mergeHandedOut(await addressStore.load(), moved.records.addresses as HandedOut | undefined);
-      if (merged) await addressStore.save(merged);
-      // Lists fill in only where this device has none, so nothing here is overwritten.
-      const reqs = requestStore(pub);
-      if (reqs && Array.isArray(moved.records.requests) && moved.records.requests.length && !(await reqs.load()).length) {
-        await reqs.save(moved.records.requests as PaymentRequest[]);
-        added.push("payment requests");
-      }
-      const cons = contactStore(pub);
-      if (cons && Array.isArray(moved.records.contacts) && moved.records.contacts.length && !(await cons.load()).length) {
-        await cons.save(moved.records.contacts as Contact[]);
-        added.push("contacts");
-      }
-      const till = cashierStore(pub);
-      const tillHere = till ? await till.load() : null;
-      if (till && tillHere && moved.records.cashier && !tillHere.config && !tillHere.sales.length) {
-        await till.save(moved.records.cashier as CashierData);
-        added.push("till settings and sales");
-      }
-
-      // Scan progress: only when the file is further along than this device. A running scan is
-      // paused first (it stops between answers, a few seconds): the engine answers nothing else
-      // while it scans.
-      const current = live.current;
-      const paused = !!current?.syncing?.();
-      if (paused) await withTimeout(current!.haltSync?.() ?? Promise.resolve(), 30_000);
-      const here = Math.max(savedHeight.current, current && !current.syncing?.() ? ((await current.height?.().catch(() => 0)) ?? 0) : 0);
-      if (moved.height <= here) {
-        if (paused) {
-          // Keep what this device scanned, then carry on scanning.
-          await withTimeout(persistState(true), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-          await open(pub, s);
-        }
-        return { height: moved.height, scanReplaced: false, added };
-      }
-      openGen.current++;
-      const w = live.current;
-      live.current = null;
-      await w?.close().catch(() => {});
-      const blob = await sealBytes(packParts([utf8.encode(moved.engine.password), moved.engine.keysData, moved.engine.cacheData]), sealSecretOf(s), sealContextOf(pub));
-      const saved = await saveSyncState(pub.id, blob);
-      const next = moved.restoreHeight < pub.restoreHeight ? updatePublic(rec, { restoreHeight: moved.restoreHeight }).pub : pub;
-      await open(next, s);
-      if (saved !== "saved") throw new Error("This browser did not let the wallet save the moved scan progress, so it scans on its own instead.");
-      return { height: moved.height, scanReplaced: true, added };
-    },
-    async saveNode(node: NodeConfig | null, password, code) {
-      const { rec, s } = await verifyAccess(password, code);
-      if (node) {
-        try {
-          await testNode(node, rec.pub.network);
-        } catch (err) {
-          const reason = err instanceof NodeTestError ? err.reason : "unreachable";
-          throw new Error(
-            reason === "wrong-network" ? `That node runs ${(err as Error).message}, but this wallet is on ${rec.pub.network}.`
-            : reason === "timeout" ? "The node did not answer within 20 seconds. Check that it is online and try again."
-            : "This browser could not reach that node. Check the address and port, that it uses HTTPS with a trusted certificate, and that it allows this site (see the setup steps below).",
-          );
-        }
-      }
-      const next: WalletSecrets = { ...s };
-      if (node) next.node = node; else delete next.node;
-      await saveWallet(rec.pub, next, password);
-      await withTimeout(persistState(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      await open(rec.pub, next);
-    },
-  });
-
-  // One store per opened wallet, so the requests list is not reloaded on every render.
-  const openPub = view.name === "open" ? view.pub : null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const openRequests = useMemo(() => (openPub ? requestStore(openPub) : undefined), [openPub]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const openCashier = useMemo(() => (openPub ? cashierStore(openPub) : undefined), [openPub]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const openContacts = useMemo(() => (openPub ? contactStore(openPub) : undefined), [openPub]);
-
-  async function lock() {
-    // Any open() still in progress must not reopen the wallet after this.
-    openGen.current++;
-    // Save progress first (bounded, so locking never hangs), then drop secrets and close. A first
-    // sync in progress is stopped so its state can be exported: the scan resumes from there.
-    const running = live.current;
-    if (running?.syncing?.()) {
-      await withTimeout(running.haltSync?.() ?? Promise.resolve(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      await withTimeout(persistState(true), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-    } else {
-      await withTimeout(persistState(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-    }
-    const w = live.current;
-    live.current = null;
-    session.current = null;
-    synced.current = false;
-    await w?.close().catch(() => {});
-    const rec = loadStoredWallet();
-    setView(viewFor(rec));
-  }
-
-  async function remove() {
-    openGen.current++;
-    const w = live.current;
-    live.current = null;
-    session.current = null;
-    await w?.close().catch(() => {});
-    removeWallet();
-    await clearSyncStates();
-    if (isDemo) clearDemoSession();
-    setView({ name: "welcome" });
-  }
-
-  // Keep the auto-lock pointing at the current lock() without re-subscribing listeners.
-  useEffect(() => { lockRef.current = lock; });
+  }, [isOpen, controller]);
 
   // Another tab took over the wallet: close it here at once (its keys leave this tab's memory).
   useEffect(() => {
-    if (tab.state === "moved") void lockRef.current?.();
-  }, [tab.state]);
+    if (tab.state === "moved") void controller.lock();
+  }, [tab.state, controller]);
 
   // While open, save sync progress periodically (persistState skips if nothing new was synced).
   useEffect(() => {
     if (!isOpen) return;
-    const t = window.setInterval(() => void persistState(), STATE_SAVE_EVERY_MS);
+    const t = window.setInterval(() => void controller.persistState(), STATE_SAVE_EVERY_MS);
     return () => window.clearInterval(t);
-  }, [isOpen, persistState]);
+  }, [isOpen, controller]);
+
+  const setCashierOn = (on: boolean) => { controller.cashierOn = on; setTillShown(on); };
 
   return (
     <div className={styles.shell}>
@@ -709,58 +134,79 @@ export function WalletApp() {
             </Stage>
           )
         ) : null}
-        {tab.state !== "owner" ? null : <>
-        {view.name === "boot" ? <Loading text="Loading…" /> : null}
-        {view.name === "welcome" ? (
+        {tab.state !== "owner" ? null : (
           <>
-            {isDemo ? <DemoIntro walletCount={testWallets.length} /> : null}
-            <Welcome onPick={(mode) => setView({ name: "onboard", mode })} />
+            {view.name === "boot" ? <Loading text="Loading…" /> : null}
+            {view.name === "welcome" ? (
+              <>
+                {isDemo ? <DemoIntro walletCount={testWalletCount} /> : null}
+                <Welcome onPick={(mode) => controller.pick(mode)} />
+              </>
+            ) : null}
+            {view.name === "onboard" ? (
+              <Onboarding mode={view.mode} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} />
+            ) : null}
+            {view.name === "locked" ? <Unlock record={view.record} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.remove} /> : null}
+            {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={controller.remove} /> : null}
+            {view.name === "opening" ? <Opening /> : null}
+            {view.name === "open" && saveProblem ? <SaveProblemNotice problem={saveProblem} /> : null}
+            {view.name === "open" ? (
+              <OpenDashboard view={view} controller={controller} onCashierChange={setCashierOn} />
+            ) : null}
+            {view.name === "fatal" ? <Fatal message={view.message} /> : null}
           </>
-        ) : null}
-        {view.name === "onboard" ? (
-          <Onboarding mode={view.mode} testWallets={testWallets} onCancel={() => setView({ name: "welcome" })} onDone={onboarded} />
-        ) : null}
-        {view.name === "locked" ? <Unlock record={view.record} onUnlocked={(pub, s) => open(pub, s)} onForget={remove} /> : null}
-        {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={remove} /> : null}
-        {view.name === "opening" ? (
-          <Stage tone="ink" kicker="Opening" sizzle={<>Waking the wallet <mark>on your device</mark>.</>} art={<ArtEngine />}>
-            <Loading text="Starting the wallet engine. The first start downloads about 4 MB." />
-          </Stage>
-        ) : null}
-        {view.name === "open" && saveProblem ? (
-          <div className="notice notice-warn" role="status">
-            <span>
-              {saveProblem === "full"
-                ? "This browser's storage is full, so the wallet cannot save how far it has scanned. It still works, but after you close it the scan starts again. Free some space and it saves again on its own."
-                : "This browser is not letting the wallet save how far it has scanned (a private window, or site data is blocked). It still works, but each unlock scans again from the start."}
-            </span>
-          </div>
-        ) : null}
-        {view.name === "open" ? (
-          <Dashboard
-            pub={view.pub}
-            wallet={view.wallet}
-            onLock={lock}
-            onRemove={remove}
-            onSynced={onSynced}
-            settings={settings(view.pub)}
-            requests={openRequests}
-            cashier={openCashier}
-            contacts={openContacts}
-            onCashierChange={setCashierOn}
-            demo={isDemo ? { mode: view.mode, fellBack: view.fellBack, assignedLabel: view.pub.name, onSwitchMode: switchMode } : undefined}
-          />
-        ) : null}
-        {view.name === "fatal" ? (
-          <div className={`card ${styles.narrow}`} role="alert">
-            <h1 className="visually-hidden">MonkStash wallet</h1>
-            <h2>Something went wrong</h2>
-            <p className="muted">{view.message}</p>
-            <button className="btn btn-secondary" onClick={() => location.reload()}>Reload</button>
-          </div>
-        ) : null}
-        </>}
+        )}
       </main>
+    </div>
+  );
+}
+
+function OpenDashboard({ view, controller, onCashierChange }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void }) {
+  const stores = controller.openStores();
+  return (
+    <Dashboard
+      pub={view.pub}
+      wallet={view.wallet}
+      onLock={controller.lock}
+      onRemove={controller.remove}
+      onSynced={controller.onSynced}
+      settings={controller.settings(view.pub)}
+      requests={stores.requests}
+      cashier={stores.cashier}
+      contacts={stores.contacts}
+      onCashierChange={onCashierChange}
+      demo={isDemo ? { mode: view.mode, fellBack: view.fellBack, assignedLabel: view.pub.name, onSwitchMode: controller.switchMode } : undefined}
+    />
+  );
+}
+
+export function Opening() {
+  return (
+    <Stage tone="ink" kicker="Opening" sizzle={<>Waking the wallet <mark>on your device</mark>.</>} art={<ArtEngine />}>
+      <Loading text="Starting the wallet engine. The first start downloads about 4 MB." />
+    </Stage>
+  );
+}
+
+export function SaveProblemNotice({ problem }: { problem: Exclude<SaveProblem, null> }) {
+  return (
+    <div className="notice notice-warn" role="status">
+      <span>
+        {problem === "full"
+          ? "This browser's storage is full, so the wallet cannot save how far it has scanned. It still works, but after you close it the scan starts again. Free some space and it saves again on its own."
+          : "This browser is not letting the wallet save how far it has scanned (a private window, or site data is blocked). It still works, but each unlock scans again from the start."}
+      </span>
+    </div>
+  );
+}
+
+export function Fatal({ message }: { message: string }) {
+  return (
+    <div className={`card ${styles.narrow}`} role="alert">
+      <h1 className="visually-hidden">MonkStash wallet</h1>
+      <h2>Something went wrong</h2>
+      <p className="muted">{message}</p>
+      <button className="btn btn-secondary" onClick={() => location.reload()}>Reload</button>
     </div>
   );
 }
@@ -778,57 +224,43 @@ function DemoIntro({ walletCount }: { walletCount: number }) {
   );
 }
 
-function Unlock({ record, onUnlocked, onForget }: { record: StoredWallet; onUnlocked: (pub: WalletPublic, s: Secrets) => void; onForget: () => void }) {
+export function Unlock({ record, unlock, submitCode, onForget, warm = warmEngine }: { record: Pick<StoredWallet, "pub">; unlock: (pw: string) => Promise<"open" | "code">; submitCode: (code: string) => Promise<void>; onForget: () => void; warm?: () => void | Promise<void> }) {
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [needsCode, setNeedsCode] = useState(false);
-  const [secrets, setSecrets] = useState<Awaited<ReturnType<typeof unlockWallet>> | null>(null);
 
   // Start the wallet engine while the password is typed, so the wallet opens sooner after Unlock.
-  useEffect(() => { void warmEngine(); }, []);
+  useEffect(() => { void warm(); }, [warm]);
 
-  // The decrypted keys wait here only while the code is asked for: two minutes at most, then the
-  // password is needed again.
+  // The decrypted keys wait only so long for the code: say so when they stop waiting.
   useEffect(() => {
-    if (!secrets) return;
-    const t = setTimeout(() => {
-      setSecrets(null);
-      setNeedsCode(false);
-      setCode("");
-      setError("That took too long, so the wallet locked again. Enter your password once more.");
-    }, 2 * 60 * 1000);
+    if (!needsCode) return;
+    const t = setTimeout(() => { setNeedsCode(false); setCode(""); setError(CODE_EXPIRED); }, CODE_WAIT_MS);
     return () => clearTimeout(t);
-  }, [secrets]);
+  }, [needsCode]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (needsCode && secrets) {
-      if (secrets.totp && verifyTotp(secrets.totp, code)) {
-        const s = secrets;
-        setSecrets(null);
-        setCode("");
-        return onUnlocked({ ...record.pub, totpEnabled: true }, s);
-      }
-      return setError(WRONG_CODE);
-    }
     setBusy(true);
     try {
-      const s = await unlockWallet(record, pw);
-      setPw("");
-      // Ask for the code whenever the encrypted vault holds an authenticator secret.
-      if (s.totp) {
-        setSecrets(s);
-        setNeedsCode(true);
-        setBusy(false);
+      if (needsCode) {
+        await submitCode(code);
+        setCode("");
         return;
       }
-      onUnlocked({ ...record.pub, totpEnabled: false }, s);
+      const next = await unlock(pw);
+      setPw("");
+      if (next === "code") setNeedsCode(true);
+      setBusy(false);
     } catch (err) {
       setBusy(false);
-      setError(err instanceof VaultError && err.code === "WRONG_PASSWORD" ? "Wrong password." : "This wallet could not be opened.");
+      const msg = (err as Error).message;
+      // The keys only wait a short while for the code: then the password is needed again.
+      if (msg === CODE_EXPIRED || msg === CODE_TOO_MANY) { setNeedsCode(false); setCode(""); }
+      setError(msg);
     }
   }
 
@@ -858,7 +290,7 @@ function Unlock({ record, onUnlocked, onForget }: { record: StoredWallet; onUnlo
           </div>
         )}
         {error ? <p id="unlock-err" className="error small" role="alert">{error}</p> : null}
-        <button className="btn btn-primary btn-block" disabled={busy}>{busy ? "Decrypting…" : "Unlock"}</button>
+        <button className="btn btn-primary btn-block" disabled={busy}>{busy ? (needsCode ? "Checking…" : "Decrypting…") : "Unlock"}</button>
       </form>
       {needsCode ? (
         <details className={styles.danger} style={{ marginTop: "var(--s-5)" }}>
@@ -884,7 +316,7 @@ function Unlock({ record, onUnlocked, onForget }: { record: StoredWallet; onUnlo
  * the guard is an explicit typed confirmation that spells out what is lost. The encrypted copy is
  * kept unless the person asks: if the password comes back to them, it is their only way in.
  */
-function OtherNetwork({ record, onRemove }: { record: StoredWallet; onRemove: () => void }) {
+export function OtherNetwork({ record, onRemove }: { record: Pick<StoredWallet, "pub">; onRemove: () => void }) {
   const [text, setText] = useState("");
   const was = record.pub.network;
   const testWallet = was !== "mainnet";

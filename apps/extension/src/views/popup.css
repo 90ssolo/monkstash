@@ -1,0 +1,105 @@
+/*
+ * Popup and side panel. The popup is a small fixed window (Chrome allows up to 800 x 600), not a page: a compact header,
+ * content that scrolls inside the frame without a scrollbar, and the tab bar pinned at the bottom.
+ * Class names are the shared screens' own (vite.config.ts keeps them stable as file__class).
+ */
+html[data-surface="popup"],
+html[data-surface="popup"] body {
+  width: 380px;
+  height: 600px;
+}
+html[data-surface="popup"] #root,
+html[data-surface="popup"] .wallet__shell {
+  height: 600px;
+}
+/* The side panel is the full wallet in a tall narrow column: the same frame, the browser's height. */
+html[data-surface="side"],
+html[data-surface="side"] body,
+html[data-surface="side"] #root,
+html[data-surface="side"] .wallet__shell {
+  height: 100vh;
+}
+html[data-surface="popup"],
+html[data-surface="popup"] body,
+html[data-surface="side"],
+html[data-surface="side"] body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__appBar {
+  flex: none;
+  height: 52px;
+  padding-inline: 14px;
+}
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__appBar .brand { font-size: 1.05rem; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__appBar .brand svg { width: 22px; height: 22px; }
+
+/* The only scrolling area. Scrolls by wheel, touch and keyboard; no scrollbar drawn. */
+:is(html[data-surface="popup"], html[data-surface="side"]) main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  width: auto;
+  margin: 0;
+  padding: 12px 14px 16px;
+}
+:is(html[data-surface="popup"], html[data-surface="side"]) main::-webkit-scrollbar { display: none; }
+
+/* Room for the pinned tab bar under the last card. */
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__wallet { padding-bottom: 72px; gap: 12px; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__content { gap: 12px; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__bottomBar button { min-height: 58px; }
+
+/* Status strip on one line: network, sync state, balance, Lock. */
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip { flex-wrap: nowrap; padding: 8px; gap: 4px; min-width: 0; overflow: hidden; }
+/* Nothing in a card may widen the column past the popup. */
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__content > * { min-width: 0; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .btn { padding-inline: 10px; min-height: 34px; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip > * { flex: none; white-space: nowrap; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__heroChip,
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__syncPill { font-size: 0.7rem; padding-inline: 8px; letter-spacing: 0.02em; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__stripBal { font-size: 0.85rem; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .wallet__lockBtn { padding-inline: 9px; }
+
+/* Two-panel screens (unlock, notices) stack tightly. */
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__stage { gap: 12px; }
+
+/*
+ * The popup always uses the phone layout, whatever viewport width the browser reports (the shared
+ * screens switch layouts with media queries on the viewport, which a popup does not control).
+ */
+html[data-surface="popup"] .wallet__appGrid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+html[data-surface="popup"] .wallet__navRail { display: none; }
+html[data-surface="popup"] .wallet__section { padding: var(--s-5) var(--s-4); }
+html[data-surface="popup"] .wallet__sectionBare { padding: 0; }
+html[data-surface="popup"] .wallet__panel { padding: var(--s-4); }
+html[data-surface="popup"] .wallet__home { padding: var(--s-5); }
+html[data-surface="popup"] .wallet__homeCards { grid-template-columns: minmax(0, 1fr); }
+html[data-surface="popup"] .wallet__quick { gap: var(--s-2); }
+html[data-surface="popup"] .wallet__quickBtn { flex-direction: column; gap: 4px; min-height: 64px; padding-inline: 4px; font-size: var(--step--1); }
+html[data-surface="popup"] .wallet__bottomBar {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Pinned to the popup frame (.wallet__shell is the positioned box), not to the viewport. */
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 30;
+  border-top: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: 0 -6px 20px rgba(27, 42, 34, 0.08);
+}
+html[data-surface="popup"] .wallet__bottomBar button {
+  appearance: none; background: none; border: 0; border-top: 2px solid transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font: inherit; font-size: 0.72rem; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+html[data-surface="popup"] .wallet__bottomBar button:focus-visible { outline: 2px solid var(--clay); outline-offset: -3px; }
+html[data-surface="popup"] .wallet__bottomBar .wallet__barOn { color: var(--forest); border-top-color: var(--forest); }
