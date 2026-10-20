@@ -1012,12 +1012,14 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
     if (wrongNet) return setError(`${resolved!.fqdn} points to a ${wrongNet} address, but this wallet is on ${pub.network}.`);
     if (!fmt?.ok) return setError(fmt?.reason ?? "Enter a recipient address");
     if (alarm && !alarmOk) return setError("Check the warning above before you continue.");
+    const nothingSpendable = "There is nothing to send yet. Money you receive can be spent after 10 confirmations (about 20 minutes).";
     if (!sendAll) {
       if (atomic === null) return setError(xmrAmountProblem(amount) ?? "Enter an amount in XMR, like 0.5.");
       if (atomic <= 0n) return setError("Enter an amount greater than 0");
+      if (unlocked <= 0n) return setError(nothingSpendable);
       if (atomic >= unlocked) return setError(`That leaves nothing for the network fee. You can send a little under ${formatXmr(unlocked)} XMR, or use Send all.`);
     } else if (unlocked <= 0n) {
-      return setError("Nothing is spendable yet. New payments unlock after 10 confirmations (about 20 minutes).");
+      return setError(nothingSpendable);
     }
     const target = dest;
     const targetAlias = resolved ? { fqdn: resolved.fqdn, name: resolved.name, dnssec: resolved.dnssec } : null;
