@@ -2,7 +2,8 @@
  * Live Monero network numbers for the mining calculator (a content page, so no wallet engine).
  *
  * Read on the server from a mainnet node, then cached: the current difficulty and height from
- * get_info, and the newest block's reward from get_last_block_header. Visitors only ever hit
+ * get_info, the newest block's reward from get_last_block_header, and the number of RingCT
+ * outputs on the chain (for the FCMP++ guide) from get_output_distribution. Visitors only ever hit
  * the cached JSON, so this cannot be used to hammer the node, and no visitor data reaches it.
  * The node is set with MONERO_STATS_NODE_URL (mainnet, restricted RPC), shared with fee-stats.
  */
@@ -36,6 +37,24 @@ interface GetInfo {
   status?: string;
 }
 
+interface OutputDistribution {
+  result?: { distributions?: { distribution?: number[] }[] };
+}
+
+/** RingCT outputs up to `height`, or undefined: optional, so the mining numbers never depend on it. */
+async function rctOutputsAt(base: string, height: number): Promise<number | undefined> {
+  try {
+    const r = await rpc<OutputDistribution>(base, "/json_rpc", {
+      jsonrpc: "2.0", id: "0", method: "get_output_distribution",
+      params: { amounts: [0], cumulative: true, binary: false, from_height: height, to_height: height },
+    });
+    const n = r.result?.distributions?.[0]?.distribution?.at(-1);
+    return positive(n) ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface LastBlockHeader {
   result?: { block_header?: { reward?: number; height?: number }; status?: string };
 }
@@ -57,6 +76,7 @@ async function measure(base: string): Promise<NetworkStats> {
   const targetSeconds = positive(info.target) ? info.target : BLOCK_TARGET_SECONDS;
   const reward = last.result?.block_header?.reward;
   if (!positive(info.height) || !positive(difficulty) || !positive(reward)) throw new Error("unexpected node response");
+  const rctOutputs = await rctOutputsAt(base, info.height - 1);
 
   return {
     ok: true,
@@ -65,6 +85,7 @@ async function measure(base: string): Promise<NetworkStats> {
     targetSeconds,
     networkHashrate: difficulty / targetSeconds,
     lastBlockReward: reward,
+    ...(rctOutputs ? { rctOutputs } : {}),
     fetchedAt: new Date().toISOString(),
   };
 }

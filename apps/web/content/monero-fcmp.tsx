@@ -3,10 +3,11 @@ import type { ArticleMeta } from "@/lib/content";
 import { Callout, KeyFact, Steps, Takeaways } from "@/components/article/parts";
 import { Figure } from "@/components/art/Figure";
 import { Adaptive } from "@/components/art/WhatIsMoneroNarrowArt";
-import { FcmpAnonymitySetArt, FcmpAnonymitySetNarrow, FcmpRoadArt, FcmpRoadNarrow } from "@/components/art/MoneroFcmpArt";
+import { FcmpRoadArt, FcmpRoadNarrow } from "@/components/art/MoneroFcmpArt";
+import { CrowdExplorer } from "@/components/article/CrowdExplorer";
 import { walletUrl } from "@/lib/site";
 
-const CHECKED = "checked 2026-10-15";
+const CHECKED = "checked 2026-10-20";
 
 export const meta: ArticleMeta = {
   slug: "monero-fcmp",
@@ -14,13 +15,14 @@ export const meta: ArticleMeta = {
   kicker: "The big upgrade",
   title: "FCMP++ and Carrot: What Monero's Biggest Upgrade Changes for You",
   seoTitle: "Monero FCMP++ and Carrot: What Changes for You",
-  summary: "Monero FCMP++ replaces rings of 16 with proofs over the whole chain, and Carrot keeps your address. No mainnet date yet. What changes and what to do.",
+  summary: "Monero FCMP++ replaces rings of 16 with proofs over the whole chain. No official date yet; a developer plan estimates spring 2027. What changes, what to do.",
   keyword: "monero fcmp",
-  updated: "2026-10-15",
+  updated: "2026-10-20",
   readingMinutes: 10,
   toc: [
     { id: "short-answer", label: "The short answer" },
     { id: "status", label: "Where FCMP++ stands today" },
+    { id: "when", label: "When will it happen?" },
     { id: "sixteen-vs-chain", label: "From 16 to the whole chain" },
     { id: "carrot", label: "Carrot in plain words" },
     { id: "other-changes", label: "Other changes you will notice" },
@@ -31,7 +33,7 @@ export const meta: ArticleMeta = {
   related: ["monero-ring-signatures", "how-monero-works", "monero-stealth-address", "monero-subaddress"],
   faq: [
     { q: "What is FCMP++ in Monero?", a: "FCMP++ stands for Full-Chain Membership Proofs. It is a proposed upgrade that replaces ring signatures, where a spend hides among 16 outputs, with a proof that the coin being spent is one of all eligible outputs on the chain, without saying which one." },
-    { q: "When is the FCMP++ release date on mainnet?", a: "There is none yet. As of 15 October 2026 no mainnet date has been announced on getmonero.org or in the developers' meeting logs we read. A public test network called the beta stressnet forked to its third version on 5 October 2026." },
+    { q: "When is the FCMP++ release date on mainnet?", a: "There is no official date yet. As of 20 October 2026 none has been announced on getmonero.org or in the developers' meeting logs. A non-binding work plan by a core contributor estimates activation around late April 2027 (week 17). The beta stressnet, a public test network, forked to its third version on 5 October 2026." },
     { q: "Will my Monero address change with Carrot?", a: "No. The Carrot specification says it keeps backwards compatibility with existing addresses, subaddresses and integrated addresses, and that no wallet key migration is required." },
     { q: "Will my Monero wallet work after the fork?", a: "Only if it is updated. Like every Monero hard fork, wallets and nodes need software that follows the new rules. Your coins and your seed stay the same; the app has to be a version that supports FCMP++." },
     { q: "Do I need to move my XMR before the upgrade?", a: "No. Nothing about the published plans asks holders to move coins. Be suspicious of anyone who tells you to send coins somewhere, or type your seed into a site, to 'upgrade' them. That is a scam pattern." },
@@ -43,6 +45,9 @@ export const meta: ArticleMeta = {
     { label: "Carrot specification (jeffro256/carrot on GitHub)", href: "https://github.com/jeffro256/carrot/blob/master/carrot.md" },
     { label: "Deprecating Monero's Custom Transaction Unlock Time (getmonero.org, 10 May 2026)", href: "https://www.getmonero.org/2026/05/10/deprecating-unlock-time.html" },
     { label: "Monero 0.18.5.3 'Fluorine Fermi' released (getmonero.org, 6 October 2026)", href: "https://www.getmonero.org/2026/10/06/monero-0.18.5.3-released.html" },
+    { label: "Monero 0.18.5.4 'Fluorine Fermi' released (getmonero.org, 16 October 2026)", href: "https://www.getmonero.org/2026/10/16/monero-0.18.5.4-released.html" },
+    { label: "FCMP++/Carrot work plan, a non-binding working draft (jeffro256/fcmp-carrot-plan on GitHub)", href: "https://github.com/jeffro256/fcmp-carrot-plan" },
+    { label: "Monero Research Lab meeting log, 14 October 2026 (libera.monerologs.net)", href: "https://libera.monerologs.net/monero-research-lab/20261014" },
     { label: "Monero roadmap (getmonero.org)", href: "https://www.getmonero.org/resources/roadmap/" },
     { label: "Monero technical specifications: ring size", href: "https://docs.getmonero.org/technical-specs/" },
     { label: "OSPEAD: optimal ring signature research (getmonero.org, 5 April 2025)", href: "https://www.getmonero.org/2025/04/05/ospead-optimal-ring-signature-research.html" },
@@ -64,11 +69,12 @@ export function Body() {
         FCMP++ is the largest change planned for Monero in years. It <mark>replaces rings of 16 with a proof that covers the whole
         chain</mark>, and it arrives together with Carrot, a new addressing protocol that keeps your current address working. Here is
         what is confirmed, what is still being tested, and what you should do (and not do) before and on fork day. Every status
-        line on this page was checked against primary sources on 15 October 2026.
+        line on this page was checked against primary sources on 20 October 2026.
       </p>
 
       <Callout title="The answer in 20 seconds">
-        <strong>There is no mainnet date yet</strong>, and <strong>there is nothing you need to do today</strong>. Your coins, seed and
+        <strong>There is no official mainnet date yet</strong> (a developer&apos;s working plan estimates spring 2027, with no promise),
+        and <strong>there is nothing you need to do today</strong>. Your coins, seed and
         address stay the same. When a date is announced, you will need to update your wallet app before the fork. What will change:
         your spends hide among every eligible output instead of 16, custom unlock times go away, and newly created wallets gain
         new key types such as a full view-only key.
@@ -76,7 +82,7 @@ export function Body() {
 
       <Takeaways items={[
         "FCMP++ is a proposed upgrade. It is running on a public test network with worthless coins, not on mainnet.",
-        "The beta stressnet forked to version 3 on 5 October 2026. No mainnet date has been announced.",
+        "The beta stressnet forked to version 3 on 5 October 2026. No mainnet date has been announced; a contributor's non-binding plan estimates late April 2027.",
         "Carrot keeps existing addresses and seeds working. No key migration is needed.",
         "On fork day, update your wallet from its official source. Nobody legitimate will ask for your seed or your coins.",
       ]} />
@@ -127,13 +133,33 @@ export function Body() {
         said phase 2 code was merged and phase 3 code was open for review, with a request for audit quotes for those phases still to
         be drafted.
       </p>
+      <p>
+        At the{" "}
+        <a href="https://libera.monerologs.net/monero-research-lab/20261014" rel="noopener">14 October 2026 meeting</a>, developers
+        reported the stressnet &quot;going smooth&quot;, the second round of the cryptography audit with Least Authority underway, and
+        requests for quotes for the phase 2 and 3 integration audits still to be sent.
+      </p>
       <KeyFact label="Mainnet date">
-        None announced as of 15 October 2026. The getmonero.org roadmap lists full-chain membership proofs under &quot;Coming Soon&quot;
+        None announced as of 20 October 2026. The getmonero.org roadmap lists full-chain membership proofs under &quot;Coming Soon&quot;
         with no date, and the project&apos;s May 2026 unlock-time post says no fork date had been set.
       </KeyFact>
+
+      <h2 id="when">When will it happen?</h2>
       <p>
-        You will read guesses elsewhere, some of them confident. We do not repeat them. A hard fork date is set by the developers
-        when they judge the code and audits ready, and announced through official channels such as getmonero.org. We will update this page when that happens.
+        <strong>Officially: not decided.</strong> A hard fork date is set by the developers when they judge the code and audits
+        ready, and is announced through official channels such as getmonero.org. Some sites have published confident dates; earlier
+        targets such as &quot;August 2026&quot; have already passed without a fork.
+      </p>
+      <p>
+        <strong>The best public estimate</strong> comes from a core contributor&apos;s{" "}
+        <a href="https://github.com/jeffro256/fcmp-carrot-plan" rel="noopener">work plan</a>, which says that according to its planner
+        FCMP++ and Carrot <mark>will activate in week 17 of 2027</mark>, which is late April 2027. Its author calls it a non-binding
+        working draft, and it only counts work left after 22 July 2026.
+      </p>
+      <p>
+        <strong>What is holding it up</strong>, from the 14 October 2026 meeting: the remaining audits (above), and a licensing
+        question around one cryptography library, which a Carrot developer called &quot;a bottleneck to HF activation&quot;. We will update
+        this page, and turn the fork-day checklist below into its own page, as soon as a date is announced.
       </p>
 
       <h2 id="sixteen-vs-chain">From 16 to the whole chain</h2>
@@ -150,9 +176,7 @@ export function Body() {
         <mark>one of all eligible outputs on the chain</mark>, without saying which. There are no decoys to choose, so there is no
         decoy pattern to analyse.
       </p>
-      <Figure caption="Left: today a spend hides among 16 outputs. Right: under FCMP++, every eligible output on the chain is a candidate.">
-        <Adaptive wide={<FcmpAnonymitySetArt />} narrow={<FcmpAnonymitySetNarrow />} />
-      </Figure>
+      <CrowdExplorer />
       <table>
         <thead><tr><th></th><th>Today (ring signatures)</th><th>With FCMP++</th></tr></thead>
         <tbody>
@@ -224,7 +248,7 @@ export function Body() {
         <tbody>
           <tr>
             <td>Monero GUI and CLI</td>
-            <td>The FCMP++ test builds of the official CLI and GUI are published on the stressnet releases page. The latest mainnet release, 0.18.5.3 (6 October 2026), does not mention FCMP++.</td>
+            <td>The FCMP++ test builds of the official CLI and GUI are published on the stressnet releases page. The latest mainnet releases, 0.18.5.3 (6 October 2026) and 0.18.5.4 (16 October 2026, bug fixes), do not mention FCMP++.</td>
             <td>{CHECKED}</td>
           </tr>
           <tr>
@@ -234,7 +258,7 @@ export function Body() {
           </tr>
           <tr>
             <td>Cake Wallet</td>
-            <td>An open pull request, &quot;initial: fcmp++-stage build&quot; (#3530), was opened on 17 August 2026. Not merged when checked.</td>
+            <td>An open pull request, &quot;initial: fcmp++-stage build&quot; (#3530), was opened on 17 August 2026. Not merged when checked, with no activity since that day.</td>
             <td>{CHECKED}</td>
           </tr>
           <tr>
@@ -249,7 +273,7 @@ export function Body() {
           </tr>
           <tr>
             <td>MonkStash</td>
-            <td>Not ready yet. Our engine, monero-ts, is built on the Monero 0.18.5 line, and its public releases and issue tracker show no FCMP++ work yet. Getting ready is on our <Link href="/donate">public roadmap</Link>.</td>
+            <td>Not ready yet. Our engine, monero-ts, moved to Monero 0.18.5.3 in its 0.11.20 release (10 October 2026), and its public releases show no FCMP++ work yet. Getting ready is on our <Link href="/donate">public roadmap</Link>.</td>
             <td>{CHECKED}</td>
           </tr>
         </tbody>

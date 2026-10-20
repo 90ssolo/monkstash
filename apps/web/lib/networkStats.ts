@@ -11,6 +11,8 @@ export interface NetworkStats {
   networkHashrate: number;
   /** Total reward of the newest block (base reward plus that block's fees), in piconero. */
   lastBlockReward: number;
+  /** RingCT outputs on the chain up to the tip (get_output_distribution), when the node answered. */
+  rctOutputs?: number;
   /** When the numbers were read (ISO). */
   fetchedAt: string;
 }
