@@ -17,6 +17,9 @@ import { fileURLToPath } from "node:url";
 import { build } from "vite";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+// The bundle's region comments name files relative to the working folder: build from this package's
+// folder wherever the script is started, so every machine writes the same bytes.
+process.chdir(root);
 const dev = process.argv.includes("--dev");
 const firefox = process.argv.includes("--firefox");
 const browser = firefox ? "firefox" : "chrome";
@@ -62,8 +65,10 @@ const perBrowser = firefox
         gecko: {
           id: "extension@monkstash.com",
           strict_min_version: "140.0",
-          // Firefox's built-in consent: this add-on collects no data.
-          data_collection_permissions: { required: ["none"] },
+          // Firefox's built-in consent counts anything handled outside the browser. The transactions you
+          // send pass through the relay to the Monero network ("transactions" is in Firefox's
+          // financialAndPaymentInfo category), so that is declared; nothing else leaves the browser.
+          data_collection_permissions: { required: ["financialAndPaymentInfo"] },
         },
       },
     }

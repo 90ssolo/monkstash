@@ -174,3 +174,13 @@
 @media (prefers-reduced-motion: reduce) {
   .pm::before, .pm::after { transition: none; }
 }
+
+/* Real screenshots of the extension (release build). */
+.shotPopup { display: block; width: min(100%, 380px); height: auto; margin-inline: auto; border-radius: 12px; border: 1px solid var(--line-2); box-shadow: 0 30px 60px -30px rgba(27, 42, 34, 0.5); background: var(--surface); }
+.shotWide { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid #38503f; }
+.statusCard { border: 1px solid var(--line-2); border-left: 3px solid var(--clay); background: var(--surface); border-radius: 0 10px 10px 0; padding: 18px 22px; margin-top: 24px; }
+.statusCard p { margin: 0; }
+.statusCard p + p { margin-top: 8px; }
+.permList { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
+.permList li { padding: 12px 16px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); }
+.permList code { font-size: 0.85em; }

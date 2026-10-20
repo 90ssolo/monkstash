@@ -4,26 +4,32 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, helpDiscussionsUrl, repoUrl, walletUrl } from "@/lib/site";
 import {
-  HeroBrowser, RiskPermissions, RiskFake, RiskUpdate, RiskSeed,
-  StepOpenTab, StepSetUp, StepBookmark, FutureStack, EmptyShelf,
+  RiskPermissions, RiskFake, RiskUpdate, RiskSeed,
+  StepOpenTab, StepSetUp, StepBookmark, EmptyShelf,
   ArrowIcon, ChkSymbols,
 } from "./Art";
 import styles from "./page.module.css";
 
+const TITLE = "MonkStash Monero Wallet Extension for Chrome and Firefox";
+const DESCRIPTION = "A non-custodial Monero wallet in your browser toolbar, for Chrome and Firefox. Open source, keys kept on your device. How to recognise the real listing.";
+const UPDATED = "2026-10-20";
+
 export const metadata: Metadata = {
-  title: "Monero Wallet Chrome Extension: What Works Today",
-  description: "Looking for a Monero wallet Chrome extension? Ours is only planned, but the full MonkStash wallet already works in Chrome today, with no install.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/monero-chrome-extension" },
-  openGraph: ogFor({ title: "Monero Wallet Chrome Extension: What Works Today", description: "Looking for a Monero wallet Chrome extension? Ours is only planned, but the full MonkStash wallet already works in Chrome today, with no install.", path: "/monero-chrome-extension" }),
+  openGraph: ogFor({ title: TITLE, description: DESCRIPTION, path: "/monero-chrome-extension" }),
 };
 
 const faqs = [
-  { q: "Is there an official Monero Chrome extension?", a: "There is no widely used, well-maintained Monero wallet extension in the Chrome Web Store. The options that exist are mostly old projects or tools that need the Monero command-line wallet running on your computer. Because of that gap, be careful with any extension claiming to be a Monero wallet." },
-  { q: "Can I use Monero in Chrome without an extension?", a: "Yes. MonkStash is a full Monero wallet that runs in the browser, including Chrome, with nothing to install. You open the page, create or restore your wallet, and your keys stay encrypted on your device." },
-  { q: "Are Monero browser extensions safe?", a: "Treat unknown extensions with caution. Browser extensions can request broad permissions, and there have been cases of malicious extensions in the past. Only install from official sources, check the permissions, and never enter recovery words into an extension you do not fully trust." },
-  { q: "Will MonkStash have a Chrome extension?", a: "A Chrome extension is planned but not in development yet. We will share it if and when it is ready and properly reviewed. Until then, the web wallet gives you the same features in your browser." },
+  { q: "Is the MonkStash extension available?", a: "It is built for Chrome and Firefox and its code is public. It is on its way to the Chrome Web Store and Firefox Add-ons, where it goes through review, and we link the official listings on this page the day they are approved. Until then, any store listing called MonkStash is not ours, and the web wallet does the same job in a normal tab." },
+  { q: "How do I know a MonkStash extension is real?", a: "Install it only from a link on this page, on monkstash.com. Check that the publisher is MonkStash and that the listing links back to monkstash.com. In the extension, Settings shows a build fingerprint you can check against the public source code." },
+  { q: "Can the extension read the websites I visit?", a: "No. It has no content scripts and no access to web pages, and no website can talk to it. It connects only to our relay at wallet.monkstash.com, or to your own node if you add one." },
+  { q: "Where are my keys kept?", a: "On your device, in the extension's own storage, encrypted with your password. While the wallet is unlocked the keys are held only in memory, and they are gone when it locks: after idle time, when your computer locks, and when the browser closes." },
+  { q: "Can I move my web wallet into the extension?", a: "Yes. Restore the same recovery words in the extension, then load a move file saved from the web wallet's Settings. It carries the scan progress and your contacts and payment requests, so the extension skips the long first scan." },
+  { q: "Can I use Monero in Chrome without an extension?", a: "Yes. The MonkStash web wallet is the same wallet in a normal tab, with nothing to install. Open it from your own bookmark." },
 ];
 
 const risks = [
@@ -42,20 +48,29 @@ const checklist = [
   { b: "Start small.", t: "Try any new wallet with a small amount before you trust it with more." },
 ];
 
-const futureBits = [
-  { b: "A shortcut in your toolbar.", t: "Your balance and address one click away, without opening a tab." },
-  { b: "The same design as the web wallet.", t: "Non-custodial, with your keys staying on your device and no tracking." },
-  { b: "A release only when it is reviewed.", t: "We would rather ship late than rush something that touches your money." },
+const features = [
+  { b: "One click from the toolbar.", t: "Balance, send, receive and recent activity in a small popup that opens instantly, even while a scan runs." },
+  { b: "The full wallet when you need it.", t: "Expand to a tab, or keep it in the side panel while you browse: payment requests, a till, contacts, proofs and every setting." },
+  { b: "Locks itself.", t: "After idle time, when every MonkStash window has been closed for a few minutes, when your computer locks, and when the browser closes." },
+  { b: "Bring your wallet.", t: "Create one, restore 25, 13 (MyMonero) or 12 (Exodus) words, add a watch-only wallet, or move from the web wallet without rescanning." },
+];
+
+const permissions = [
+  { p: "Storage and unlimited storage", why: "to keep the encrypted wallet and its scan progress on your device." },
+  { p: "wallet.monkstash.com", why: "our relay to the Monero network, the only site it connects to by default." },
+  { p: "Idle", why: "to lock the wallet when your computer locks." },
+  { p: "Offscreen and side panel (Chrome only)", why: "to keep the wallet running while the popup is closed, and to open it in the side panel." },
+  { p: "Your own node, only if you add one", why: "the browser asks you to allow that one address." },
 ];
 
 export default function ChromeExtensionPage() {
   return (
     <>
       <JsonLd data={[
-        { "@context": "https://schema.org", "@type": "Article", headline: "Monero Wallet Chrome Extension: What Exists and What Works Today", description: metadata.description as string, dateModified: "2026-10-15", mainEntityOfPage: absoluteUrl("/monero-chrome-extension"), author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" } },
+        { "@context": "https://schema.org", "@type": "Article", headline: TITLE, description: DESCRIPTION, dateModified: UPDATED, mainEntityOfPage: absoluteUrl("/monero-chrome-extension"), author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" } },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
-          { "@type": "ListItem", position: 2, name: "Chrome extension", item: absoluteUrl("/monero-chrome-extension") },
+          { "@type": "ListItem", position: 2, name: "Browser extension", item: absoluteUrl("/monero-chrome-extension") },
         ] },
         { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
       ]} />
@@ -67,50 +82,80 @@ export default function ChromeExtensionPage() {
         <section className={styles.hero} id="top">
           <div className="container-wide">
             <nav className={styles.crumb} aria-label="Breadcrumb" style={{ marginBottom: "var(--s-6)" }}>
-              <Link href="/">Home</Link><span aria-hidden="true">/</span><span>Chrome extension</span>
+              <Link href="/">Home</Link><span aria-hidden="true">/</span><span>Browser extension</span>
             </nav>
             <div className={styles.heroGrid}>
               <div>
                 <h1 className={styles.h1}>
-                  <span className={`eyebrow ${styles.h1Kicker}`}>Monero wallet Chrome extension</span>{" "}
-                  You <mark>do not need</mark> an extension to use Monero in Chrome.
+                  <span className={`eyebrow ${styles.h1Kicker}`}>Monero wallet extension for Chrome and Firefox</span>{" "}
+                  Your Monero wallet, <mark>one click away</mark>.
                 </h1>
-                <p className={styles.sub}>A MonkStash Chrome extension is planned, but it is not in development yet. You do not have to wait: the full MonkStash wallet runs in Chrome right now, with no install and no download.</p>
-                <div className={styles.ctaRow}>
-                  <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the wallet in Chrome <ArrowIcon /></Link>
-                  <Link className="btn btn-ghost btn-lg" href="#risks">Why extensions are risky</Link>
+                <p className={styles.sub}>MonkStash in your browser toolbar: check your balance, send and receive XMR without opening a tab. Your keys are made and kept on your device, and the code is public.</p>
+                <div className={styles.statusCard} role="status">
+                  <p><strong>Store listings are on their way.</strong> The extension is built and on its way to the Chrome Web Store and Firefox Add-ons, where it goes through review. We link the official listings here the day they are approved.</p>
+                  <p>Until then, a store listing called MonkStash is not ours. The <Link className={styles.inlineLink} href={walletUrl}>web wallet</Link> is the same wallet, today.</p>
                 </div>
-                <p className={styles.micro}><span>Works today.</span><span>Nothing to install.</span><span>Keys stay on your device.</span></p>
+                <div className={styles.ctaRow}>
+                  <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the web wallet <ArrowIcon /></Link>
+                  <a className="btn btn-ghost btn-lg" href={repoUrl} rel="noopener">See the source code</a>
+                </div>
+                <p className={styles.micro}><span>Chrome and Firefox.</span><span>Cannot read your websites.</span><span>Open source.</span></p>
               </div>
               <figure className={styles.fig}>
-                <div className={styles.heroArt}><HeroBrowser /></div>
-                <figcaption className={styles.figCap}><span><b>Figure 1</b></span><span>The wallet in a normal tab. The dashed slot is where a future toolbar icon would go.</span></figcaption>
+                <img className={styles.shotPopup} src="/extension/popup-home.png" width={760} height={1200} alt="The MonkStash extension popup: sync status, the balance, and Send, Receive and Get paid buttons, with Home, Send, Receive, Activity and More at the bottom." />
+                <figcaption className={styles.figCap}><span><b>Figure 1</b></span><span>The popup, release build, with a new empty wallet.</span></figcaption>
               </figure>
             </div>
           </div>
         </section>
 
-        {/* 2. HONEST STATE */}
-        <section className={`${styles.sec} ${styles.alt}`} id="state">
+        {/* 2. HOW TO RECOGNISE IT */}
+        <section className={`${styles.sec} ${styles.alt}`} id="real">
           <div className="container-wide">
             <div className={styles.stateGrid}>
               <div>
                 <div className={styles.secHead} style={{ marginBottom: 28 }}>
-                  <p className="eyebrow">The honest state</p>
-                  <h2>The shelf for Monero extensions is nearly empty.</h2>
+                  <p className="eyebrow">The real one</p>
+                  <h2>Install it only from a link on this page.</h2>
                 </div>
-                <p className={styles.stateBody}>If you have searched the Chrome Web Store for a Monero wallet, you have probably found slim pickings. There is <mark>no widely used, actively maintained Monero wallet extension</mark>. The options that turn up are mostly old projects, or tools that only work alongside the Monero command-line wallet running on your own computer.</p>
-                <p className={styles.stateBody}>That gap is exactly why it pays to be careful. An empty shelf is where look-alikes move in. Our own extension is <Link className={styles.inlineLink} href="#future">planned, not built</Link>, and the <Link className={styles.inlineLink} href={walletUrl}>web wallet</Link> already does the job.</p>
+                <p className={styles.stateBody}>The shelf for Monero extensions is nearly empty, and <mark>an empty shelf is where look-alikes move in</mark>. Fake wallet extensions copy the name and the icon perfectly, so the only reliable check is where the link came from.</p>
+                <p className={styles.stateBody}>The official MonkStash listings will be linked here, on monkstash.com, and nowhere else. The publisher is MonkStash, the listing links back to this site, and the extension shows a build fingerprint in Settings that anyone can check against the <a className={styles.inlineLink} href={repoUrl} rel="noopener">public source code</a> (see <Link className={styles.inlineLink} href="/verify">how to verify a build</Link>).</p>
               </div>
               <figure className={styles.stateFig}>
                 <EmptyShelf />
-                <figcaption className={styles.figCap}><span><b>Figure 2</b></span><span>Old projects and gaps, not a well-kept shelf.</span></figcaption>
+                <figcaption className={styles.figCap}><span><b>Figure 2</b></span><span>Old projects and gaps: where copies like to sit.</span></figcaption>
               </figure>
             </div>
           </div>
         </section>
 
-        {/* 3. RISKS */}
+        {/* 3. WHAT IT DOES */}
+        <section className={`${styles.sec}`} id="features" aria-labelledby="featuresH">
+          <div className="container-wide">
+            <div className={styles.futGrid}>
+              <div>
+                <div className={styles.secHead} style={{ marginBottom: 28 }}>
+                  <p className="eyebrow">What the extension does</p>
+                  <h2 id="featuresH">Quick in the popup, <mark>complete in a tab</mark>.</h2>
+                </div>
+                <ul className={styles.futList}>
+                  {features.map((f) => <li key={f.b}><b>{f.b}</b> {f.t}</li>)}
+                </ul>
+                <h3 style={{ margin: "28px 0 12px" }}>What it asks your browser for</h3>
+                <ul className={styles.permList}>
+                  {permissions.map((p) => <li key={p.p}><b>{p.p}:</b> {p.why}</li>)}
+                </ul>
+                <p>It has no content scripts and cannot read or change the pages you visit. More in the <Link className={styles.inlineLink} href="/privacy#extension">privacy policy</Link>.</p>
+              </div>
+              <figure className={styles.futFig}>
+                <img className={styles.shotWide} src="/extension/tab-home.png" width={1600} height={1000} alt="The full MonkStash wallet in a browser tab: a side menu with Home, Send, Receive, Get paid, Activity, Contacts, Checkup and Settings, and the balance with Send, Receive and Get paid." loading="lazy" />
+                <figcaption className={`${styles.figCap} ${styles.darkCap}`}><span><b>Figure 3</b></span><span>The same wallet expanded to a tab.</span></figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. RISKS */}
         <section className={`${styles.sec} ${styles.dark}`} id="risks" aria-labelledby="risksH">
           <div className="container-wide">
             <div className={styles.secHead}>
@@ -130,7 +175,7 @@ export default function ChromeExtensionPage() {
             <div className={styles.checkWrap}>
               <div>
                 <h3>Your checklist for any wallet extension</h3>
-                <p>Run through it every time. It takes about a minute, and it is the cheapest security you will ever buy.</p>
+                <p>Run through it every time, ours included. It takes about a minute, and it is the cheapest security you will ever buy.</p>
               </div>
               <ul className={styles.checklist}>
                 {checklist.map((c) => <li key={c.b}><b>{c.b}</b> {c.t}</li>)}
@@ -143,20 +188,20 @@ export default function ChromeExtensionPage() {
           </div>
         </section>
 
-        {/* 4. USE IT TODAY */}
+        {/* 5. USE IT TODAY */}
         <section className={styles.sec} id="today">
           <div className="container-wide">
             <div className={styles.secHead}>
-              <p className="eyebrow">Use MonkStash in Chrome today</p>
-              <h2>Three steps, and Monero is in your browser.</h2>
-              <p className="lede">MonkStash runs in the browser itself. You create or restore your wallet, your recovery words are <mark>encrypted on your device</mark>, and the wallet connects to a Monero node to find your payments. Nothing is installed, and nothing is sent to our servers.</p>
+              <p className="eyebrow">Until the listings are live</p>
+              <h2>Three steps, and Monero is in your browser today.</h2>
+              <p className="lede">The web wallet is the same MonkStash in a normal tab. You create or restore your wallet, your recovery words are <mark>encrypted on your device</mark>, and nothing is installed. Later, a move file takes it into the extension without a rescan.</p>
             </div>
             <div className={styles.steps}>
               <article className={styles.step}>
                 <span className={styles.stepNum}>i</span>
                 <div className={styles.stepIll}><StepOpenTab /></div>
                 <h3>Open the wallet</h3>
-                <p>Go to the <Link className={styles.inlineLink} href={walletUrl}>MonkStash wallet</Link> in Chrome. It is a normal web page, so there is <mark>nothing to approve or install</mark>.</p>
+                <p>Go to the <Link className={styles.inlineLink} href={walletUrl}>MonkStash wallet</Link>. It is a normal web page, so there is <mark>nothing to approve or install</mark>.</p>
               </article>
               <article className={styles.step}>
                 <span className={styles.stepNum}>ii</span>
@@ -168,90 +213,61 @@ export default function ChromeExtensionPage() {
                 <span className={styles.stepNum}>iii</span>
                 <div className={styles.stepIll}><StepBookmark /></div>
                 <h3>Bookmark it</h3>
-                <p>Star the page once. From then on you reach the wallet from <mark>your own bookmark</mark>, not from a search result that could be a fake. You are ready to receive and send XMR.</p>
+                <p>Star the page once. From then on you reach the wallet from <mark>your own bookmark</mark>, not from a search result that could be a fake.</p>
               </article>
             </div>
             <p className={styles.stepsNext}>New to Monero? Start with <Link className={styles.inlineLink} href="/create-monero-wallet">how to create a wallet</Link> or <Link className={styles.inlineLink} href="/what-is-monero">what Monero is</Link>.</p>
           </div>
         </section>
 
-        {/* 5. FUTURE */}
-        <section className={`${styles.sec} ${styles.alt}`} id="future" aria-labelledby="futureH">
-          <div className="container-wide">
-            <div className={styles.futGrid}>
-              <div>
-                <div className={styles.secHead} style={{ marginBottom: 28 }}>
-                  <p className="eyebrow">What the extension will add</p>
-                  <h2 id="futureH">A toolbar shortcut, built the same careful way.</h2>
-                </div>
-                <p className="lede" style={{ marginBottom: 22 }}>A Chrome extension can make a wallet quicker to reach and can integrate with pages you visit. If we build one, it will follow the same principles as the web wallet.</p>
-                <ul className={styles.futList}>
-                  {futureBits.map((f) => <li key={f.b}><b>{f.b}</b> {f.t}</li>)}
-                </ul>
-                <div className={styles.noDate}>
-                  <p>The extension is a milestone on the <Link className={styles.inlineLink} href="/donate">community roadmap</Link>, funded by the people who use MonkStash. <mark>We are not promising a date.</mark></p>
-                </div>
-                <div className={styles.actions}>
-                  <Link className="btn btn-clay" href="/donate">Help fund the extension</Link>
-                  <Link className={styles.inlineLink} href={walletUrl}>Or use the wallet now</Link>
-                </div>
-              </div>
-              <figure className={styles.futFig}>
-                <FutureStack />
-                <figcaption className={`${styles.figCap} ${styles.darkCap}`}><span><b>Figure 3</b></span><span>The plan on paper: a popup on top of the same wallet core. Not built yet.</span></figcaption>
-              </figure>
-            </div>
-          </div>
-        </section>
-
         {/* 6. COMPARE */}
-        <section className={styles.sec} id="compare">
+        <section className={`${styles.sec} ${styles.alt}`} id="compare">
           <div className="container-wide">
             <div className={styles.secHead}>
               <p className="eyebrow">Side by side</p>
-              <h2>Three ways to get Monero into Chrome.</h2>
-              <p className="lede">Only one of them works today and has an address you can bookmark and check.</p>
+              <h2>The web wallet, the extension, and unknown extensions.</h2>
+              <p className="lede">The first two are the same wallet. The difference is where it opens.</p>
             </div>
             <div className={styles.tablewrap}>
               <table className={styles.mag}>
-                <caption>Table 1. MonkStash in Chrome, a future extension, and unknown extensions</caption>
+                <caption>Table 1. MonkStash on the web, the MonkStash extension, and unknown extensions (20 October 2026)</caption>
                 <thead>
                   <tr>
                     <th scope="col">What you care about</th>
-                    <th scope="col" className={styles.us}>MonkStash in Chrome today</th>
-                    <th scope="col">A future MonkStash extension</th>
+                    <th scope="col" className={styles.us}>MonkStash web wallet</th>
+                    <th scope="col">MonkStash extension</th>
                     <th scope="col">Unknown extensions from the store</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <th scope="row">Install needed</th>
-                    <td className={styles.us} data-label="Today">Nothing</td>
-                    <td data-label="Future extension">A store install</td>
+                    <td className={styles.us} data-label="Web wallet">Nothing</td>
+                    <td data-label="Extension">From the official store listing</td>
                     <td data-label="Unknown extensions">A store install</td>
                   </tr>
                   <tr>
                     <th scope="row">Where your keys live</th>
-                    <td className={styles.us} data-label="Today">Encrypted on your device</td>
-                    <td data-label="Future extension">Encrypted on your device (same design)</td>
+                    <td className={styles.us} data-label="Web wallet">Encrypted on your device</td>
+                    <td data-label="Extension">Encrypted on your device, in memory only while unlocked</td>
                     <td data-label="Unknown extensions">Depends on the maker. Check first.</td>
                   </tr>
                   <tr>
-                    <th scope="row">Risk of fake copies</th>
-                    <td className={styles.us} data-label="Today">Lower, if you use your own bookmark</td>
-                    <td data-label="Future extension">Possible, as with any extension</td>
-                    <td data-label="Unknown extensions">Higher. Look-alikes are common.</td>
+                    <th scope="row">Access to your websites</th>
+                    <td className={styles.us} data-label="Web wallet">None</td>
+                    <td data-label="Extension">None (no content scripts)</td>
+                    <td data-label="Unknown extensions">Often asks to read every page</td>
                   </tr>
                   <tr>
-                    <th scope="row">Updates</th>
-                    <td className={styles.us} data-label="Today">You get the current version each time you open it</td>
-                    <td data-label="Future extension">Through the store</td>
-                    <td data-label="Unknown extensions">Automatic, and can change the tool</td>
+                    <th scope="row">How to check it</th>
+                    <td className={styles.us} data-label="Web wallet">Your own bookmark, and /verify</td>
+                    <td data-label="Extension">Link from this page, build fingerprint in Settings</td>
+                    <td data-label="Unknown extensions">Hard. Look-alikes are common.</td>
                   </tr>
                   <tr>
-                    <th scope="row">Works today</th>
-                    <td className={styles.us} data-label="Today"><span className={styles.yes}><svg aria-hidden="true"><use href="#exChk" /></svg>Yes</span></td>
-                    <td data-label="Future extension"><span className={styles.yes}><svg className={styles.chkClay} aria-hidden="true"><use href="#exNo" /></svg>No, planned</span></td>
+                    <th scope="row">Available</th>
+                    <td className={styles.us} data-label="Web wallet"><span className={styles.yes}><svg aria-hidden="true"><use href="#exChk" /></svg>Yes</span></td>
+                    <td data-label="Extension">After store review</td>
                     <td data-label="Unknown extensions">Varies. Few are maintained.</td>
                   </tr>
                 </tbody>
@@ -264,12 +280,12 @@ export default function ChromeExtensionPage() {
         </section>
 
         {/* 7. FAQ */}
-        <section className={`${styles.sec} ${styles.alt}`} id="faq">
+        <section className={styles.sec} id="faq">
           <div className={`container-wide ${styles.faqGrid}`}>
             <div className={styles.faqSide}>
               <p className="eyebrow">Questions</p>
-              <h2>Monero in Chrome, answered</h2>
-              <p>More questions? See the <Link className={styles.inlineLink} href="/faq">full FAQ</Link> or <Link className={styles.inlineLink} href="/support">ask for support</Link>.</p>
+              <h2>The MonkStash extension, answered</h2>
+              <p>More questions? See the <Link className={styles.inlineLink} href="/faq">full FAQ</Link>, <a className={styles.inlineLink} href={helpDiscussionsUrl} rel="noopener">ask in public on GitHub</a> or <Link className={styles.inlineLink} href="/support">email support</Link>.</p>
             </div>
             <div className={styles.faq}>
               {faqs.map((f, i) => (
@@ -285,11 +301,11 @@ export default function ChromeExtensionPage() {
         {/* 8. FINAL CTA */}
         <section className={styles.final} aria-labelledby="finalH">
           <div className={`container-wide ${styles.finalInner}`}>
-            <h2 id="finalH">Skip the store. Open your wallet.</h2>
-            <p>Free, non-custodial, and ready in Chrome in about two minutes. No download, no account, and no extension to vet.</p>
+            <h2 id="finalH">Start today. Move to the toolbar later.</h2>
+            <p>The web wallet is free, non-custodial and ready in about two minutes. When the store listings go live, a move file brings your wallet into the extension without a rescan.</p>
             <div className={styles.ctaRow}>
-              <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the wallet in Chrome</Link>
-              <Link className="btn btn-ghost btn-lg" href="/donate">Help fund the extension</Link>
+              <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the web wallet</Link>
+              <a className="btn btn-ghost btn-lg" href={repoUrl} rel="noopener">Read the source code</a>
             </div>
           </div>
         </section>

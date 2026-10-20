@@ -65,9 +65,9 @@ export const donate = {
     {
       id: "extension",
       title: "Extension and phone apps",
-      outcome: "MonkStash in your Chrome and Firefox toolbar, then as an app on iPhone and Android, built on the same wallet core.",
+      outcome: "MonkStash in your Chrome and Firefox toolbar (built, going through store review), then as an app on iPhone and Android, built on the same wallet core.",
       why: "There is still no good Monero browser extension. This fills the gap.",
-      status: "later",
+      status: "building",
     },
   ] as Milestone[],
 };

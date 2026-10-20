@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, helpDiscussionsUrl, walletUrl } from "@/lib/site";
 import { SupportHeroArt, NeverAskArt, PipeArt } from "../_trust/TrustArt";
 import styles from "../_trust/trust.module.css";
 
@@ -129,10 +129,11 @@ export default function SupportPage() {
           <div className="container-wide">
             <div className={styles.secHead} style={{ marginBottom: 0 }}>
               <p className="eyebrow">How to reach us</p>
-              <h2 id="contactH">Email us. We will never ask for your recovery words.</h2>
-              <p className={styles.statusBody}>Check the <Link className={styles.inlineLink} href="/faq">FAQ</Link> and the guides above first, since they cover the common problems. If you are still stuck, email us. We answer by email only: there is no chat or phone line, and we never message you first. Please <mark>ignore anyone claiming to be MonkStash support</mark> in a message or comment.</p>
+              <h2 id="contactH">Email us or ask in public. We will never ask for your recovery words.</h2>
+              <p className={styles.statusBody}>Check the <Link className={styles.inlineLink} href="/faq">FAQ</Link> and the guides above first, since they cover the common problems. If you are still stuck, email us, or ask in public on GitHub so others with the same question find the answer too. There is no chat or phone line, and we never message you first. Please <mark>ignore anyone claiming to be MonkStash support</mark> in a private message, and never post your recovery words, keys or move files anywhere.</p>
               <ul className={styles.resList}>
-                <li><a href="mailto:support@monkstash.com">support@monkstash.com</a> for help with the wallet or the tools.</li>
+                <li><a href="mailto:support@monkstash.com">support@monkstash.com</a> for help with the wallet, the browser extension or the tools.</li>
+                <li><a href={helpDiscussionsUrl} rel="noopener">Help &amp; Support on GitHub Discussions</a> to ask in public. Our replies there carry the repository&apos;s Owner or Maintainer label.</li>
                 <li><a href="mailto:security@monkstash.com">security@monkstash.com</a> to report a vulnerability privately.</li>
                 <li><a href="mailto:hello@monkstash.com">hello@monkstash.com</a> for everything else, including corrections to a guide.</li>
               </ul>

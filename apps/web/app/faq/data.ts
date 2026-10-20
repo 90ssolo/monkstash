@@ -47,9 +47,9 @@ export const faqCategories: FaqCategory[] = [
         links: [{ href: "/monero-node", label: "What a node does" }],
       },
       {
-        q: "Is there a Chrome extension?",
-        a: "A Chrome extension is planned, but you can use the full wallet today without it.",
-        links: [{ href: "/monero-chrome-extension", label: "The Monero Chrome extension" }],
+        q: "Is there a browser extension?",
+        a: "Yes, for Chrome and Firefox. It is built and its code is public, and it is on its way through store review. Install it only from the links on our extension page; until they are live, any store listing called MonkStash is not ours. The web wallet works today without an install.",
+        links: [{ href: "/monero-chrome-extension", label: "The MonkStash extension" }],
       },
       {
         q: "Is MonkStash free?",

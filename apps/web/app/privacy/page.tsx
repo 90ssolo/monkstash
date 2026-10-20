@@ -9,8 +9,8 @@ import { KeysOnDeviceArt } from "../_trust/TrustArt";
 import trust from "../_trust/trust.module.css";
 import styles from "./privacy.module.css";
 
-const UPDATED = "2026-10-16";
-const UPDATED_TEXT = "16 October 2026";
+const UPDATED = "2026-10-20";
+const UPDATED_TEXT = "20 October 2026";
 const DESCRIPTION =
   "What MonkStash can and cannot see: no accounts, no cookies, no tracking. Your keys never leave your device. Here is exactly what passes through our server.";
 
@@ -36,6 +36,7 @@ const TOC = [
   { id: "short", label: "The short version" },
   { id: "map", label: "Where your data lives" },
   { id: "device", label: "On your device" },
+  { id: "extension", label: "Browser extension" },
   { id: "server", label: "What our server sees" },
   { id: "links", label: "Payment links" },
   { id: "tracking", label: "Cookies and tracking" },
@@ -123,6 +124,26 @@ export default function PrivacyPage() {
               </p>
               <p>
                 Using <em>Remove wallet</em> deletes all of this from the device. Two display preferences (whether amounts are hidden, and whether you bookmarked the wallet) stay until you clear your browser&apos;s site data. Your money is not affected: it lives on the Monero network, and your recovery words bring it back. See <Link className={trust.inlineLink} href="/back-up-monero-wallet">how to back up a Monero wallet</Link>.
+              </p>
+            </section>
+
+            <section id="extension" aria-labelledby="extension-h">
+              <h2 id="extension-h">The browser extension</h2>
+              <p>
+                The MonkStash extension for Chrome and Firefox is the same wallet in a different window, and it follows the same rules. Your recovery words, keys and records are kept in the extension&apos;s own storage in your browser, encrypted in the same way. While the wallet is unlocked, the decrypted keys are held only in the memory of the extension&apos;s background page, and <mark>they are gone when it locks</mark>: after the idle time, when every MonkStash window has been closed for a few minutes, when your computer locks, or when the browser closes.
+              </p>
+              <p>
+                <strong>The extension cannot read the websites you visit.</strong> It has no content scripts and no access to web pages, and no website can talk to it. It asks your browser only for what it needs:
+              </p>
+              <ul>
+                <li><strong>Storage, unlimited storage:</strong> to keep the encrypted wallet and its sync progress, which can grow to tens of megabytes for an older wallet.</li>
+                <li><strong>Access to wallet.monkstash.com:</strong> the relay described below, the only site it connects to by default.</li>
+                <li><strong>Idle:</strong> to lock the wallet when your computer locks.</li>
+                <li><strong>Offscreen and side panel (Chrome):</strong> to keep the wallet running while the small popup is closed, and to show it in the side panel.</li>
+                <li><strong>Your own node, if you add one:</strong> the browser asks you to allow that one address, and the access is removed again when you stop using it.</li>
+              </ul>
+              <p>
+                Browser stores ask extensions to label what data leaves the browser. Ours says financial information, because <mark>the transactions you send pass through our relay</mark> on their way to the Monero network, exactly as they do in the web wallet. Nothing else is sent, nothing is sold, and none of it is used for anything but your wallet. The extension has no analytics and no ads.
               </p>
             </section>
 

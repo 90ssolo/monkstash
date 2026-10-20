@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Wallet Phishing: How to Spot a Fake",
   summary: "Monero wallet phishing explained: how fake wallet sites and apps work, a 60-second check, and what to do if you already typed your seed words.",
   keyword: "monero wallet phishing",
-  updated: "2026-10-17",
+  updated: "2026-10-20",
   readingMinutes: 10,
   toc: [
     { id: "how", label: "How the scams work" },
@@ -220,7 +220,7 @@ export function Body() {
         <li><strong>Bookmark it.</strong> Open the <Link href={walletUrl}>wallet</Link> once from this site and check that your address bar says <strong className="mono">{walletAddressText}</strong>, then save it. Use the bookmark from then on.</li>
         <li><strong>We never ask for your words outside the wallet screen.</strong> Not by email, not in a chat, not on a support form. If anyone claiming to be us asks, it is not us.</li>
         <li><strong>Your keys stay on your device.</strong> The words are used locally and encrypted with your password. There are no accounts and no tracking on wallet pages.</li>
-        <li><strong>No extension yet.</strong> A <Link href="/monero-chrome-extension">MonkStash browser extension</Link> is planned but not built, so any &quot;MonkStash&quot; extension in a store today is fake.</li>
+        <li><strong>One official extension, linked from one page.</strong> The <Link href="/monero-chrome-extension">MonkStash browser extension</Link> for Chrome and Firefox is going through store review. Install it only from the links on that page; any &quot;MonkStash&quot; extension you find another way, and any listing before those links appear, is not ours.</li>
         <li><strong>The code is open source.</strong> Anyone can <a href={repoUrl} rel="noopener">read what it does</a> (BSD-3-Clause). Open code does not stop a copycat site from running a changed copy, so the address bar check still matters most.</li>
       </ul>
       <p>

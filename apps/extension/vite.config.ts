@@ -21,6 +21,13 @@ export default defineConfig({
     alias: [
       { find: /^@\//, replacement: here("../web/") },
       { find: /^next\/link$/, replacement: here("./src/adapters/Link.tsx") },
+      // The shared screens live in apps/web, so their imports would resolve through apps/web's own
+      // node_modules. A clean install of only this package (as store reviewers do) has none: resolve
+      // them from this package's dependencies instead, which also guarantees one copy of React.
+      ...["react-dom", "react", "qrcode", "monero-ts", "@quietmint/wallet-core", "@quietmint/node-client"].map((m) => ({
+        find: new RegExp(`^${m.replace("/", "\/")}(/.*)?$`),
+        replacement: `${here(`./node_modules/${m}`)}$1`,
+      })),
       { find: /^assert$/, replacement: here("./src/shims/assert.ts") },
       ...["fs", "child_process", "path", "http", "https", "os", "crypto", "url", "net", "tls", "stream", "zlib", "util", "web-worker", "socks-proxy-agent"]
         .map((m) => ({ find: new RegExp(`^${m}$`), replacement: empty })),
