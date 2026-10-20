@@ -1,3 +1,7 @@
+# Every text file is stored and checked out with LF line endings on every system, so a fresh clone
+# builds byte-identical files anywhere (see /verify and scripts/verify-build.mjs).
+* text=auto eol=lf
+
 # Files that run on Linux servers keep Linux line endings, even on Windows checkouts.
 deploy/** text eol=lf
 apps/pay/Dockerfile text eol=lf
