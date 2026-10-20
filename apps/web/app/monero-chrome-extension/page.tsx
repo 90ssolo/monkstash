@@ -15,7 +15,7 @@ import styles from "./page.module.css";
 
 const TITLE = "MonkStash Monero Wallet Extension for Chrome and Firefox";
 const DESCRIPTION = "A non-custodial Monero wallet in your browser toolbar, for Chrome and Firefox. Open source, keys kept on your device. How to recognise the real listing.";
-const UPDATED = "2026-10-20";
+const UPDATED = "2026-10-21";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -30,7 +30,7 @@ const faqs = [
   { q: "How do I know a MonkStash extension is real?", a: "Install it only from a link on this page, on monkstash.com. Check that the publisher is MonkStash and that the listing links back to monkstash.com. In the extension, Settings shows a build fingerprint you can check against the public source code." },
   { q: "Can the extension read the websites I visit?", a: "No. It has no content scripts and no access to web pages, and no website can talk to it. It connects only to our relay at wallet.monkstash.com, or to your own node if you add one." },
   { q: "Where are my keys kept?", a: "On your device, in the extension's own storage, encrypted with your password. While the wallet is unlocked the keys are held only in memory, and they are gone when it locks: after idle time, when your computer locks, and when the browser closes." },
-  { q: "Can I move my web wallet into the extension?", a: "Yes. Restore the same recovery words in the extension, then load a move file saved from the web wallet's Settings. It carries the scan progress and your contacts and payment requests, so the extension skips the long first scan." },
+  { q: "Can I move my web wallet into the extension?", a: "Yes. In the web wallet, save a move file (Settings, Move to another device). In the extension's setup, choose I already use MonkStash, pick that file and enter your recovery words. The file carries the scan progress, your contacts and payment requests, so the extension skips the long first scan." },
   { q: "Can I use Monero in Chrome without an extension?", a: "Yes. The MonkStash web wallet is the same wallet in a normal tab, with nothing to install. Open it from your own bookmark." },
 ];
 
