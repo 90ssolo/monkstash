@@ -162,7 +162,7 @@ async function handle(target: string, method: string, args: unknown[], seq?: num
       case "submitCode": return controller.submitCode(args[0] as string);
       case "lock": return controller.lock();
       case "remove": return controller.remove();
-      case "pick": return controller.pick(args[0] as "create" | "restore" | "view-only" | null);
+      case "pick": return controller.pick(args[0] as Parameters<WalletController["pick"]>[0]);
       case "onboarded": return controller.onboarded(args[0] as Parameters<WalletController["onboarded"]>[0]);
       case "onSynced": return controller.onSynced();
       case "setCashierOn": {

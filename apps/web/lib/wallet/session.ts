@@ -28,6 +28,9 @@ import { clearDemoSession, isDemo, pickRandom, preferredMode, setDemoSession, ty
 
 type Secrets = WalletSecrets;
 
+/** The setup paths on the welcome screen. "move" restores with words or keys plus a move file. */
+export type SetupMode = "create" | "restore" | "view-only" | "move";
+
 /** Saving over a list that could not be read would erase it: refuse, and say what to do. */
 const UNREADABLE = (what: string) => new StorageError(`Your saved ${what} could not be read in this browser, so nothing was saved (to avoid overwriting them). Reload the page and try again.`);
 
@@ -137,7 +140,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
 export type View =
   | { name: "boot" }
   | { name: "welcome" }
-  | { name: "onboard"; mode: "create" | "restore" | "view-only" }
+  | { name: "onboard"; mode: SetupMode }
   | { name: "locked"; record: StoredWallet }
   | { name: "otherNetwork"; record: StoredWallet }
   | { name: "opening"; pub: WalletPublic }
@@ -204,7 +207,7 @@ export class WalletController {
   }
 
   /** Shows onboarding (or goes back to the welcome screen). */
-  pick(mode: "create" | "restore" | "view-only" | null) {
+  pick(mode: SetupMode | null) {
     // Only from the welcome and setup screens: a stray call must never hide a stored wallet.
     if (this.view.name !== "welcome" && this.view.name !== "onboard") return;
     this.set(mode ? { name: "onboard", mode } : { name: "welcome" });
@@ -413,6 +416,36 @@ export class WalletController {
     this.pending = null;
   }
 
+  /**
+   * Merges the records of a move file into this device's: address counters take the higher index,
+   * so no address handed out on either device is reused; lists fill in only where this device has
+   * none, so nothing here is overwritten. Returns what was added, for the message.
+   */
+  private async mergeMovedRecords(pub: WalletPublic, s: Secrets, moved: Awaited<ReturnType<typeof openMoveFile>>): Promise<string[]> {
+    const added: string[] = [];
+    const addressStore = handedOutStore(pub, s);
+    const merged = mergeHandedOut(await addressStore.load(), moved.records.addresses as HandedOut | undefined);
+    if (merged) await addressStore.save(merged);
+    // From the given secrets, not the open session: during setup no wallet is open yet.
+    const reqs = sealedList<PaymentRequest[]>(pub, s, "requests", "payment requests", []);
+    if (Array.isArray(moved.records.requests) && moved.records.requests.length && !(await reqs.load()).length) {
+      await reqs.save(moved.records.requests as PaymentRequest[]);
+      added.push("payment requests");
+    }
+    const cons = sealedList<Contact[]>(pub, s, "contacts", "contacts", []);
+    if (Array.isArray(moved.records.contacts) && moved.records.contacts.length && !(await cons.load()).length) {
+      await cons.save(moved.records.contacts as Contact[]);
+      added.push("contacts");
+    }
+    const till = sealedList<CashierData>(pub, s, "cashier", "sales", EMPTY_CASHIER);
+    const tillHere = await till.load();
+    if (moved.records.cashier && !tillHere.config && !tillHere.sales.length) {
+      await till.save(moved.records.cashier as CashierData);
+      added.push("till settings and sales");
+    }
+    return added;
+  }
+
   onboarded = async (r: OnboardingResult) => {
     // Only from setup: saving a new vault over a stored wallet would lose it.
     if (this.view.name !== "onboard") throw new Error("Wallet setup is not open. Start again from the welcome screen.");
@@ -439,9 +472,14 @@ export class WalletController {
       return;
     }
 
+    const secrets: Secrets = { seed: r.seed, privateViewKey: r.privateViewKey };
+    // A move file is opened before anything is saved: one for another wallet stops setup here.
+    const moved = r.moveFile
+      ? await openMoveFile(r.moveFile, moveSecretOf(r.kind, secrets), { primaryAddress: r.primaryAddress, network: r.network, kind: r.kind })
+      : null;
     const pub: WalletPublic = {
       id: crypto.randomUUID(), name: "Wallet", kind: r.kind, network: r.network, primaryAddress: r.primaryAddress,
-      restoreHeight: r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
+      restoreHeight: moved ? moved.restoreHeight : r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
     };
     try {
       await saveWallet(pub, { seed: r.seed, privateViewKey: r.privateViewKey, totp: r.totp }, r.password);
@@ -454,7 +492,14 @@ export class WalletController {
     if (r.origin === "create") {
       await handedOutStore(pub, { seed: r.seed, privateViewKey: r.privateViewKey }).save({}).catch(() => {});
     }
-    await this.open(pub, { seed: r.seed, privateViewKey: r.privateViewKey });
+    if (moved) {
+      // Records and scan progress from the other device. If this browser refuses to keep the scan
+      // progress, the wallet still opens and scans on its own.
+      await this.mergeMovedRecords(pub, secrets, moved).catch(() => {});
+      const blob = await sealBytes(packParts([utf8.encode(moved.engine.password), moved.engine.keysData, moved.engine.cacheData]), sealSecretOf(secrets), sealContextOf(pub));
+      await saveSyncState(pub.id, blob).catch(() => {});
+    }
+    await this.open(pub, secrets);
   };
 
   /**
@@ -593,29 +638,7 @@ export class WalletController {
         const { rec, s } = await this.verifyAccess(password, code);
         const pub = rec.pub;
         const moved = await openMoveFile(file, moveSecretOf(pub.kind, s), { primaryAddress: pub.primaryAddress, network: pub.network, kind: pub.kind });
-        const added: string[] = [];
-
-        // Address counters: the higher index wins, so no address handed out on either device is reused.
-        const addressStore = handedOutStore(pub, s);
-        const merged = mergeHandedOut(await addressStore.load(), moved.records.addresses as HandedOut | undefined);
-        if (merged) await addressStore.save(merged);
-        // Lists fill in only where this device has none, so nothing here is overwritten.
-        const reqs = this.requestStore(pub);
-        if (reqs && Array.isArray(moved.records.requests) && moved.records.requests.length && !(await reqs.load()).length) {
-          await reqs.save(moved.records.requests as PaymentRequest[]);
-          added.push("payment requests");
-        }
-        const cons = this.contactStore(pub);
-        if (cons && Array.isArray(moved.records.contacts) && moved.records.contacts.length && !(await cons.load()).length) {
-          await cons.save(moved.records.contacts as Contact[]);
-          added.push("contacts");
-        }
-        const till = this.cashierStore(pub);
-        const tillHere = till ? await till.load() : null;
-        if (till && tillHere && moved.records.cashier && !tillHere.config && !tillHere.sales.length) {
-          await till.save(moved.records.cashier as CashierData);
-          added.push("till settings and sales");
-        }
+        const added = await this.mergeMovedRecords(pub, s, moved);
 
         // Scan progress: only when the file is further along than this device. A running scan is
         // paused first (it stops between answers, a few seconds): the engine answers nothing else

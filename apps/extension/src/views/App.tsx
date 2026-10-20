@@ -11,6 +11,7 @@ import { Dashboard } from "@/components/wallet/Dashboard";
 import { Loading, Onboarding, Welcome, type OnboardingResult } from "@/components/wallet/Onboarding";
 import { Fatal, Opening, OtherNetwork, SaveProblemNotice, Unlock } from "@/components/wallet/WalletApp";
 import { Stage } from "@/components/wallet/Stage";
+import type { SetupMode } from "@/lib/wallet/session";
 import { ArtLock } from "@/components/wallet/WalletArt";
 import { BrandMark } from "@/components/BrandMark";
 import styles from "@/components/wallet/wallet.module.css";
@@ -108,14 +109,15 @@ function Screen({ surface }: { surface: Surface }) {
 
   if (view.name === "welcome") {
     if (surface !== "tab") return <SetUpInTab />;
-    return <Welcome onPick={(mode) => void controller("pick", mode)} />;
+    return <Welcome moveFirst onPick={(mode) => void controller("pick", mode)} />;
   }
   if (view.name === "onboard") {
     if (surface !== "tab") return <SetUpInTab continuing />;
     return (
       <Onboarding
-        mode={view.mode as "create" | "restore" | "view-only"}
+        mode={view.mode as SetupMode}
         onCancel={() => void controller("pick", null)}
+        onSwitchMode={(mode) => void controller("pick", mode)}
         onDone={(r: OnboardingResult) => controller("onboarded", r)}
       />
     );

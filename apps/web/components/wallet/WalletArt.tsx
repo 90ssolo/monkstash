@@ -178,6 +178,21 @@ export function IconRestore(p: IP) {
   );
 }
 
+/** Two windows and a file passing from one to the other: moving a wallet between devices. */
+export function IconMove(p: IP) {
+  return (
+    <svg viewBox="0 0 56 56" aria-hidden="true" focusable="false" fill="none" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <rect x="5" y="12" width="20" height="16" rx="2.5" stroke={ink} strokeWidth="2" />
+      <path d="M5 17h20" stroke={ink} strokeWidth="2" opacity=".55" />
+      <rect x="31" y="28" width="20" height="16" rx="2.5" stroke={ink} strokeWidth="2" />
+      <path d="M31 33h20" stroke={ink} strokeWidth="2" opacity=".55" />
+      <path d="M17 34c0 6 4 9 10 9" stroke={clay} strokeWidth="2.4" />
+      <path d="M24 39l4 4-4 4" stroke={clay} strokeWidth="2.4" />
+      <path d="M36 6h7l4 4v9h-11z" stroke={clay} strokeWidth="2" />
+    </svg>
+  );
+}
+
 export function IconWatch(p: IP) {
   return (
     <svg viewBox="0 0 56 56" aria-hidden="true" focusable="false" fill="none" strokeLinecap="round" strokeLinejoin="round" {...p}>

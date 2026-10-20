@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  checkAddressFormat, checkMoneroWords, estimateHeightAt, exodusPhraseProblem, isHexKey, MyMoneroPhraseError, type NetworkType, type SeedCheck, type TotpConfig, type WalletKind,
+  checkAddressFormat, checkMoneroWords, estimateHeightAt, exodusPhraseProblem, isHexKey, MoveFileError, MyMoneroPhraseError, openMoveFile, readMoveHeader,
+  type MoveHeader, type NetworkType, type SeedCheck, type TotpConfig, type WalletKind,
 } from "@quietmint/wallet-core";
-import { siteHref } from "@/lib/site";
+import { siteHref, walletAbsoluteUrl } from "@/lib/site";
 import { exodusToMoneroSeed, generateWallet, inspectSeed, normalizeSeed, validateAddress, viewKeyMatches } from "@/lib/wallet/engine";
 import { NETWORK } from "@/lib/wallet/config";
 import { isDemo } from "@/lib/wallet/demo";
@@ -12,7 +13,7 @@ import { PasswordStep } from "./PasswordStep";
 import { TotpStep } from "./TotpStep";
 import { Stage } from "./Stage";
 import {
-  ArtAuth, ArtConfirm, ArtLock, ArtRestore, ArtWatch, ArtWelcome, ArtWords, IconCreate, IconRestore, IconWatch,
+  ArtAuth, ArtConfirm, ArtLock, ArtRestore, ArtWatch, ArtWelcome, ArtWords, IconCreate, IconMove, IconRestore, IconWatch,
 } from "./WalletArt";
 import { EMPTY_START, RestoreStartField, startHeight, type RestoreStart } from "./RestoreStart";
 import styles from "./wallet.module.css";
@@ -28,9 +29,12 @@ export interface OnboardingResult {
   totp?: TotpConfig;
   /** Which path produced this wallet. Demo mode only swaps out the create flow's sample words. */
   origin: "create" | "restore" | "watch";
+  /** A move file from another device for this wallet: its scan progress and records come along. */
+  moveFile?: Uint8Array;
 }
 
-type Mode = "create" | "restore" | "view-only";
+type Mode = "create" | "restore" | "view-only" | "move";
+type Base = Omit<OnboardingResult, "password" | "totp">;
 
 /** True when this browser lets the site keep data (localStorage), which a saved wallet needs. */
 function storageWorks(): boolean {
@@ -44,7 +48,11 @@ function storageWorks(): boolean {
   }
 }
 
-export function Welcome({ onPick }: { onPick: (m: Mode) => void }) {
+/**
+ * The setup choices. `moveFirst` lists "I already use MonkStash" first, for the browser extension:
+ * most people installing it already use the web wallet.
+ */
+export function Welcome({ onPick, moveFirst = false }: { onPick: (m: Mode) => void; moveFirst?: boolean }) {
   // Checked before anything is typed, so nobody writes down words for a wallet that cannot be saved.
   const [blocked, setBlocked] = useState(false);
   useEffect(() => { setBlocked(!storageWorks()); }, []);
@@ -68,6 +76,7 @@ export function Welcome({ onPick }: { onPick: (m: Mode) => void }) {
         </div>
       ) : null}
       <div className={styles.choices}>
+        {moveFirst ? <MoveChoice disabled={blocked} onPick={onPick} /> : null}
         <button className={styles.choice} disabled={blocked} onClick={() => onPick("create")}>
           <span className={styles.choiceIc}><IconCreate /></span>
           <span className={styles.choiceBody}>
@@ -92,6 +101,7 @@ export function Welcome({ onPick }: { onPick: (m: Mode) => void }) {
           </span>
           <span className={styles.choiceGo} aria-hidden="true">&rarr;</span>
         </button>
+        {moveFirst ? null : <MoveChoice disabled={blocked} onPick={onPick} />}
       </div>
       <div className="notice notice-warn" style={{ marginTop: "var(--s-5)" }}>
         <span>
@@ -103,8 +113,27 @@ export function Welcome({ onPick }: { onPick: (m: Mode) => void }) {
   );
 }
 
-export function Onboarding({ mode, testWallets = [], onCancel, onDone }: { mode: Mode; testWallets?: TestWallet[]; onCancel: () => void; onDone: (r: OnboardingResult) => Promise<void> }) {
-  const [base, setBase] = useState<Omit<OnboardingResult, "password" | "totp"> | null>(null);
+function MoveChoice({ disabled, onPick }: { disabled: boolean; onPick: (m: Mode) => void }) {
+  return (
+    <button className={styles.choice} disabled={disabled} onClick={() => onPick("move")}>
+      <span className={styles.choiceIc}><IconMove /></span>
+      <span className={styles.choiceBody}>
+        <strong>I already use MonkStash</strong>
+        <span>Bring your wallet from the web wallet, the extension or another browser with a move file and your recovery words, and skip the long scan.</span>
+      </span>
+      <span className={styles.choiceGo} aria-hidden="true">&rarr;</span>
+    </button>
+  );
+}
+
+export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchMode }: {
+  mode: Mode; testWallets?: TestWallet[]; onCancel: () => void; onDone: (r: OnboardingResult) => Promise<void>;
+  /** Leaves this path for another one (from "move" to a plain restore when there is no move file). */
+  onSwitchMode?: (m: Mode) => void;
+}) {
+  const [base, setBase] = useState<Base | null>(null);
+  // Move mode: the chosen file and what its unencrypted header says (network, wallet type, height).
+  const [move, setMove] = useState<PickedMove | null>(null);
   const [password, setPassword] = useState<string | null>(null);
   // Create mode: the generated keys live here so Back from the password step shows the same words again.
   const [createKeys, setCreateKeys] = useState<NewKeys | null>(null);
@@ -137,11 +166,33 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone }: { mode:
     if (busy) return;
     if (password) return setPassword(null);
     if (base) return setBase(null);
+    if (move) return setMove(null);
     onCancel();
   }
 
-  const stepCount = mode === "create" ? 4 : 3;
-  const step = !base ? 1 : !password ? stepCount - 1 : stepCount;
+  // Move mode checks the file against the words or keys before the password step, so a file from
+  // another wallet is caught while the right one can still be chosen. The file's restore height
+  // replaces the date question.
+  async function acceptBase(b: Base): Promise<string | null> {
+    if (mode !== "move" || !move) {
+      setBase(b);
+      return null;
+    }
+    try {
+      const secret = b.kind === "full" ? normalizeSeed(b.seed ?? "") : b.privateViewKey.trim().toLowerCase();
+      const moved = await openMoveFile(move.file, secret, { primaryAddress: b.primaryAddress, network: b.network, kind: b.kind });
+      setBase({ ...b, restoreHeight: moved.restoreHeight, moveFile: move.file });
+      return null;
+    } catch (e) {
+      return e instanceof MoveFileError
+        ? `${e.message} Check that the file was made from this wallet, or go back and choose another one.`
+        : "That move file could not be read. Make a new one on the other device and try again.";
+    }
+  }
+
+  const stepCount = mode === "create" || mode === "move" ? 4 : 3;
+  const step = mode === "move" && !move ? 1 : !base ? stepCount - 2 : !password ? stepCount - 1 : stepCount;
+  const keysPhase: Phase = mode === "restore" || (mode === "move" && move?.header.kind === "full") ? "restore" : "watch";
 
   if (!base && mode === "create") return <CreateSteps keys={createKeys} onKeys={setCreateKeys} onReady={setBase} onCancel={onCancel} />;
 
@@ -150,11 +201,15 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone }: { mode:
       mode={mode}
       step={step}
       stepCount={stepCount}
-      phase={!base ? (mode === "restore" ? "restore" : "watch") : !password ? "password" : "totp"}
+      phase={mode === "move" && !move ? "move" : !base ? keysPhase : !password ? "password" : "totp"}
       onCancel={back}
     >
-      {!base ? (
-        mode === "restore" ? <RestoreSeed onReady={setBase} testWallets={testWallets} draft={restoreDraft} setDraft={setRestoreDraft} /> : <ViewOnly onReady={setBase} draft={watchDraft} setDraft={setWatchDraft} />
+      {mode === "move" && !move ? (
+        <MoveFileStep onReady={setMove} onNoFile={onSwitchMode ? () => onSwitchMode("restore") : undefined} />
+      ) : !base ? (
+        keysPhase === "restore"
+          ? <RestoreSeed onReady={acceptBase} testWallets={testWallets} draft={restoreDraft} setDraft={setRestoreDraft} fromMove={move?.name} />
+          : <ViewOnly onReady={acceptBase} draft={watchDraft} setDraft={setWatchDraft} fromMove={move?.name} />
       ) : !password ? (
         <PasswordStep onDone={setPassword} />
       ) : (
@@ -168,15 +223,16 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone }: { mode:
   );
 }
 
-type Phase = "words" | "confirm" | "restore" | "watch" | "password" | "totp";
+type Phase = "words" | "confirm" | "restore" | "watch" | "move" | "password" | "totp";
 
 const FLOW_STEPS: Record<Mode, string[]> = {
   create: ["Choose", "Recovery words", "Confirm", "Password", "Authenticator"],
   restore: ["Choose", "Recovery words", "Password", "Authenticator"],
   "view-only": ["Choose", "Address and key", "Password", "Authenticator"],
+  move: ["Choose", "Move file", "Words or keys", "Password", "Authenticator"],
 };
 
-const FLOW_TITLE: Record<Mode, string> = { create: "Create a new wallet", restore: "Restore a wallet", "view-only": "Add a watch-only wallet" };
+const FLOW_TITLE: Record<Mode, string> = { create: "Create a new wallet", restore: "Restore a wallet", "view-only": "Add a watch-only wallet", move: "Move a MonkStash wallet here" };
 
 /**
  * Presentational frame shared by every onboarding step: context panel, progress rail, Back row.
@@ -196,6 +252,7 @@ function OnboardFrame({ mode, step, stepCount, phase, focusKey = "", onCancel, c
     words: { kicker: "Recovery words", sizzle: <>These words are the <mark>only key</mark> to your money. Pen, paper, somewhere safe.</>, art: <ArtWords />, tone: "paper" },
     confirm: { kicker: "Check your backup", sizzle: <>A quick check that the <mark>paper copy</mark> is right, before anything gets locked.</>, art: <ArtConfirm />, tone: "paper" },
     restore: { kicker: "Restore", sizzle: <>Bring your wallet back with the words you wrote down. They are <mark>checked on this device</mark>.</>, art: <ArtRestore />, tone: "paper" },
+    move: { kicker: "Move", sizzle: <>Bring your wallet over <mark>without the long scan</mark>. The file goes from your device to your device.</>, art: <ArtRestore />, tone: "paper" },
     watch: { kicker: "Watch-only", sizzle: <>Follow an address you own, with <mark>no power to spend</mark> from it.</>, art: <ArtWatch />, tone: "paper" },
     password: { kicker: "Password", sizzle: <>Your password turns the keys into a <mark>locked box</mark> on this device. We never see it.</>, art: <ArtLock />, tone: "ink" },
     totp: { kicker: "Second lock", sizzle: <>An optional code from your phone, <mark>every time you unlock</mark>.</>, art: <ArtAuth />, tone: "ink" },
@@ -351,8 +408,10 @@ function ConfirmWords({ words, onOk, onBack }: { words: string[]; onOk: () => vo
 interface RestoreDraft { seed: string; start: RestoreStart }
 interface WatchDraft { address: string; viewKey: string; start: RestoreStart }
 
-function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
-  onReady: (b: Omit<OnboardingResult, "password" | "totp">) => void; testWallets?: TestWallet[]; draft: RestoreDraft; setDraft: (d: RestoreDraft) => void;
+function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
+  onReady: (b: Base) => Promise<string | null>; testWallets?: TestWallet[]; draft: RestoreDraft; setDraft: (d: RestoreDraft) => void;
+  /** The move file's name, when there is one: it carries the restore height, so no date is asked. */
+  fromMove?: string;
 }) {
   const { seed, start } = draft;
   const setSeed = (v: string) => setDraft({ ...draft, seed: v });
@@ -377,7 +436,7 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
       const problem = exodusPhraseProblem(seed);
       if (problem) return setError(`${problem} If these are not Exodus words, check which wallet they came from.`);
     }
-    const from = startHeight(start, NETWORK);
+    const from = fromMove ? { height: 0 } : startHeight(start, NETWORK);
     if ("error" in from) return setError(from.error);
     setBusy(true);
     try {
@@ -386,7 +445,11 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
       const { primaryAddress, privateViewKey } = await inspectSeed(words, NETWORK);
       // Exodus added Monero on 26 April 2019, so without a date there is no need to scan earlier blocks.
       const height = from.height || (count === 12 && start.by === "date" ? heightFromDate(EXODUS_MONERO_START) : 0);
-      onReady({ kind: "full", network: NETWORK, primaryAddress, privateViewKey, seed: words, restoreHeight: height, origin: "restore" });
+      const problem = await onReady({ kind: "full", network: NETWORK, primaryAddress, privateViewKey, seed: words, restoreHeight: height, origin: "restore" });
+      if (problem) {
+        setError(problem);
+        setBusy(false);
+      }
     } catch (err) {
       // MyMonero phrase errors explain exactly what is wrong (unknown word, last word does not match).
       setError(err instanceof MyMoneroPhraseError
@@ -398,9 +461,11 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
 
   return (
     <form onSubmit={submit}>
-      <h2 tabIndex={-1}>Restore from recovery words</h2>
+      <h2 tabIndex={-1}>{fromMove ? "Enter this wallet's recovery words" : "Restore from recovery words"}</h2>
       <div className="notice notice-info" style={{ marginBottom: "var(--s-5)" }}>
-        <span>Your seed is checked and encrypted in this browser. It is never uploaded.</span>
+        <span>{fromMove
+          ? <>The words unlock <span className="mono">{fromMove}</span>. They are checked in this browser and never uploaded.</>
+          : "Your seed is checked and encrypted in this browser. It is never uploaded."}</span>
       </div>
       {isDemo && testWallets.length ? (
         <div className="card-flat" style={{ marginBottom: "var(--s-5)" }}>
@@ -436,7 +501,7 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft }: {
           </p>
         ) : null}
       </div>
-      <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="restore" />
+      {fromMove ? null : <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="restore" />}
       {error ? <p id="seed-err" className="error small" role="alert">{error}</p> : null}
       <p className="small muted">Not sure what kind of phrase you have? The <a href={siteHref("/tools/monero-seed-doctor")}>seed doctor</a> tells you, without asking for your words.</p>
       <button className="btn btn-primary btn-block" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
@@ -458,7 +523,7 @@ function wordProblem(check: Extract<SeedCheck, { kind: "unknown-words" }>): stri
 /** The first character of a primary address on each network. */
 const PRIMARY_PREFIX: Record<NetworkType, string> = { mainnet: "4", stagenet: "5", testnet: "9" };
 
-function ViewOnly({ onReady, draft, setDraft }: { onReady: (b: Omit<OnboardingResult, "password" | "totp">) => void; draft: WatchDraft; setDraft: (d: WatchDraft) => void }) {
+function ViewOnly({ onReady, draft, setDraft, fromMove }: { onReady: (b: Base) => Promise<string | null>; draft: WatchDraft; setDraft: (d: WatchDraft) => void; fromMove?: string }) {
   const { address, viewKey, start } = draft;
   const setAddress = (v: string) => setDraft({ ...draft, address: v });
   const setViewKey = (v: string) => setDraft({ ...draft, viewKey: v });
@@ -481,7 +546,7 @@ function ViewOnly({ onReady, draft, setDraft }: { onReady: (b: Omit<OnboardingRe
       return setError(`Use your primary address (it starts with ${prefix}), not ${fmt.kind === "integrated" ? "an integrated address" : "a subaddress"}.`, "addr");
     }
     if (!isHexKey(viewKey)) return setError("The private view key is 64 characters of 0-9 and a-f.", "vk");
-    const from = startHeight(start, NETWORK);
+    const from = fromMove ? { height: 0 } : startHeight(start, NETWORK);
     if ("error" in from) return setError(from.error);
     setBusy(true);
     if (!(await validateAddress(address, NETWORK))) {
@@ -492,16 +557,27 @@ function ViewOnly({ onReady, draft, setDraft }: { onReady: (b: Omit<OnboardingRe
       setBusy(false);
       return setError("This view key does not belong to this address. Copy both again from the same wallet (a wrong key would show 0 XMR forever).", "both");
     }
-    onReady({ kind: "view-only", network: NETWORK, primaryAddress: address.trim(), privateViewKey: viewKey.trim().toLowerCase(), restoreHeight: from.height, origin: "watch" });
+    const problem = await onReady({ kind: "view-only", network: NETWORK, primaryAddress: address.trim(), privateViewKey: viewKey.trim().toLowerCase(), restoreHeight: from.height, origin: "watch" });
+    if (problem) {
+      setBusy(false);
+      setError(problem);
+    }
   }
 
   return (
     <form onSubmit={submit}>
-      <h2 tabIndex={-1}>Add a view-only wallet</h2>
-      <p className="muted">
-        A view-only wallet shows incoming payments but cannot send. Find both values in your current wallet: in Monero GUI
-        under Settings, Seed &amp; keys; in Feather under Wallet, Keys.
-      </p>
+      <h2 tabIndex={-1}>{fromMove ? "Enter this wallet's address and view key" : "Add a view-only wallet"}</h2>
+      {fromMove ? (
+        <p className="muted">
+          <span className="mono">{fromMove}</span> is from a watch-only wallet. Enter the same primary address and private view
+          key you used on the other device. They unlock the file and are checked in this browser.
+        </p>
+      ) : (
+        <p className="muted">
+          A view-only wallet shows incoming payments but cannot send. Find both values in your current wallet: in Monero GUI
+          under Settings, Seed &amp; keys; in Feather under Wallet, Keys.
+        </p>
+      )}
       <div className="field">
         <label htmlFor="addr">Primary address</label>
         <textarea id="addr" className="textarea mono" style={{ minHeight: 80 }} autoComplete="off" spellCheck={false} value={address}
@@ -516,9 +592,84 @@ function ViewOnly({ onReady, draft, setDraft }: { onReady: (b: Omit<OnboardingRe
           aria-invalid={vkBad} aria-describedby={vkBad ? "vk-hint vo-err" : "vk-hint"} />
         <span id="vk-hint" className="hint">Never enter your private spend key or seed here.</span>
       </div>
-      <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="watch" />
+      {fromMove ? null : <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="watch" />}
       {error ? <p id="vo-err" className="error small" role="alert">{error}</p> : null}
       <button className="btn btn-primary btn-block" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
+    </form>
+  );
+}
+
+/* ---------------- Move from another device ---------------- */
+
+type PickedMove = { file: Uint8Array; header: MoveHeader; name: string };
+
+/** Largest move file accepted (a very long-lived wallet's file is tens of MB). */
+const MOVE_FILE_MAX_BYTES = 256 * 1024 * 1024;
+
+/** The web wallet, where most move files are made. */
+const walletHref = walletAbsoluteUrl;
+
+function MoveFileStep({ onReady, onNoFile }: { onReady: (m: PickedMove) => void; onNoFile?: () => void }) {
+  const [picked, setPicked] = useState<PickedMove | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    setPicked(null);
+    setError(null);
+    if (!f) return;
+    if (f.size > MOVE_FILE_MAX_BYTES) return setError("This file is too large to be a MonkStash move file.");
+    setReading(true);
+    try {
+      const file = new Uint8Array(await f.arrayBuffer());
+      const header = readMoveHeader(file);
+      if (header.network !== NETWORK) setError(`This move file is for ${header.network}, but this wallet runs on ${NETWORK}.`);
+      else setPicked({ file, header, name: f.name });
+    } catch (err) {
+      setError(err instanceof MoveFileError ? err.message : "That file could not be read.");
+    } finally {
+      setReading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (picked) onReady(picked); }}>
+      <h2 tabIndex={-1}>Bring your wallet from another device</h2>
+      <p className="muted">
+        Each browser and extension keeps its own storage, and we never hold a copy of your wallet, so it cannot show up here on
+        its own. A move file brings it over with its scan progress, so you skip the long first scan.
+      </p>
+      <ol className={styles.moveSteps}>
+        <li>
+          Open your wallet where you use it now: <a href={walletHref} target="_blank" rel="noopener">MonkStash on the web</a>, the
+          extension, or another browser. Wait until it says <b>Up to date</b>, then go to <b>Settings</b>, <b>Move to another device</b>, and save a move file.
+          It asks for that wallet&apos;s password.
+        </li>
+        <li>Choose the file below. Then enter the wallet&apos;s recovery words (for a watch-only wallet, its address and view key). They unlock the file.</li>
+      </ol>
+      <div className="field">
+        <label htmlFor="move-setup-file">Move file</label>
+        <input id="move-setup-file" className="input" type="file" accept=".monkstash" onChange={pick}
+          aria-invalid={!!error} aria-describedby={error ? "move-setup-hint move-setup-err" : "move-setup-hint"} />
+        <span id="move-setup-hint" className="hint">A file ending in .monkstash. It is read in this browser and never uploaded.</span>
+      </div>
+      {reading ? <p className="small muted" role="status">Reading the file…</p> : null}
+      {picked ? (
+        <p className="small" role="status">
+          {picked.header.kind === "full" ? "Full wallet" : "Watch-only wallet"}, scanned to block{" "}
+          <span className="tnum">{picked.header.height.toLocaleString()}</span>, saved{" "}
+          {new Date(picked.header.savedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}.
+        </p>
+      ) : null}
+      {error ? <p id="move-setup-err" className="error small" role="alert">{error}</p> : null}
+      <button className="btn btn-primary btn-block" disabled={!picked}>Continue</button>
+      {onNoFile ? (
+        <div className={styles.noMoveFile}>
+          <p className="small muted">No move file? You can restore with your recovery words alone. The wallet then scans the chain on its own, which can take a while for an older wallet.</p>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onNoFile}>Restore with words only</button>
+        </div>
+      ) : null}
     </form>
   );
 }

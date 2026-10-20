@@ -144,7 +144,7 @@ export function WalletApp() {
               </>
             ) : null}
             {view.name === "onboard" ? (
-              <Onboarding mode={view.mode} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} />
+              <Onboarding mode={view.mode} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} onSwitchMode={(m) => controller.pick(m)} />
             ) : null}
             {view.name === "locked" ? <Unlock record={view.record} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.remove} /> : null}
             {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={controller.remove} /> : null}

@@ -526,3 +526,8 @@
 
 /* Get paid: room between the till card and the requests that follow. */
 .tillCard + .recentH { margin-top: var(--s-7); margin-bottom: var(--s-3); }
+
+/* Setup: move from another device */
+.moveSteps { margin: 0 0 var(--s-5); padding-left: 1.3em; display: grid; gap: var(--s-3); line-height: 1.55; }
+.noMoveFile { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line); display: grid; gap: var(--s-2); justify-items: start; }
+.noMoveFile p { margin: 0; }
