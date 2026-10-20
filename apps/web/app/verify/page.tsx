@@ -10,8 +10,8 @@ import trust from "../_trust/trust.module.css";
 import styles from "../privacy/privacy.module.css";
 import { LiveBuild } from "./LiveBuild";
 
-const UPDATED = "2026-10-20";
-const UPDATED_TEXT = "20 October 2026";
+const UPDATED = "2026-10-21";
+const UPDATED_TEXT = "21 October 2026";
 const DESCRIPTION =
   "Check that the MonkStash wallet your browser loads is exactly the open-source code on GitHub: rebuild it yourself and compare fingerprints, or run the one-minute checker.";
 
@@ -102,14 +102,17 @@ export default function VerifyPage() {
               <p>
                 The source is on <a className={trust.inlineLink} href={repoUrl}>GitHub</a>, and the scripts are short enough to read: <span className="mono">apps/web/scripts/build-manifest.mjs</span> and <span className="mono">scripts/verify-build.mjs</span>.
               </p>
+              <p>
+                Every change to the code is also built twice in public, on an x86-64 and on an ARM64 Linux machine, and the fingerprints are compared: the website with the wallet, and the browser extension for Chrome and Firefox. You can see each run and its fingerprints in the <a className={trust.inlineLink} href={`${repoUrl}/actions/workflows/reproducible-builds.yml`}>Reproducible builds</a> check on GitHub. After a release is deployed, its fingerprint there is the one this site serves.
+              </p>
             </section>
 
             <section id="limits" aria-labelledby="limits-h">
               <h2 id="limits-h">What it does not prove</h2>
               <ul>
-                <li><strong>It checks what you were served, when you checked.</strong> A web server could in theory send different files to one visitor at one moment. A browser extension closes this gap, because its code is installed once and checked once; that is on our roadmap.</li>
+                <li><strong>It checks what you were served, when you checked.</strong> A web server could in theory send different files to one visitor at one moment. The <Link className={trust.inlineLink} href="/monero-chrome-extension">browser extension</Link> closes this gap: its code is installed once, shows its own fingerprint in Settings, and can be checked file by file against the same source.</li>
                 <li><strong>Each page also carries a little inline data.</strong> Next.js adds small inline scripts with the page&apos;s data, which differ per request, so a build hash cannot cover them. On wallet pages a strict security policy lets only scripts carrying a one-time code from our server run.</li>
-                <li><strong>Rebuild on linux/amd64.</strong> We test reproducibility in Docker on that platform. Building elsewhere may produce different bytes for the same code.</li>
+                <li><strong>Rebuild on Linux, in Docker.</strong> Builds match on x86-64 and ARM64 Linux, checked on every change. Builds of the extension on Windows have matched too; macOS is not checked yet. The Docker build is the reference.</li>
                 <li><strong>Matching code is not the same as safe code.</strong> A match proves the site runs the published source, not that the source has no bugs. An independent security review is a separate step on our <Link className={trust.inlineLink} href="/donate">roadmap</Link>.</li>
               </ul>
               <div className={styles.next}>
