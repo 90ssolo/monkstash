@@ -26,6 +26,16 @@ Recovery words and keys are created in the browser, encrypted with the wallet pa
 * **The wallet has its own origin** (`wallet.` subdomain), so content pages can never read its storage.
 * **What the server can see.** The default node relay sees a wallet's IP address and sync requests, never its keys. Users can connect straight to their own node in Settings instead. Payment link details live in the URL fragment, which browsers never send to a server.
 
+## Verify the build
+
+Builds are reproducible: the same commit, built in Docker with the pinned base image, gives byte-identical files. Each release publishes `/build.json` (the commit, the public build settings and a SHA-256 for every file a browser can download) and the wallet shows the fingerprint in Settings.
+
+```bash
+node scripts/verify-build.mjs https://wallet.monkstash.com
+```
+
+That checks every live file against the manifest. To compare with your own build of the same commit, follow the steps on [monkstash.com/verify](https://monkstash.com/verify), which fills in the exact commit and settings. What this proves, and what it does not, is explained on the same page.
+
 ## Run it locally
 
 Requirements: Node.js 24 and pnpm 10.

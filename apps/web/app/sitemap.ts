@@ -12,6 +12,7 @@ const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" |
   { path: "/faq", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.6 },
   { path: "/support", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.5 },
   { path: "/about", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.5 },
+  { path: "/verify", updated: "2026-10-20", changeFrequency: "monthly", priority: 0.4 },
   { path: "/privacy", updated: "2026-10-16", changeFrequency: "monthly", priority: 0.3 },
   { path: "/tools", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
   { path: "/tools/monero-address-validator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },

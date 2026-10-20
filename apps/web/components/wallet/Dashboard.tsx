@@ -21,7 +21,7 @@ import { ContactChips, ContactManager, TamperAlarm } from "./Contacts";
 import { CheckProof, ProveSent } from "./Proofs";
 import type { ContactStore } from "@/lib/wallet/contacts";
 import { freshAddress } from "@/lib/wallet/addresses";
-import { payLinkOrigin } from "@/lib/site";
+import { payLinkOrigin, siteHref } from "@/lib/site";
 import type { CashierStore } from "@/lib/wallet/cashier";
 import { Qr } from "./Qr";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
@@ -447,6 +447,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                   <dt>Network</dt><dd>{pub.network}</dd>
                   <dt>Restore height</dt><dd className="tnum">{pub.restoreHeight.toLocaleString()}</dd>
                   <dt>Main address</dt><dd className="mono" title={pub.primaryAddress}>{shortAddress(pub.primaryAddress, 8)}</dd>
+                  <dt>App build</dt><dd><BuildFingerprint /></dd>
                 </dl>
                 <CopyButton value={pub.primaryAddress} label="Copy main address" />
                 {settings ? (
@@ -1297,6 +1298,20 @@ function minutesLeft(confirmations: number): number {
 }
 
 /** When the locked part of the balance becomes spendable, from the newest incoming payment. */
+/** The build this wallet was loaded from (public/build.json), linking to how to check it. */
+function BuildFingerprint() {
+  const [fp, setFp] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    fetch("/build.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { fingerprint?: string } | null) => setFp(b?.fingerprint ?? null))
+      .catch(() => setFp(null));
+  }, []);
+  if (fp === undefined) return <span className="muted">…</span>;
+  if (fp === null) return <span className="muted">development build</span>;
+  return <a href={siteHref("/verify")} className="mono" title={`Fingerprint ${fp}. How to check it`}>{fp.slice(0, 12)}</a>;
+}
+
 function unlockNote(txs: TxSummary[]): string {
   const waiting = txs.filter((t) => t.direction === "in" && (t.pending || t.confirmations < 10));
   if (!waiting.length) return "The rest unlocks after about 10 confirmations, usually around 20 minutes.";

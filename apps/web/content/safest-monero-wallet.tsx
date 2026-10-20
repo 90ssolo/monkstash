@@ -228,7 +228,7 @@ export function Body() {
         <Link href={walletUrl}>MonkStash</Link> is a free, non-custodial browser wallet. Keys are created and encrypted on your device
         with your password, and nothing is sent to our servers. It is also an <strong>early preview and has not been independently audited</strong>.
         It does not connect to a hardware wallet today. Its code is <a href={repoUrl} rel="noopener">open source</a> (BSD-3-Clause),
-        but signed, reproducible builds are not available yet, so you cannot yet prove that the site serves exactly that code.
+        and its builds are reproducible, so you can <Link href="/verify">check that the site serves exactly that code</Link>. Signed releases are still to come.
       </p>
       <p>
         So it belongs on the bottom rung, for small everyday amounts. If you hold more, use a hardware wallet with the Monero GUI

@@ -22,7 +22,7 @@ const NODE_PATHS = new Set<string>(NODE_ENDPOINTS.map((e) => `/${e}`));
 /** Paths the wallet origin serves besides the wallet page itself. */
 const walletAsset = (p: string) =>
   p.startsWith("/_next/") || p.startsWith("/monero/") || p.startsWith("/api/") || p.startsWith("/brand/") ||
-  NODE_PATHS.has(p) || p === "/favicon.svg" || p === "/icon.svg" || p === "/robots.txt";
+  NODE_PATHS.has(p) || p === "/favicon.svg" || p === "/icon.svg" || p === "/robots.txt" || p === "/build.json";
 const isWalletPath = (p: string) => p === "/wallet" || p.startsWith("/wallet/");
 const isPayPath = (p: string) => p === "/pay" || p.startsWith("/pay/");
 

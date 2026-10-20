@@ -104,7 +104,7 @@ export const faqCategories: FaqCategory[] = [
       },
       {
         q: "Is MonkStash open source?",
-        a: "Yes. The full MonkStash code (the web wallet, this website, MonkStash Pay and the WooCommerce plugin) is public under the BSD-3-Clause license, so anyone can read it, run it, or report a problem. Open code is not the same as an audit: an independent security review and signed, reproducible builds are still on the roadmap.",
+        a: "Yes. The full MonkStash code (the web wallet, this website, MonkStash Pay and the WooCommerce plugin) is public under the BSD-3-Clause license, so anyone can read it, run it, or report a problem. Open code is not the same as an audit. Builds are reproducible, so you can check that the site serves exactly this code (see /verify); an independent security review and signed releases are still on the roadmap.",
         hl: "BSD-3-Clause license",
         links: [{ href: repoUrl, label: "Read the code" }, { href: "/donate#roadmap", label: "The roadmap" }],
       },

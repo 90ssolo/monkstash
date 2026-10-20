@@ -50,6 +50,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/support", label: "Support" },
       { href: "/donate", label: "Support the project" },
       { href: "/privacy", label: "Privacy policy" },
+      { href: "/verify", label: "Verify the build" },
     ],
   },
 ];

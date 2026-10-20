@@ -19,3 +19,6 @@ private/
 apps/pay/dist/
 apps/pay/data/
 apps/pay/.env
+
+# Written by apps/web/scripts/build-manifest.mjs during the production build.
+apps/web/public/build.json

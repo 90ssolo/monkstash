@@ -54,6 +54,9 @@ const config: NextConfig = {
   poweredByHeader: false,
   // Self-contained server bundle for the VPS (deploy/): only the files the server needs.
   output: "standalone",
+  // A fixed build ID (the public source commit) instead of a random one, so two builds of the
+  // same commit produce identical files and anyone can check the live site (see /verify).
+  generateBuildId: async () => process.env.BUILD_ID || null,
   // The monorepo root, so workspace packages are traced into the bundle.
   outputFileTracingRoot: path.join(__dirname, "../.."),
   // monero-ts loads its WebAssembly from disk at runtime, which tracing cannot see.
