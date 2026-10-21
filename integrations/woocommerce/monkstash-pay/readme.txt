@@ -6,7 +6,7 @@ Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 8.0
 Stable tag: 0.1.1
-License: BSD-3-Clause
+License: New BSD License
 License URI: https://opensource.org/licenses/BSD-3-Clause
 
 Accept Monero on your WooCommerce shop through your own MonkStash Pay server. Non-custodial, with a fresh address for every order.
