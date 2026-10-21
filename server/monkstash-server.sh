@@ -637,6 +637,7 @@ cmd_pay_info() {
   [ -r "$PAY_ENV" ] || die "MonkStash Pay is not installed (add it with: monkstash-server install --pay)"
   say "MonkStash Pay:     https://$PAY_DOMAIN   (state: $(pay_state))"
   say "Webhooks go to:    $(env_get PAY_WEBHOOK_URL | grep . || echo "not set (add --shop-url)")"
+  say "Dashboard:         https://$PAY_DOMAIN/admin   (sign in with the API key below)"
   say ""
   say "In WooCommerce (Payments, MonkStash Pay):"
   say "  MonkStash Pay server:  https://$PAY_DOMAIN"

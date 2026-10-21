@@ -26,6 +26,8 @@ export interface StoredInvoice {
   lockedNotified?: string[];
   /** The payment link this invoice was made from, when a visitor paid through one. */
   linkId?: string;
+  /** Set when the shop marked a problem invoice as dealt with (refunded, accepted and so on). */
+  review?: { resolvedAt: number; note?: string };
 }
 
 /** A reusable payment link: every visitor who pays through it gets their own fresh invoice. */

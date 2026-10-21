@@ -9,6 +9,7 @@ MonkStash Pay is a small open-source payment server you run yourself. Your shop 
 * **A fresh address per order.** Payments are matched by address, never by amount, so two orders for the same price can never be confused.
 * **Prices in your currency.** Set prices in EUR, USD, GBP and 25 more; the XMR amount is held for a set time (30 minutes by default).
 * **Payment links and donate buttons.** No shop needed: share one link in a chat, an email or a profile, or paste a button into any website. Every payer gets their own invoice. See [Payment links](#payment-links-and-donate-buttons).
+* **A dashboard for your sales.** Sign in at `/admin` with your API key: totals, every invoice, a list of payments that need your attention, payment links, and a sales export for your accountant. See [Dashboard](#dashboard).
 * **Light.** One small Node.js program and a JSON file. No database, no full node required (though your own node is best).
 
 ## How it works
@@ -237,6 +238,18 @@ Invoices made from a link carry `linkId` in the API and in webhooks, next to the
 
 `/l/<id>` shows the title, the description and either the price or the amount choices. It works without JavaScript. After the payer confirms, they land on the usual checkout page for their own invoice. A switched-off, expired or fully used link answers with a clear page saying so (HTTP `410`). Each visitor can start at most 6 payments a minute through links; mistyped amounts do not count.
 
+## Dashboard
+
+Open `https://<your Pay address>/admin` and sign in with your API key (on MonkStash Server, `sudo monkstash-server pay-info` shows both).
+
+* **Overview:** sales today, in the last 7 and 30 days (in XMR and in your prices' currencies), the server's sync state and warnings, and the latest invoices.
+* **Invoices:** every invoice, newest first, with search (order, payment link or transaction id) and a status filter. Each invoice shows the price, the locked rate, what arrived, the transactions counted, and any locked payments that were not.
+* **Needs review:** invoices with a problem nobody has dealt with yet: part paid after the price hold ended, paid late, a locked payment, a payment that disappeared after it was reported, or an overpayment. Each says what to do. Mark one as dealt with and write what you did ("Refunded 0.02 XMR, transaction ..."); the note goes into the export.
+* **Payment links:** create links with a form, copy the link or the website button, see each link's QR code and totals, and switch links off and on.
+* **Export:** a CSV of every invoice that received money in a period, by the date the money arrived (UTC): price, currency, locked rate and its source, XMR due, received and overpaid, the value received at the invoice rate, transaction ids and your review note. Invoices priced in XMR have no value in another currency; add it from your own records.
+
+How sign-in works: the session is a cookie signed with a key derived from your API key, valid for 12 hours, sent only to `/admin` on this server (`HttpOnly`, `SameSite=Strict`, `Secure` over HTTPS). Changing the API key signs everyone out. Every form carries a token, and posts from other sites are refused. Failed sign-ins are limited to 10 a minute per address. The dashboard loads nothing from anywhere else.
+
 ## Webhooks
 
 When an invoice changes status, MonkStash Pay sends a `POST` to `PAY_WEBHOOK_URL`:
@@ -303,6 +316,6 @@ Use the raw request body exactly as received, before any JSON parsing.
 
 * One wallet, one wallet account and one shop per server.
 * Invoices are kept in a JSON file loaded into memory: fine for thousands of orders, not for millions.
-* No admin screen yet. Use the API, the `monkstash-server link` command, or your shop's order list.
+* One dashboard sign-in: the API key. There are no separate staff accounts yet.
 
 License: BSD-3-Clause.

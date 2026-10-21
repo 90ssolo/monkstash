@@ -170,7 +170,7 @@ const belongsTo = (rec: StoredInvoice, e: IncomingPayment) =>
   e.subaddressIndex === rec.invoice.subaddressIndex && e.accountIndex === accountOf(rec);
 
 /** Payments that count toward the invoice: locked ones (see IncomingPayment.locked) never do. */
-function paymentsFor(rec: StoredInvoice, incoming: IncomingPayment[]) {
+export function paymentsFor(rec: StoredInvoice, incoming: IncomingPayment[]) {
   return incoming
     .filter((e) => belongsTo(rec, e) && !e.locked)
     .map((e) => ({ ...e, seenAt: rec.seen[e.hash] ?? (e.timestamp ? e.timestamp * 1000 : undefined) }));

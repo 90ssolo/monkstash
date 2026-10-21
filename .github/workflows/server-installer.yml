@@ -185,6 +185,21 @@ jobs:
           test "$(curl -s $R -o /dev/null -w '%{http_code}' "$url")" = 410
           ! sudo -E monkstash-server link new "--amount" 2> /dev/null
 
+      - name: Dashboard sign-in over HTTPS
+        run: |
+          key=$(sudo sed -n 's/^PAY_API_KEY=//p' /etc/monkstash-server/pay.env)
+          echo "::add-mask::$key"
+          R="--resolve pay.localhost:443:127.0.0.1 --cacert $CA"
+          curl -fsS $R https://pay.localhost/admin | grep -q "Sign in"
+          sudo monkstash-server pay-info | grep -q "https://pay.localhost/admin"
+          jar=$(mktemp)
+          code=$(curl -s $R -c "$jar" -o /dev/null -w '%{http_code}' -H "Origin: https://pay.localhost" --data-urlencode "key=$key" https://pay.localhost/admin/login)
+          test "$code" = 303
+          grep -q monkstash_admin "$jar"
+          curl -fsS $R -b "$jar" https://pay.localhost/admin | grep -q "Overview"
+          curl -fsS $R -b "$jar" "https://pay.localhost/admin/export.csv" | head -n 1 | grep -q "^invoice_id,"
+          rm -f "$jar"
+
       - name: Status shows payments
         run: |
           sudo monkstash-server status | tee /tmp/status.txt

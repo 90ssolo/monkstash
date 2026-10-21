@@ -14,6 +14,7 @@
  *   GET  /l/:id               the payment link page: the payer picks or confirms the amount
  *   POST /l/:id               creates the payer's own invoice and redirects to its checkout page
  *   GET  /l/:id/qr.svg        QR code of the link, for print or a profile picture
+ *   /admin/...                the shop's dashboard, signed in with the API key (see admin/routes.ts)
  *
  * Until the first successful sync after a start, invoice routes answer 503 with Retry-After:
  * the server cannot tell yet what has been paid. /api/health always answers.
@@ -29,6 +30,8 @@ import type { Store } from "./store";
 import type { IncomingPayment, Watcher } from "./wallet";
 import QRCode from "qrcode";
 import { checkoutPage, linkPage, linkUnavailablePage, notFoundPage, syncingPage, CHECKOUT_CSS, CHECKOUT_JS } from "./checkout";
+import { adminRoutes } from "./admin/routes";
+import { ADMIN_CSS, ADMIN_JS } from "./admin/pages";
 import { chosenAmount, createLink, linkAvailability, linkUrl, presentLink, updateLink } from "./links";
 
 export interface AppState {
@@ -125,6 +128,7 @@ export function createApp(deps: AppDeps) {
   // through subaddresses.
   const createLimit = limiter(60);
   const keyHash = createHash("sha256").update(cfg.apiKey).digest();
+  const admin = adminRoutes({ cfg, store, state, send, readBody, clientOf: (req) => clientOf(req), failLimit: (k) => authFailLimit(k) });
   // Anyone with a link can ask for an invoice, so each visitor gets far fewer than a shop plugin.
   const linkCreateLimit = limiter(6);
   // One invoice at a time per link, so a link limited to N payments never hands out N + 1.
@@ -162,6 +166,14 @@ export function createApp(deps: AppDeps) {
       // ---- Static assets for the checkout page
       if (method === "GET" && p === "/assets/checkout.css") return send(res, 200, CHECKOUT_CSS, "text/css; charset=utf-8", { "cache-control": "public, max-age=3600" });
       if (method === "GET" && p === "/assets/checkout.js") return send(res, 200, CHECKOUT_JS, "text/javascript; charset=utf-8", { "cache-control": "public, max-age=3600" });
+      if (method === "GET" && p === "/assets/admin.css") return send(res, 200, ADMIN_CSS, "text/css; charset=utf-8", { "cache-control": "public, max-age=3600" });
+      if (method === "GET" && p === "/assets/admin.js") return send(res, 200, ADMIN_JS, "text/javascript; charset=utf-8", { "cache-control": "public, max-age=3600" });
+
+      // ---- The shop's dashboard
+      if (p === "/admin" || p.startsWith("/admin/")) {
+        if (!publicLimit(clientOf(req))) return json(res, 429, { error: "Too many requests. Slow down." });
+        return await admin(req, res, url);
+      }
 
       // ---- Payment links (public)
       const lk = /^\/l\/([A-Za-z0-9_-]{16,64})(\/qr\.svg)?$/.exec(p);
