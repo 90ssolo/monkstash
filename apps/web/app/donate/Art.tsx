@@ -223,15 +223,30 @@ export function ProofArt(p: P) {
   );
 }
 
-/** Final band seal: a coin inside a ring. */
+/**
+ * Final band seal: the Monero symbol inside a lettered band, like the edge of a coin. The words
+ * follow arcs inside the band (MONKSTASH over the top, "built in the open" under the bottom), so
+ * nothing crosses a ring at any size. One instance per page, so fixed path ids are safe.
+ */
 export function SealArt(p: P) {
   return (
-    <svg viewBox="0 0 300 300" role="img" aria-label="A Monero coin inside a ring of small marks" {...p}>
-      <circle cx="150" cy="150" r="124" fill="none" stroke="#e9a07a" strokeWidth="2" />
-      <circle cx="150" cy="150" r="108" fill="none" stroke="#cfdacf" strokeOpacity=".5" strokeWidth="1" strokeDasharray="2 7" />
-      <circle cx="150" cy="150" r="64" fill="none" stroke="#fbfbf7" strokeWidth="2.4" />
+    <svg viewBox="0 0 300 300" role="img" aria-label="A seal: the Monero symbol in the centre, with MonkStash and built in the open lettered around the edge" {...p}>
+      <defs>
+        {/* Baselines inside the band (rings at 96 and 136). Top letters stand outward from r 108;
+            bottom letters stand inward from r 127. Both paths run left to right, so both read upright. */}
+        <path id="seal-top" d="M 42 150 A 108 108 0 0 1 258 150" />
+        <path id="seal-bottom" d="M 23 150 A 127 127 0 0 0 277 150" />
+      </defs>
+      <circle cx="150" cy="150" r="136" fill="none" stroke="#e9a07a" strokeWidth="2" />
+      <circle cx="150" cy="150" r="96" fill="none" stroke="#e9a07a" strokeOpacity=".55" strokeWidth="1.2" />
+      <text style={D} fontSize="15" fontWeight="600" letterSpacing="5" fill="#fbfbf7">
+        <textPath href="#seal-top" startOffset="50%" textAnchor="middle">MONKSTASH</textPath>
+      </text>
+      <text style={D} fontStyle="italic" fontSize="17" fill="#cfdacf">
+        <textPath href="#seal-bottom" startOffset="50%" textAnchor="middle">built in the open</textPath>
+      </text>
+      <circle cx="150" cy="150" r="62" fill="none" stroke="#fbfbf7" strokeWidth="2.4" />
       <MoneroSymbol x={112} y={112} size={76} variant="mono" style={{ color: "#e9a07a" }} />
-      <text x="150" y="256" style={D} fontStyle="italic" fontSize="18" fill="#cfdacf" textAnchor="middle">built in the open</text>
     </svg>
   );
 }

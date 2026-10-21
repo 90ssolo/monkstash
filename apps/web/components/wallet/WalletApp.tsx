@@ -10,11 +10,11 @@ import type { StoredWallet, WalletPublic } from "@quietmint/wallet-core";
 import { warmEngine } from "@/lib/wallet/engine";
 import { CODE_EXPIRED, CODE_TOO_MANY, CODE_WAIT_MS, STATE_SAVE_EVERY_MS, WalletController, type SaveProblem, type View } from "@/lib/wallet/session";
 import { DEV_TOOLS_ENABLED, NETWORK } from "@/lib/wallet/config";
-import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
+import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS, readLockOnLeave, writeLockOnLeave } from "@/lib/wallet/autolock";
 import { fetchTestWallets } from "@/lib/wallet/testWallets";
 import { isDemo } from "@/lib/wallet/demo";
 import { BrandMark } from "@/components/BrandMark";
-import { Dashboard } from "./Dashboard";
+import { Dashboard, type LockOnLeave } from "./Dashboard";
 import { Loading, Onboarding, Welcome } from "./Onboarding";
 import { Stage } from "./Stage";
 import { ArtEngine, ArtLock } from "./WalletArt";
@@ -37,6 +37,8 @@ export function WalletApp() {
   const tab = useSingleTab();
   const [testWalletCount, setTestWalletCount] = useState(0);
   const [tillShown, setTillShown] = useState(false);
+  const [lockOnLeave, setLockOnLeave] = useState(readLockOnLeave);
+  const changeLockOnLeave = (on: boolean) => { writeLockOnLeave(on); setLockOnLeave(on); };
 
   useEffect(() => {
     controller.start();
@@ -66,11 +68,12 @@ export function WalletApp() {
       // locks between customers is unusable. Full wallets keep the normal auto-lock.
       if (controller.cashierOn && controller.view.name === "open" && controller.view.pub.kind === "view-only") return;
       const now = clock();
-      // While the first scan runs in a visible tab, waiting is not idleness: locking would stop
-      // the scan. Leaving the tab still locks (progress is saved on the way out).
-      if (controller.syncBusy && !document.hidden) lastActive = now;
+      // While the first scan runs, waiting is not idleness: locking would stop the scan. By default
+      // leaving the tab still locks (progress is saved on the way out); with lock-on-leave turned
+      // off, a running scan also keeps a background tab open. Once it is done, idle lock applies.
+      if (controller.syncBusy && (!document.hidden || !lockOnLeave)) lastActive = now;
       if (now - lastActive >= AUTO_LOCK_IDLE_MS) lockNow();
-      else if (hiddenSince !== null && now - hiddenSince >= AUTO_LOCK_HIDDEN_MS) lockNow();
+      else if (lockOnLeave && hiddenSince !== null && now - hiddenSince >= AUTO_LOCK_HIDDEN_MS) lockNow();
     };
     const onActivity = () => { lastActive = clock(); };
     const onVisibility = () => {
@@ -90,7 +93,7 @@ export function WalletApp() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(timer);
     };
-  }, [isOpen, controller]);
+  }, [isOpen, controller, lockOnLeave]);
 
   // Another tab took over the wallet: close it here at once (its keys leave this tab's memory).
   useEffect(() => {
@@ -151,7 +154,7 @@ export function WalletApp() {
             {view.name === "opening" ? <Opening /> : null}
             {view.name === "open" && saveProblem ? <SaveProblemNotice problem={saveProblem} /> : null}
             {view.name === "open" ? (
-              <OpenDashboard view={view} controller={controller} onCashierChange={setCashierOn} />
+              <OpenDashboard view={view} controller={controller} onCashierChange={setCashierOn} lockOnLeave={{ on: lockOnLeave, onChange: changeLockOnLeave }} />
             ) : null}
             {view.name === "fatal" ? <Fatal message={view.message} /> : null}
           </>
@@ -161,7 +164,7 @@ export function WalletApp() {
   );
 }
 
-function OpenDashboard({ view, controller, onCashierChange }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void }) {
+function OpenDashboard({ view, controller, onCashierChange, lockOnLeave }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void; lockOnLeave: LockOnLeave }) {
   const stores = controller.openStores();
   return (
     <Dashboard
@@ -175,6 +178,7 @@ function OpenDashboard({ view, controller, onCashierChange }: { view: Extract<Vi
       cashier={stores.cashier}
       contacts={stores.contacts}
       onCashierChange={onCashierChange}
+      lockOnLeave={lockOnLeave}
       demo={isDemo ? { mode: view.mode, fellBack: view.fellBack, assignedLabel: view.pub.name, onSwitchMode: controller.switchMode } : undefined}
     />
   );

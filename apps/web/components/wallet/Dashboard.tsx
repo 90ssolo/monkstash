@@ -88,7 +88,10 @@ function NavIcon({ s }: { s: Section }) {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{ICONS[s]}</svg>;
 }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab" }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string }) {
+/** The web wallet's choice to lock after the tab is left; the extension has no such toggle. */
+export interface LockOnLeave { on: boolean; onChange: (on: boolean) => void }
+
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", lockOnLeave }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; lockOnLeave?: LockOnLeave }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
@@ -504,8 +507,21 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 <h3 id="set-security">Security</h3>
                 <div className={styles.autolock}>
                   <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M5.2 7V5a2.8 2.8 0 015.6 0v2" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
-                  <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after {leaveText}.</p>
+                  {lockOnLeave && !lockOnLeave.on ? (
+                    <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle. While a scan is running, it stays open in a background tab so the scan can finish.</p>
+                  ) : (
+                    <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after {leaveText}.</p>
+                  )}
                 </div>
+                {lockOnLeave ? (
+                  <label className="check" style={{ margin: "0 0 var(--s-4)" }}>
+                    <input type="checkbox" checked={lockOnLeave.on} onChange={(e) => lockOnLeave.onChange(e.target.checked)} />
+                    <span>
+                      Lock {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after I leave this tab.{" "}
+                      <span className="muted">Turn off to let a long scan finish while you use other tabs. Your browser may still slow a background tab down. Leave it on if other people use this computer.</span>
+                    </span>
+                  </label>
+                ) : null}
                 {settings ? (
                   <>
                     <details className={styles.danger}>

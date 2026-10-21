@@ -52,3 +52,42 @@ test("restore, lock, wrong password, unlock, reload", async ({ page }) => {
   await unlock(page);
   await dashboard(page);
 });
+
+test("lock on leave: on by default, can be turned off, and the choice is kept", async ({ page }) => {
+  await page.clock.install();
+  await openWallet(page);
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  const toggle = page.getByRole("checkbox", { name: /Lock 5 minutes after I leave this tab/ });
+  await expect(toggle).toBeChecked();
+
+  const leaveTab = () => page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  const comeBack = () => page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  // Off: six minutes in another tab does not lock it.
+  await toggle.uncheck();
+  await expect(page.getByText(/stays open in a background tab/)).toBeVisible();
+  await leaveTab();
+  await page.clock.runFor(6 * 60_000);
+  await comeBack();
+  await expect(page.locator("#upw")).toHaveCount(0);
+
+  // The choice survives a reload; turning it back on restores the lock after leaving.
+  await page.reload();
+  await unlock(page);
+  await dashboard(page);
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await leaveTab();
+  await page.clock.runFor(6 * 60_000);
+  await comeBack();
+  await expect(page.locator("#upw")).toBeVisible();
+});
