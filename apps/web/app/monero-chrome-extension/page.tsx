@@ -15,7 +15,7 @@ import styles from "./page.module.css";
 
 const TITLE = "MonkStash Monero Wallet Extension for Chrome and Firefox";
 const DESCRIPTION = "A non-custodial Monero wallet in your browser toolbar, for Chrome and Firefox. Open source, keys kept on your device. How to recognise the real listing.";
-const UPDATED = "2026-10-21";
+const UPDATED = "2026-10-22";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -53,12 +53,12 @@ const checklist = [
 const features = [
   { b: "One click from the toolbar.", t: "Balance, send, receive and recent activity in a small popup that opens instantly, even while a scan runs." },
   { b: "The full wallet when you need it.", t: "Expand to a tab, or keep it in the side panel while you browse: payment requests, a till, contacts, proofs and every setting." },
-  { b: "Locks itself.", t: "After idle time, when every MonkStash window has been closed for a few minutes, when your computer locks, and when the browser closes." },
+  { b: "Locks itself, and asks before it pays.", t: "Every payment needs your password. It locks after idle time, a minute after every MonkStash window has closed (a few seconds in Firefox), when your computer locks, and when the browser closes." },
   { b: "Bring your wallet.", t: "Create one, restore 25, 13 (MyMonero) or 12 (Exodus) words, add a watch-only wallet, or move from the web wallet without rescanning." },
 ];
 
 const permissions = [
-  { p: "Storage and unlimited storage", why: "to keep the encrypted wallet and its scan progress on your device." },
+  { p: "Storage and unlimited storage", why: "to keep the encrypted wallet and its scan progress on your device, in storage that clearing your browsing history does not erase." },
   { p: "wallet.monkstash.com", why: "our relay to the Monero network, the only site it connects to by default." },
   { p: "Idle", why: "to lock the wallet when your computer locks." },
   { p: "Offscreen and side panel (Chrome only)", why: "to keep the wallet running while the popup is closed, and to open it in the side panel." },
