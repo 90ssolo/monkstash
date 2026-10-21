@@ -7,7 +7,7 @@
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * WC requires at least: 8.0
- * WC tested up to:   9.4
+ * WC tested up to:   11.2
  * Author:            The MonkStash developers
  * License:           BSD-3-Clause
  * License URI:       https://opensource.org/licenses/BSD-3-Clause
@@ -41,13 +41,13 @@ add_action(
 		}
 		require_once MONKSTASH_PAY_DIR . 'includes/class-monkstash-pay-client.php';
 		require_once MONKSTASH_PAY_DIR . 'includes/class-monkstash-pay-orders.php';
-		require_once MONKSTASH_PAY_DIR . 'includes/class-wc-gateway-monkstash-pay.php';
+		require_once MONKSTASH_PAY_DIR . 'includes/class-monkstash-pay-gateway.php';
 		require_once MONKSTASH_PAY_DIR . 'includes/class-monkstash-pay-webhook.php';
 
 		add_filter(
 			'woocommerce_payment_gateways',
 			static function ( $methods ) {
-				$methods[] = 'WC_Gateway_MonkStash_Pay';
+				$methods[] = 'MonkStash_Pay_Gateway';
 				return $methods;
 			}
 		);

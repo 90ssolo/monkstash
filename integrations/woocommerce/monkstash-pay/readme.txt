@@ -2,7 +2,7 @@
 Contributors: monkstash
 Tags: monero, xmr, crypto, payments, privacy
 Requires at least: 6.4
-Tested up to: 6.6
+Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 8.0
 Stable tag: 0.1.1
@@ -81,6 +81,7 @@ Each visitor address can start at most 10 Monero payments in 10 minutes, and the
 
 = 0.1.1 =
 * Locked payments (coins the sender locked for later) are noted on the order and put an unpaid order on hold. Needs MonkStash Pay with locked-payment support.
+* Tested with WordPress 7.1 and WooCommerce 11.2. Error messages are escaped; the gateway class is now MonkStash_Pay_Gateway (settings are kept).
 
 = 0.1.0 =
 * First version: checkout, webhooks with signature and status confirmation, five-minute fallback check, block checkout, HPOS.

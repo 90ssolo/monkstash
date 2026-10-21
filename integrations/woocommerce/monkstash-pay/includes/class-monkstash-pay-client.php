@@ -76,7 +76,7 @@ class MonkStash_Pay_Client {
 	 */
 	private function request( string $method, string $path, ?array $body, int $expect ): array {
 		if ( ! self::is_safe_url( $this->base ) ) {
-			throw new Exception( __( 'The MonkStash Pay server address must start with https://.', 'monkstash-pay' ) );
+			throw new Exception( esc_html__( 'The MonkStash Pay server address must start with https://.', 'monkstash-pay' ) );
 		}
 		$args = array(
 			'method'      => $method,
@@ -93,14 +93,14 @@ class MonkStash_Pay_Client {
 		}
 		$res = wp_remote_request( $this->base . $path, $args );
 		if ( is_wp_error( $res ) ) {
-			throw new Exception( sprintf( /* translators: %s: error message */ __( 'Could not reach the MonkStash Pay server: %s', 'monkstash-pay' ), $res->get_error_message() ) );
+			throw new Exception( esc_html( sprintf( /* translators: %s: error message */ __( 'Could not reach the MonkStash Pay server: %s', 'monkstash-pay' ), $res->get_error_message() ) ) );
 		}
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		$data = json_decode( (string) wp_remote_retrieve_body( $res ), true );
 		if ( $code !== $expect || ! is_array( $data ) ) {
 			$msg = is_array( $data ) && isset( $data['error'] ) ? (string) $data['error'] : 'HTTP ' . $code;
 			// The HTTP status is the exception code: 503 means "busy or still syncing, try later".
-			throw new Exception( sprintf( /* translators: %s: error message */ __( 'MonkStash Pay: %s', 'monkstash-pay' ), $msg ), $code );
+			throw new Exception( esc_html( sprintf( /* translators: %s: error message */ __( 'MonkStash Pay: %s', 'monkstash-pay' ), $msg ) ), (int) $code );
 		}
 		return $data;
 	}

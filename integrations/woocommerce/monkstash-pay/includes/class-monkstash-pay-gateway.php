@@ -6,7 +6,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class WC_Gateway_MonkStash_Pay extends WC_Payment_Gateway {
+class MonkStash_Pay_Gateway extends WC_Payment_Gateway {
 
 	/** Currencies MonkStash Pay can price in (ECB reference currencies, plus XMR). */
 	const CURRENCIES = array(
