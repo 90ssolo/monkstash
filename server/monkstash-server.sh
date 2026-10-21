@@ -13,7 +13,7 @@
 # Source and tests: https://github.com/90ssolo/monkstash/tree/main/server (BSD-3-Clause).
 set -euo pipefail
 
-SCRIPT_VERSION="0.1.0"
+SCRIPT_VERSION="0.2.0"
 SELF_URL="https://monkstash.com/server/install.sh"
 
 # The Monero release signing key (binaryFate), as published by the Monero project.
@@ -31,6 +31,14 @@ LOG_DIR="/var/log/monero"
 WWW_DIR="/var/lib/monkstash-server/www"
 BIN="/usr/local/bin/monkstash-server"
 DEFAULT_ORIGIN="https://wallet.monkstash.com"
+
+# MonkStash Pay is built on this server from this exact public commit (git checks it by hash).
+# A new Pay release is a new commit here, delivered by "monkstash-server self-update".
+PAY_REPO="https://github.com/90ssolo/monkstash.git"
+PAY_REF="eb51024161693137fec448f9782a10ffd42eb9da"
+PAY_SRC="/opt/monkstash-pay/src"
+PAY_ENV="$CONF_DIR/pay.env"
+PAY_PORT_LOCAL=8080
 
 # Temporary files live under one directory that is removed on exit, whatever happens.
 TMP_ROOT=$(mktemp -d)
@@ -58,6 +66,7 @@ Usage:
   monkstash-server status [--json]     Sync progress, peers, disk, version
   monkstash-server update [--check]    Install a newer Monero release (signature checked)
   monkstash-server self-update         Update this script from $SELF_URL
+  monkstash-server pay-info            MonkStash Pay address, API key and webhook secret (root)
   monkstash-server uninstall [--purge] Remove the services (--purge also deletes the blockchain)
 
 Install options:
@@ -68,10 +77,20 @@ Install options:
   --full               Keep the whole blockchain instead of a pruned copy (needs about 3x the disk)
   --origin URL         Another web wallet allowed to use this node from a browser (repeatable).
                        $DEFAULT_ORIGIN is always allowed.
+  --pay                Also install MonkStash Pay (view-only shop payments) at pay.<domain>
+  --pay-domain NAME    Address for MonkStash Pay instead of pay.<domain>
+  --shop-url URL       Your WooCommerce shop, for example https://shop.example.com: payment
+                       webhooks go to its MonkStash Pay plugin
+  --shop-name NAME     Shown on the checkout page and in the customer's wallet
+  --currency CODE      Price currency for invoices (default EUR)
   --no-firewall        Do not configure ufw
   --auto-update        Check for new Monero releases every day and install them
   --yes                Do not ask for confirmation
   --force              Skip the disk and memory checks
+
+MonkStash Pay asks for your shop wallet's primary address, private VIEW key and restore height
+(or reads MONKSTASH_PAY_ADDRESS, MONKSTASH_PAY_VIEW_KEY and MONKSTASH_PAY_RESTORE_HEIGHT).
+It can see payments, never spend them. Never enter a seed or spend key.
 EOF
 }
 
@@ -81,6 +100,7 @@ need_root() { [ "$(id -u)" -eq 0 ] || die "run this as root, for example: sudo b
 # Settings, kept in $CONF_FILE so status, update and a later install use the same values.
 
 NETWORK="mainnet"; DOMAIN=""; EMAIL=""; PRUNED=1; ORIGINS=""; FIREWALL=1; AUTO_UPDATE=0; YES=0; FORCE=0
+PAY=0; PAY_DOMAIN=""; SHOP_URL=""; SHOP_NAME=""; CURRENCY="EUR"
 
 load_conf() { if [ -f "$CONF_FILE" ]; then # shellcheck disable=SC1090
   . "$CONF_FILE"; fi; }
@@ -97,6 +117,11 @@ PRUNED="$PRUNED"
 ORIGINS="$ORIGINS"
 FIREWALL="$FIREWALL"
 AUTO_UPDATE="$AUTO_UPDATE"
+PAY="$PAY"
+PAY_DOMAIN="$PAY_DOMAIN"
+SHOP_URL="$SHOP_URL"
+SHOP_NAME="$SHOP_NAME"
+CURRENCY="$CURRENCY"
 EOF
 }
 
@@ -366,6 +391,15 @@ $DOMAIN {
 	}
 }
 EOF
+    if [ "$PAY" -eq 1 ]; then cat <<EOF
+
+# MonkStash Pay: checkout pages and the shop API. Pay sets its own security headers.
+$PAY_DOMAIN {
+	header -Server
+	reverse_proxy 127.0.0.1:$PAY_PORT_LOCAL
+}
+EOF
+    fi
   } > /etc/caddy/Caddyfile
 }
 
@@ -444,7 +478,9 @@ async function load() {
     const rows = [
       ["Network", s.network], ["Height", s.height ? s.height.toLocaleString() : "starting"], ["Connections", `${s.out_peers} out, ${s.in_peers} in`],
       ["Blockchain", s.pruned ? "pruned" : "full"], ["Database", s.db_size ? gb(s.db_size) : "n/a"], ["Disk free", s.free_space ? gb(s.free_space) : "n/a"],
-      ["Monero", s.version + (s.update_available ? " (update available)" : "")], ["Checked", new Date(s.checked_at).toLocaleString()],
+      ["Monero", s.version + (s.update_available ? " (update available)" : "")],
+      ...(s.pay && s.pay !== "off" ? [["Payments", { ready: "MonkStash Pay is ready", syncing: "MonkStash Pay is scanning", running: "MonkStash Pay is running", down: "MonkStash Pay is not answering" }[s.pay] || s.pay]] : []),
+      ["Checked", new Date(s.checked_at).toLocaleString()],
     ];
     $("facts").replaceChildren(...rows.flatMap(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; return [dt, dd]; }));
   } catch { $("state").textContent = "Status is not available yet. It appears a minute after the install."; }
@@ -472,6 +508,132 @@ configure_firewall() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# MonkStash Pay
+
+env_get() { [ -r "$PAY_ENV" ] && sed -n "s/^$1=//p" "$PAY_ENV" | head -n 1; return 0; }
+
+# The shop wallet, from the environment, the existing settings, or questions on this terminal.
+collect_pay_wallet() {
+  PAY_ADDRESS="${MONKSTASH_PAY_ADDRESS:-$(env_get PAY_ADDRESS)}"
+  PAY_VIEW_KEY="${MONKSTASH_PAY_VIEW_KEY:-$(env_get PAY_VIEW_KEY)}"
+  PAY_HEIGHT="${MONKSTASH_PAY_RESTORE_HEIGHT:-$(env_get PAY_RESTORE_HEIGHT)}"
+  if [ -z "$PAY_ADDRESS" ] || [ -z "$PAY_VIEW_KEY" ] || [ -z "$PAY_HEIGHT" ]; then
+    [ -t 0 ] || die "MonkStash Pay needs the shop wallet: set MONKSTASH_PAY_ADDRESS, MONKSTASH_PAY_VIEW_KEY and MONKSTASH_PAY_RESTORE_HEIGHT, or run this on a terminal"
+    say ""
+    say "MonkStash Pay watches your shop wallet with its VIEW key: it can see payments, never spend them."
+    say "Never enter your recovery words or spend key here. Use a wallet only for the shop."
+    [ -n "$PAY_ADDRESS" ] || { printf 'Shop wallet primary address: '; read -r PAY_ADDRESS; }
+    [ -n "$PAY_VIEW_KEY" ] || { printf 'Private view key (not shown): '; read -rs PAY_VIEW_KEY; printf '\n'; }
+    [ -n "$PAY_HEIGHT" ] || { printf 'Restore height (block when the wallet was made, or a little earlier): '; read -r PAY_HEIGHT; }
+  fi
+  local prefix=4; [ "$NETWORK" = stagenet ] && prefix=5
+  PAY_ADDRESS=$(printf '%s' "$PAY_ADDRESS" | tr -d '[:space:]')
+  PAY_VIEW_KEY=$(printf '%s' "$PAY_VIEW_KEY" | tr -d '[:space:]' | tr 'A-F' 'a-f')
+  case "$PAY_ADDRESS" in "$prefix"*) ;; *) die "a $NETWORK primary address starts with $prefix" ;; esac
+  [ "${#PAY_ADDRESS}" -eq 95 ] || die "a primary address has 95 characters (this one has ${#PAY_ADDRESS}); subaddresses and integrated addresses do not work here"
+  case "$PAY_ADDRESS" in *[!123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*) die "the address has characters a Monero address cannot have" ;; esac
+  [ "${#PAY_VIEW_KEY}" -eq 64 ] || die "a private view key is 64 characters of 0-9 and a-f"
+  case "$PAY_VIEW_KEY" in *[!0-9a-f]*) die "a private view key is 64 characters of 0-9 and a-f" ;; esac
+  case "$PAY_HEIGHT" in ""|*[!0-9]*) die "the restore height is a block number, like 3500000" ;; esac
+  ok "shop wallet ${PAY_ADDRESS:0:8}...${PAY_ADDRESS: -6}, scanning from block $PAY_HEIGHT"
+}
+
+install_docker() {
+  if ! command -v docker > /dev/null; then apt_install docker.io; fi
+  command -v git > /dev/null || apt_install git
+  systemctl enable --now docker > /dev/null 2>&1
+  ok "docker $(docker version --format '{{.Server.Version}}' 2> /dev/null)"
+}
+
+pay_tag() { echo "monkstash-pay:${PAY_REF:0:12}"; }
+
+build_pay() {
+  local tag; tag=$(pay_tag)
+  if docker image inspect "$tag" > /dev/null 2>&1; then ok "MonkStash Pay ${PAY_REF:0:12} already built"; return; fi
+  [ -d "$PAY_SRC/.git" ] || git clone --quiet "$PAY_REPO" "$PAY_SRC"
+  git -C "$PAY_SRC" fetch --quiet origin "$PAY_REF" 2> /dev/null || git -C "$PAY_SRC" fetch --quiet origin
+  git -C "$PAY_SRC" -c advice.detachedHead=false checkout --quiet --force "$PAY_REF"
+  [ "$(git -C "$PAY_SRC" rev-parse HEAD)" = "$PAY_REF" ] || die "could not check out MonkStash Pay at $PAY_REF"
+  say "  building MonkStash Pay from ${PAY_REF:0:12} (a few minutes)..."
+  docker build --quiet -f "$PAY_SRC/apps/pay/Dockerfile" -t "$tag" "$PAY_SRC" > /dev/null || die "the MonkStash Pay build failed"
+  ok "MonkStash Pay built from public commit ${PAY_REF:0:12}"
+}
+
+write_pay_env() {
+  local api secret webhook=""
+  api=$(env_get PAY_API_KEY); [ -n "$api" ] || api=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  secret=$(env_get PAY_WEBHOOK_SECRET); [ -n "$secret" ] || secret=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  [ -n "$SHOP_URL" ] && webhook="${SHOP_URL%/}/wp-json/monkstash-pay/v1/webhook"
+  install -d -m 0700 "$CONF_DIR"
+  umask 077
+  cat > "$PAY_ENV.tmp" <<EOF
+# MonkStash Pay settings, written by monkstash-server. Secret: readable by root only.
+PAY_NETWORK=$NETWORK
+PAY_ADDRESS=$PAY_ADDRESS
+PAY_VIEW_KEY=$PAY_VIEW_KEY
+PAY_RESTORE_HEIGHT=$PAY_HEIGHT
+PAY_NODE_URL=http://127.0.0.1:$RRPC
+PAY_API_KEY=$api
+PAY_WEBHOOK_URL=$webhook
+PAY_WEBHOOK_SECRET=$secret
+PAY_PUBLIC_URL=https://$PAY_DOMAIN
+PAY_HOST=127.0.0.1
+PAY_PORT=$PAY_PORT_LOCAL
+PAY_TRUST_PROXY=1
+PAY_SHOP_NAME=$SHOP_NAME
+PAY_CURRENCY=$CURRENCY
+PAY_CONFIRMATIONS=standard
+EOF
+  mv -f "$PAY_ENV.tmp" "$PAY_ENV"; chmod 0600 "$PAY_ENV"
+  umask 022
+  # The config directory holds the secrets now; the plain settings file stays readable.
+  chmod 0755 "$CONF_DIR"; [ -f "$CONF_FILE" ] && chmod 0644 "$CONF_FILE"
+}
+
+write_pay_unit() {
+  cat > /etc/systemd/system/monkstash-pay.service <<EOF
+[Unit]
+Description=MonkStash Pay (view-only shop payments)
+After=docker.service monerod.service network-online.target
+Requires=docker.service
+
+[Service]
+ExecStartPre=-/usr/bin/docker rm -f monkstash-pay
+ExecStart=/usr/bin/docker run --rm --name monkstash-pay --network host --env-file $PAY_ENV -v monkstash-pay-data:/data --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges $(pay_tag)
+ExecStop=/usr/bin/docker stop -t 30 monkstash-pay
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+# "ready", "syncing" (waiting for its first wallet scan), "down", "running" (seen without the
+# API key, for a non-root status) or "off".
+pay_state() {
+  [ -f /etc/systemd/system/monkstash-pay.service ] || { echo off; return; }
+  if [ ! -r "$PAY_ENV" ]; then systemctl is-active --quiet monkstash-pay && echo running || echo down; return; fi
+  local h; h=$(curl -s --max-time 5 -H "Authorization: Bearer $(env_get PAY_API_KEY)" "http://127.0.0.1:$PAY_PORT_LOCAL/api/health" || true)
+  if [ -z "$h" ]; then echo down; elif jq -e '.ok == true' > /dev/null 2>&1 <<< "$h"; then echo ready; else echo syncing; fi
+}
+
+cmd_pay_info() {
+  load_conf; need_root pay-info
+  [ -r "$PAY_ENV" ] || die "MonkStash Pay is not installed (add it with: monkstash-server install --pay)"
+  say "MonkStash Pay:     https://$PAY_DOMAIN   (state: $(pay_state))"
+  say "Webhooks go to:    $(env_get PAY_WEBHOOK_URL | grep . || echo "not set (add --shop-url)")"
+  say ""
+  say "In WooCommerce (Payments, MonkStash Pay):"
+  say "  MonkStash Pay server:  https://$PAY_DOMAIN"
+  say "  API key:               $(env_get PAY_API_KEY)"
+  say "  Webhook secret:        $(env_get PAY_WEBHOOK_SECRET)"
+  say "  Behind a trusted proxy: leave off unless your shop is behind a proxy or CDN"
+  say ""
+  say "Keep these two secrets private. Anyone with the API key can create invoices for your shop."
+}
+
+# ---------------------------------------------------------------------------------------------
 # Commands
 
 cmd_install() {
@@ -484,6 +646,12 @@ cmd_install() {
       --full) PRUNED=0 ;;
       --pruned) PRUNED=1 ;;
       --origin) case "$2" in https://*) ORIGINS="$ORIGINS ${2%/}" ;; *) die "--origin must start with https://" ;; esac; shift ;;
+      --pay) PAY=1 ;;
+      --no-pay) PAY=0 ;;
+      --pay-domain) PAY_DOMAIN="${2:?}"; shift ;;
+      --shop-url) case "$2" in https://*) SHOP_URL="${2%/}" ;; *) die "--shop-url must start with https://" ;; esac; shift ;;
+      --shop-name) SHOP_NAME="${2:?}"; shift ;;
+      --currency) CURRENCY=$(printf '%s' "${2:?}" | tr 'a-z' 'A-Z'); shift ;;
       --no-firewall) FIREWALL=0 ;;
       --auto-update) AUTO_UPDATE=1 ;;
       --no-auto-update) AUTO_UPDATE=0 ;;
@@ -504,10 +672,19 @@ cmd_install() {
   check_resources
   pick_domain
   case "$DOMAIN" in ""|*[!A-Za-z0-9.-]*|.*|*..*) die "invalid domain: $DOMAIN" ;; esac
+  if [ "$PAY" -eq 1 ]; then
+    [ -n "$PAY_DOMAIN" ] || PAY_DOMAIN="pay.$DOMAIN"
+    case "$PAY_DOMAIN" in *[!A-Za-z0-9.-]*|.*|*..*) die "invalid --pay-domain: $PAY_DOMAIN" ;; esac
+    case "$SHOP_NAME" in *[[:cntrl:]]*|*'"'*) die "the shop name cannot contain quotes or control characters" ;; esac
+    case "$CURRENCY" in [A-Z][A-Z][A-Z]) ;; *) die "--currency is a three-letter code like EUR or USD" ;; esac
+    collect_pay_wallet
+    ok "MonkStash Pay at https://$PAY_DOMAIN$([ -n "$SHOP_URL" ] && echo ", webhooks to $SHOP_URL")"
+  fi
 
   if [ "$YES" -ne 1 ] && [ -t 0 ]; then
     say ""
     say "This will install a $([ "$PRUNED" -eq 1 ] && echo pruned || echo full) $NETWORK Monero node reachable at https://$DOMAIN,"
+    [ "$PAY" -eq 1 ] && say "MonkStash Pay at https://$PAY_DOMAIN,"
     say "$([ "$FIREWALL" -eq 1 ] && echo "turn on the firewall (SSH stays open), ")and start syncing. Continue? [y/N]"
     read -r answer; case "$answer" in y|Y|yes) ;; *) die "stopped" ;; esac
   fi
@@ -521,6 +698,12 @@ cmd_install() {
   # shellcheck disable=SC2086
   install_release $rel
 
+  if [ "$PAY" -eq 1 ]; then
+    step "Installing MonkStash Pay"
+    install_docker
+    build_pay
+  fi
+
   step "Configuring"
   # This script becomes the monkstash-server command.
   if [ "$(readlink -f "$0")" != "$BIN" ]; then install -m 0755 "$0" "$BIN"; fi
@@ -528,6 +711,7 @@ cmd_install() {
   write_monero_conf
   write_units
   write_status_page
+  if [ "$PAY" -eq 1 ]; then write_pay_env; write_pay_unit; fi
   write_caddy
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile > /dev/null 2>&1 || die "the web server settings are not valid (caddy validate)"
   ok "settings written"
@@ -540,6 +724,12 @@ cmd_install() {
   systemctl enable --now monkstash-status.timer > /dev/null 2>&1
   if [ "$AUTO_UPDATE" -eq 1 ]; then systemctl enable --now monkstash-update.timer > /dev/null 2>&1; ok "daily Monero updates on"
   else systemctl disable --now monkstash-update.timer > /dev/null 2>&1 || true; fi
+  if [ "$PAY" -eq 1 ]; then
+    systemctl enable monkstash-pay.service > /dev/null 2>&1; systemctl restart monkstash-pay.service
+    ok "MonkStash Pay running (it starts answering once the node and its first wallet scan are done)"
+  elif [ -f /etc/systemd/system/monkstash-pay.service ]; then
+    systemctl disable --now monkstash-pay.service > /dev/null 2>&1 || true; rm -f /etc/systemd/system/monkstash-pay.service; systemctl daemon-reload
+  fi
   systemctl reload caddy 2> /dev/null || systemctl restart caddy
   ok "node, status page and HTTPS running"
   "$BIN" status --write "$WWW_DIR/status.json" > /dev/null 2>&1 || true
@@ -551,6 +741,12 @@ cmd_install() {
   say "  Status page:   https://$DOMAIN/status"
   say "  In MonkStash:  Settings, Connection, use your own node, paste the address above"
   say ""
+  if [ "$PAY" -eq 1 ]; then
+    say "  MonkStash Pay:   https://$PAY_DOMAIN"
+    say "  Shop settings:   sudo monkstash-server pay-info   (API key and webhook secret for the plugin)"
+    [ -n "$SHOP_URL" ] || say "  Webhooks:        not set yet; run install again with --shop-url https://your-shop"
+  fi
+  say ""
   say "  Check progress:  monkstash-server status"
   say "  Update Monero:   monkstash-server update"
 }
@@ -560,7 +756,8 @@ rpc() { curl -fsS --max-time 10 "http://127.0.0.1:$RPC/$1"; }
 status_json() {
   local info running=false
   if systemctl is-active --quiet monerod.service && info=$(rpc get_info 2> /dev/null); then running=true; else info='{}'; fi
-  jq -n --argjson i "$info" --argjson running "$running" --arg network "$NETWORK" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg pruned "$PRUNED" '{
+  jq -n --argjson i "$info" --argjson running "$running" --arg network "$NETWORK" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg pruned "$PRUNED" --arg pay "$(pay_state)" '{
+    pay: $pay,
     running: $running, network: $network, pruned: ($pruned == "1"),
     height: ($i.height // 0), target: ([($i.target_height // 0), ($i.height // 0)] | max),
     synced: (($i.synchronized // false) and (($i.height // 0) >= ($i.target_height // 0))),
@@ -584,7 +781,8 @@ cmd_status() {
     "Height:      \(.height) of \(.target)",
     "Connections: \(.out_peers) out, \(.in_peers) in",
     "Database:    \(.db_size / 1e9 * 10 | floor / 10) GB, \(.free_space / 1e9 | floor) GB free",
-    "Monero:      \(.version)\(if .update_available then " (update available: monkstash-server update)" else "" end)"' <<< "$s"
+    "Monero:      \(.version)\(if .update_available then " (update available: monkstash-server update)" else "" end)",
+    (if .pay != "off" then "Payments:    MonkStash Pay \(.pay)" else empty end)' <<< "$s"
   [ -n "$DOMAIN" ] && say "Address:     https://$DOMAIN   (status page: https://$DOMAIN/status)"
   return 0
 }
@@ -593,6 +791,10 @@ cmd_update() {
   load_conf; need_root update
   local check=0; [ "${1:-}" = "--check" ] && check=1
   local rel version cur; rel=$(latest_release); version=${rel%% *}; cur=$(installed_version)
+  if [ "$PAY" = 1 ] && [ "$check" -eq 0 ] && ! docker image inspect "$(pay_tag)" > /dev/null 2>&1; then
+    step "Updating MonkStash Pay to ${PAY_REF:0:12}"
+    build_pay; write_pay_unit; systemctl daemon-reload; systemctl restart monkstash-pay.service; ok "MonkStash Pay restarted"
+  fi
   if [ "$cur" = "$version" ]; then ok "Monero $cur is the latest release"; return 0; fi
   if [ "$check" -eq 1 ]; then say "Monero $version is available (installed: ${cur:-none}). Run: monkstash-server update"; return 0; fi
   step "Updating Monero ${cur:-none} to $version"
@@ -617,15 +819,21 @@ cmd_self_update() {
 cmd_uninstall() {
   need_root uninstall
   local purge=0; [ "${1:-}" = "--purge" ] && purge=1
-  systemctl disable --now monkstash-update.timer monkstash-status.timer monerod.service > /dev/null 2>&1 || true
+  systemctl disable --now monkstash-pay.service monkstash-update.timer monkstash-status.timer monerod.service > /dev/null 2>&1 || true
+  if command -v docker > /dev/null; then
+    docker rm -f monkstash-pay > /dev/null 2>&1 || true
+    docker images --format '{{.Repository}}:{{.Tag}}' | grep '^monkstash-pay:' | xargs -r docker rmi > /dev/null 2>&1 || true
+    [ "$purge" -eq 1 ] && docker volume rm monkstash-pay-data > /dev/null 2>&1 || true
+  fi
+  rm -rf /opt/monkstash-pay /etc/systemd/system/monkstash-pay.service
   rm -f /etc/systemd/system/monerod.service /etc/systemd/system/monkstash-status.* /etc/systemd/system/monkstash-update.*
   systemctl daemon-reload
   if [ -f /etc/caddy/Caddyfile ] && grep -q "Written by monkstash-server" /etc/caddy/Caddyfile; then
     printf ':80 {\n\trespond "Not configured" 404\n}\n' > /etc/caddy/Caddyfile; systemctl reload caddy 2> /dev/null || true
   fi
   rm -rf "$MONERO_DIR" "$WWW_DIR" /etc/monero "$CONF_DIR"
-  if [ "$purge" -eq 1 ]; then rm -rf "$DATA_DIR" "$LOG_DIR"; ok "removed, including the blockchain"
-  else ok "removed. The blockchain is kept in $DATA_DIR (delete it with: rm -rf $DATA_DIR)"; fi
+  if [ "$purge" -eq 1 ]; then rm -rf "$DATA_DIR" "$LOG_DIR"; ok "removed, including the blockchain and Pay's invoices"
+  else ok "removed. The blockchain is kept in $DATA_DIR and Pay's invoices in the docker volume monkstash-pay-data (--purge deletes both)"; fi
   say "Caddy, ufw and their rules are left installed. Remove this command with: rm $BIN"
 }
 
@@ -634,6 +842,7 @@ case "${1:-}" in
   status) shift; cmd_status "$@" ;;
   update) shift; cmd_update "$@" ;;
   self-update) shift; cmd_self_update ;;
+  pay-info) shift; cmd_pay_info ;;
   uninstall) shift; cmd_uninstall "$@" ;;
   version|--version) say "monkstash-server $SCRIPT_VERSION" ;;
   help|-h|--help|"") usage ;;

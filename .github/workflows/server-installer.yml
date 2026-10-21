@@ -103,3 +103,74 @@ jobs:
           sudo monkstash-server uninstall
           ! systemctl is-active --quiet monerod
           test -d /var/lib/monero
+
+  install-pay:
+    # Node plus MonkStash Pay, with a throwaway stagenet shop wallet made only for this test (its
+    # spend key was never kept; stagenet coins have no value).
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      CA: /tmp/caddy-local-root.crt
+      MONKSTASH_PAY_ADDRESS: 53GEHf6S6uNTpTUxe3Uck23miKbiDtpKZi6qvdXMGQ9PNJ6LeDRfa8eLZ7ozxw4jCf1qdRLCAom4K6amgWZDhsmSUTad2cr
+      MONKSTASH_PAY_VIEW_KEY: ca3940e9c65968310caa23566cf6304df48ad71abb2d229ac89d2705cfa16008
+      MONKSTASH_PAY_RESTORE_HEIGHT: "2200000"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install node and MonkStash Pay
+        run: sudo -E bash server/monkstash-server.sh install --network stagenet --domain localhost --pay --shop-url https://shop.example --shop-name "Test shop" --yes
+
+      - name: Trust Caddy's local certificate for these tests
+        run: |
+          for i in $(seq 1 30); do sudo test -f /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt && break; sleep 2; done
+          sudo cp /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt "$CA" && sudo chmod 0644 "$CA"
+
+      - name: Secrets stay on the server, readable by root only
+        run: |
+          test "$(sudo stat -c %a /etc/monkstash-server/pay.env)" = 600
+          ! cat /etc/monkstash-server/pay.env 2> /dev/null
+          ! sudo journalctl --no-pager -u monkstash-pay -u monerod -u caddy | grep -q "$MONKSTASH_PAY_VIEW_KEY"
+          sudo monkstash-server pay-info | grep -q "API key:"
+
+      - name: Pay answers and finishes its first scan
+        run: |
+          key=$(sudo sed -n 's/^PAY_API_KEY=//p' /etc/monkstash-server/pay.env)
+          echo "::add-mask::$key"
+          for i in $(seq 1 60); do
+            h=$(curl -s -H "Authorization: Bearer $key" http://127.0.0.1:8080/api/health || true)
+            echo "$h" | jq -e '.ok == true' > /dev/null 2>&1 && break
+            sleep 10
+          done
+          echo "$h" | jq '{ok, network, height, syncError}'
+          echo "$h" | jq -e '.ok == true and .network == "stagenet"'
+
+      - name: Invoice and checkout over HTTPS
+        run: |
+          key=$(sudo sed -n 's/^PAY_API_KEY=//p' /etc/monkstash-server/pay.env)
+          echo "::add-mask::$key"
+          R="--resolve pay.localhost:443:127.0.0.1 --cacert $CA"
+          code=$(curl -s -o /dev/null -w '%{http_code}' $R -X POST https://pay.localhost/api/invoices -H 'Content-Type: application/json' -d '{"amount":"0.05","currency":"XMR"}')
+          echo "without the API key: $code"; test "$code" = 401
+          inv=$(curl -fsS $R -X POST https://pay.localhost/api/invoices -H "Authorization: Bearer $key" -H 'Content-Type: application/json' -d '{"amount":"0.05","currency":"XMR","reference":"order-1"}')
+          echo "$inv" | jq '{id, status, checkoutUrl}'
+          url=$(echo "$inv" | jq -r .checkoutUrl)
+          case "$url" in https://pay.localhost/pay/*) ;; *) echo "unexpected checkout URL $url"; exit 1 ;; esac
+          curl -fsS $R "$url" | grep -qi "monero"
+          curl -fsS $R "$url/qr.svg" | grep -q "<svg"
+
+      - name: Status shows payments
+        run: |
+          sudo monkstash-server status | tee /tmp/status.txt
+          grep -q "Payments:    MonkStash Pay ready" /tmp/status.txt
+
+      - name: Uninstall removes Pay
+        run: |
+          sudo monkstash-server uninstall
+          ! sudo docker ps --format '{{.Names}}' | grep -q monkstash-pay
+          ! test -f /etc/monkstash-server/pay.env
