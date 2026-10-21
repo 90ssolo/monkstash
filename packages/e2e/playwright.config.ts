@@ -9,6 +9,8 @@ import { defineConfig } from "@playwright/test";
  * Throwaway stagenet wallets come from apps/web/test-wallets.local.json (never committed).
  * Tests that need them are skipped when the file is missing.
  */
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3210";
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 120_000,
@@ -18,7 +20,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3210",
+    baseURL: BASE,
     // The Chrome installed on this machine: no browser download needed.
     channel: process.env.E2E_CHANNEL ?? "chrome",
     headless: true,
@@ -27,7 +29,7 @@ export default defineConfig({
   },
   webServer: {
     command: "pnpm --filter @quietmint/web dev",
-    url: "http://localhost:3210/api/network-stats",
+    url: `${BASE}/api/network-stats`,
     reuseExistingServer: true,
     timeout: 180_000,
     cwd: "../..",

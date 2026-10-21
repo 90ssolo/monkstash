@@ -246,6 +246,7 @@ export function remoteSettings(host: HostConnection, pub: WalletPublic, openFull
     restoreHeight: s.restoreHeight,
     revealSeed: (password, code) => call("revealSeed", password, code),
     checkAccess: (password, code) => call("checkAccess", password, code),
+    approveSend: (password, code, metadata) => call("approveSend", password, code, metadata),
     changePassword: (password, code, next) => call("changePassword", password, code, next),
     // A new authenticator secret is made here, shown as a QR, and saved by enableTotp in the host.
     newTotp() {

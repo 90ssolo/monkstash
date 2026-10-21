@@ -22,6 +22,11 @@ export interface SettingsActions {
   saveNode(node: NodeConfig | null, password: string, code: string): Promise<void>;
   /** Re-checks the password (and 2FA code), e.g. before leaving cashier mode. */
   checkAccess(password: string, code: string): Promise<void>;
+  /**
+   * Checks the password (and 2FA code) and approves these signed transactions for broadcast within
+   * two minutes. The wallet refuses to send anything that was not approved this way.
+   */
+  approveSend(password: string, code: string, metadata: string[]): Promise<void>;
   /** Re-encrypts the wallet with a new password. */
   changePassword(password: string, code: string, newPassword: string): Promise<void>;
   /** A fresh authenticator secret to show as a QR code. Nothing is saved until enableTotp. */

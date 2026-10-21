@@ -3,7 +3,7 @@
  * the computer's lock state so the wallet locks with it. Chrome stops this worker when idle; the
  * host page keeps running on its own, so nothing here holds wallet state.
  */
-import type { Control } from "./shared/rpc";
+import { VAULT_COPY_KEY, type Control } from "./shared/rpc";
 
 const HOST_URL = "host.html";
 /** A host page that has not said it is ready by then is closed and started again on the next try. */
@@ -53,6 +53,17 @@ chrome.runtime.onMessage.addListener((raw, sender, reply) => {
   const msg = raw as Control;
   if (msg?.t === "ensure-host") {
     ensureHost().then(() => reply({ ok: true }), (e: unknown) => reply({ ok: false, error: (e as Error)?.message ?? String(e) }));
+    return true;
+  }
+  // Only the host page keeps the wallet record copy (see host/main.ts keepVaultCopy).
+  const fromHost = sender.url === chrome.runtime.getURL("host.html");
+  if (fromHost && msg?.t === "vault-copy-get") {
+    chrome.storage.local.get(VAULT_COPY_KEY).then((got) => reply({ ok: true, value: got[VAULT_COPY_KEY] ?? null }), (e: unknown) => reply({ ok: false, error: String(e) }));
+    return true;
+  }
+  if (fromHost && msg?.t === "vault-copy-set") {
+    const done = typeof msg.value === "string" ? chrome.storage.local.set({ [VAULT_COPY_KEY]: msg.value }) : chrome.storage.local.remove(VAULT_COPY_KEY);
+    done.then(() => reply({ ok: true }), (e: unknown) => reply({ ok: false, error: String(e) }));
     return true;
   }
   return false;

@@ -44,7 +44,16 @@ export type Control =
   | { t: "host-ready" }
   | { t: "idle-state"; state: "active" | "idle" | "locked" }
   /** Firefox: an open view says so every few seconds, which keeps the background page loaded. */
-  | { t: "heartbeat" };
+  | { t: "heartbeat" }
+  /**
+   * Chrome: the host (an offscreen document) cannot use extension storage, so the service worker
+   * reads and writes the copy of the encrypted wallet record for it.
+   */
+  | { t: "vault-copy-get" }
+  | { t: "vault-copy-set"; value: string | null };
+
+/** The extension-storage key of the copy of the encrypted wallet record. */
+export const VAULT_COPY_KEY = "quietmint.wallet.v1";
 
 /**
  * Chrome refuses a single extension message over 64 MiB, and a move file of a long-lived wallet

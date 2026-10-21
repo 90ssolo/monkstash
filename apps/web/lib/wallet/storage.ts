@@ -11,6 +11,19 @@ import {
 // Legacy identifier from the pre-rebrand name. Do NOT rename: existing wallets and saved
 // state are stored under it, and changing it would make them unreadable.
 const KEY = "quietmint.wallet.v1";
+/** The storage key of the encrypted wallet record (the extension keeps a copy of it, see below). */
+export const VAULT_KEY = KEY;
+
+/**
+ * Called after every change to the stored record, with the new JSON (null when removed). The
+ * browser extension uses it to keep a copy in its own storage: Firefox clears an extension's
+ * localStorage when someone clears their browsing history, but not its extension storage.
+ */
+type Mirror = (value: string | null) => void;
+let mirror: Mirror | null = null;
+export function setVaultMirror(m: Mirror | null): void {
+  mirror = m;
+}
 
 export class StorageUnavailableError extends Error {
   constructor() {
@@ -41,7 +54,9 @@ export function loadStoredWallet(): StoredWallet | null {
 
 export async function saveWallet(pub: WalletPublic, secrets: WalletSecrets, password: string): Promise<StoredWallet> {
   const record: StoredWallet = { pub, vault: await encryptJson(secrets, password) };
-  store().setItem(KEY, JSON.stringify(record));
+  const json = JSON.stringify(record);
+  store().setItem(KEY, json);
+  mirror?.(json);
   return record;
 }
 
@@ -51,7 +66,9 @@ export async function unlockWallet(record: StoredWallet, password: string): Prom
 
 export function updatePublic(record: StoredWallet, patch: Partial<WalletPublic>): StoredWallet {
   const next = { ...record, pub: { ...record.pub, ...patch } };
-  store().setItem(KEY, JSON.stringify(next));
+  const json = JSON.stringify(next);
+  store().setItem(KEY, json);
+  mirror?.(json);
   return next;
 }
 
@@ -59,6 +76,7 @@ export function removeWallet(): void {
   try {
     const s = store();
     s.removeItem(KEY);
+    mirror?.(null);
     // Per-wallet checkup marks (components/wallet/Checkup.tsx) would otherwise show a wallet was here.
     for (let i = s.length - 1; i >= 0; i--) {
       const k = s.key(i);

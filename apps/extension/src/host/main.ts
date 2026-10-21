@@ -9,14 +9,15 @@
  */
 import { setVisibility, warmEngine, type LiveWallet, type SyncState } from "@/lib/wallet/engine";
 import { STATE_SAVE_EVERY_MS, WalletController, type View } from "@/lib/wallet/session";
-import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
+import { AUTO_LOCK_IDLE_MS, AUTO_LOCK_NO_VIEWS_MS } from "@/lib/wallet/autolock";
+import { setVaultMirror, VAULT_KEY } from "@/lib/wallet/storage";
 import { post, PORT_NAME, receiver, type Control, type HostState, type ToHost, type ToView } from "../shared/rpc";
 
 const controller = new WalletController();
 // Stagenet test builds only: lets automated tests inspect the controller from DevTools.
 /** Auto-lock times (the web wallet's defaults; stagenet test builds can shorten them). */
 let idleMs = AUTO_LOCK_IDLE_MS;
-let noViewsMs = AUTO_LOCK_HIDDEN_MS;
+let noViewsMs = AUTO_LOCK_NO_VIEWS_MS;
 if (__TEST_BUILD__) {
   (globalThis as { __monkstash?: unknown }).__monkstash = {
     controller,
@@ -139,7 +140,7 @@ const WALLET_CALLS = new Set([
 ]);
 /** Settings actions a view may call. Each one checks the password (and code) against the vault. */
 const SETTINGS_CALLS = new Set([
-  "revealSeed", "checkAccess", "changePassword", "enableTotp", "disableTotp", "watchOnlyKeys",
+  "revealSeed", "checkAccess", "approveSend", "changePassword", "enableTotp", "disableTotp", "watchOnlyKeys",
   "rescanFrom", "exportMove", "importMove", "saveNode",
 ]);
 
@@ -290,5 +291,43 @@ setInterval(() => {
   if (controller.unlocked) void controller.persistState();
 }, STATE_SAVE_EVERY_MS);
 
-controller.start();
-void chrome.runtime.sendMessage({ t: "host-ready" } satisfies Control).catch(() => {});
+/**
+ * The encrypted wallet record lives in this page's localStorage (shared code with the web wallet),
+ * with a copy in the extension's own storage. Firefox clears an extension's localStorage when
+ * someone clears their browsing history and site data; extension storage survives that. On start,
+ * a missing record is restored from the copy, and a record without a copy (an older version) gets
+ * one. Only the encrypted record is copied: it is useless without the wallet password.
+ */
+// Firefox: this page (the background page) uses extension storage itself. Chrome: an offscreen
+// document cannot, so the service worker does it (sw.ts).
+async function readVaultCopy(): Promise<unknown> {
+  if (chrome.storage?.local) return (await chrome.storage.local.get(VAULT_KEY))[VAULT_KEY];
+  const r = (await chrome.runtime.sendMessage({ t: "vault-copy-get" } satisfies Control)) as { ok: boolean; value?: unknown; error?: string };
+  if (!r?.ok) throw new Error(r?.error ?? "no answer");
+  return r.value;
+}
+async function writeVaultCopy(value: string | null): Promise<void> {
+  if (chrome.storage?.local) return value === null ? chrome.storage.local.remove(VAULT_KEY) : chrome.storage.local.set({ [VAULT_KEY]: value });
+  const r = (await chrome.runtime.sendMessage({ t: "vault-copy-set", value } satisfies Control)) as { ok: boolean; error?: string };
+  if (!r?.ok) throw new Error(r?.error ?? "no answer");
+}
+
+async function keepVaultCopy(): Promise<void> {
+  let local: string | null = null;
+  try { local = window.localStorage.getItem(VAULT_KEY); } catch { /* storage blocked */ }
+  try {
+    const copy = await readVaultCopy();
+    if (!local && typeof copy === "string") window.localStorage.setItem(VAULT_KEY, copy);
+    else if (local && copy !== local) await writeVaultCopy(local);
+  } catch (e) {
+    console.warn("[host] could not reach extension storage:", (e as Error).message);
+  }
+  setVaultMirror((value) => { void writeVaultCopy(value).catch(() => {}); });
+  // Ask the browser to keep this extension's data (scan progress, records) under storage pressure.
+  void navigator.storage?.persist?.().catch(() => false);
+}
+
+void keepVaultCopy().finally(() => {
+  controller.start();
+  void chrome.runtime.sendMessage({ t: "host-ready" } satisfies Control).catch(() => {});
+});

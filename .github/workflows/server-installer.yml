@@ -35,6 +35,15 @@ jobs:
           bash -n server/monkstash-server.sh
           shellcheck -S warning server/monkstash-server.sh
 
+      - name: Release signature
+        # Every version of the script must be signed with the release key it names (see
+        # scripts/sign-installer.sh); self-update refuses anything else.
+        run: |
+          key=$(sed -n 's/^RELEASE_KEY="\(.*\)"$/\1/p' server/monkstash-server.sh)
+          printf 'release@monkstash.com namespaces="monkstash-server" %s\n' "$key" > /tmp/signers
+          ssh-keygen -Y verify -f /tmp/signers -I release@monkstash.com -n monkstash-server \
+            -s server/monkstash-server.sh.sig < server/monkstash-server.sh
+
       - name: Install (stagenet, local HTTPS)
         run: sudo bash server/monkstash-server.sh install --network stagenet --domain localhost --yes
 

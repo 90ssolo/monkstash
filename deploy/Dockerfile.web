@@ -12,6 +12,7 @@ COPY packages/node-client packages/node-client
 COPY apps/web apps/web
 # The node installer is served at /server/install.sh, so its hash is in the build manifest too.
 COPY server/monkstash-server.sh apps/web/public/server/install.sh
+COPY server/monkstash-server.sh.sig apps/web/public/server/install.sh.sig
 RUN pnpm install --frozen-lockfile --filter @quietmint/web...
 # Public settings are baked into the pages at build time.
 ARG NEXT_PUBLIC_SITE_URL

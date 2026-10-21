@@ -2,6 +2,8 @@
 export const AUTO_LOCK_IDLE_MS = 10 * 60 * 1000;
 /** ...or after the tab has been hidden (switched away, minimised) for this long. */
 export const AUTO_LOCK_HIDDEN_MS = 5 * 60 * 1000;
+/** Extension in Chrome: the wallet locks this long after the last MonkStash window closed. */
+export const AUTO_LOCK_NO_VIEWS_MS = 60 * 1000;
 /** A running scan keeps a visible, untouched wallet open for at most this long (lock on leave on). */
 export const AUTO_LOCK_SCAN_MAX_MS = 60 * 60 * 1000;
 

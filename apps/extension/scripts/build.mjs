@@ -42,7 +42,8 @@ await build({ configFile: join(root, "vite.config.ts") });
 const require = createRequire(join(root, "package.json"));
 const moneroDist = dirname(require.resolve("monero-ts/package.json"));
 mkdirSync(join(out, "monero"), { recursive: true });
-copyFileSync(join(moneroDist, "dist/monero.worker.js"), join(out, "monero/monero.worker.js"));
+// The engine's worker, without its pointer to a source map that is not shipped.
+writeFileSync(join(out, "monero/monero.worker.js"), readFileSync(join(moneroDist, "dist/monero.worker.js"), "utf8").replace(/\n?\/\/# sourceMappingURL=\S+\s*$/, "\n"));
 
 const icons = { 16: "icons/icon-16.png", 32: "icons/icon-32.png", 48: "icons/icon-48.png", 128: "icons/icon-128.png" };
 const common = {
@@ -86,7 +87,23 @@ const manifest = {
   host_permissions: [`${new URL(target.api).origin.replace(/:\d+$/, "")}/*`],
   // Your own node, asked for when you save it in Settings (only that one host is granted).
   optional_host_permissions: ["https://*/*", "http://localhost/*", "http://127.0.0.1/*", "http://[::1]/*"],
-  content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
+  // Extension pages: own scripts and the WebAssembly engine only; connections to our API and to
+  // a node the user added (https, or http on this computer); no frames, forms, plugins or base tags.
+  content_security_policy: {
+    extension_pages: [
+      "default-src 'self'",
+      "script-src 'self' 'wasm-unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self'",
+      `connect-src 'self' https: http://localhost:* http://127.0.0.1:* http://[::1]:*${dev ? " ws: http:" : ""}`,
+      "worker-src 'self'",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      "form-action 'none'",
+    ].join("; "),
+  },
 };
 writeFileSync(join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 // A release must never carry the stagenet test hook (see host/main.ts).

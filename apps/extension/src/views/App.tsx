@@ -180,6 +180,7 @@ function OpenWallet({ surface }: { surface: Surface }) {
         onCashierChange={setCashierOn}
         compact={compact}
         leaveText="you close every MonkStash window"
+        leaveDelay={__FIREFOX__ ? "a few seconds" : "1 minute"}
       />
     </>
   );

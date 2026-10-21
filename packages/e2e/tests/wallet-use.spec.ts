@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dashboard, openWallet, restore, setPassword, testWallets, wallet } from "./helpers";
+import { PASSWORD, dashboard, openWallet, restore, setPassword, testWallets, wallet } from "./helpers";
 
 test.skip(!testWallets().length, "needs apps/web/test-wallets.local.json");
 
@@ -47,6 +47,13 @@ test("receive and send (simulation): new addresses, review screen, sent", async 
   await page.getByRole("button", { name: "Review" }).click();
   await expect(page.getByRole("heading", { name: "Review payment" })).toBeVisible();
   await expect(page.getByText("Network fee")).toBeVisible();
+  // Every payment needs the wallet password: without it nothing can be sent, a wrong one is refused.
+  await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+  await page.locator("#send-pw").fill("not-the-password");
+  await page.getByRole("button", { name: "Send now" }).click();
+  await expect(page.getByText("Wrong password.")).toBeVisible();
+  await expect(page.getByText(/Your payment was sent to the network/)).toHaveCount(0);
+  await page.locator("#send-pw").fill(PASSWORD);
   await page.getByRole("button", { name: "Send now" }).click();
   await expect(page.getByText(/Your payment was sent to the network/)).toBeVisible();
 });

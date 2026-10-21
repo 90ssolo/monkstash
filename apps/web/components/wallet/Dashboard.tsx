@@ -91,7 +91,7 @@ function NavIcon({ s }: { s: Section }) {
 /** The web wallet's choice to lock after the tab is left; the extension has no such toggle. */
 export interface LockOnLeave { on: boolean; onChange: (on: boolean) => void }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", lockOnLeave }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; lockOnLeave?: LockOnLeave }) {
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
@@ -389,7 +389,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                   Money paid to your shop checkout or tills sits in its own account, so the tills never share an address. Move it to your main balance to spend it.
                 </p>
                 {bal.other.map((o) => (
-                  <MoveFunds key={o.account} account={o.account} balance={o.balance} unlocked={o.unlocked} wallet={wallet} canSend={pub.kind === "full"} hidden={hidden} onDone={refresh} />
+                  <MoveFunds key={o.account} account={o.account} balance={o.balance} unlocked={o.unlocked} wallet={wallet} settings={settings} canSend={pub.kind === "full"} hidden={hidden} onDone={refresh} />
                 ))}
               </div>
             ) : null}
@@ -413,7 +413,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
           <section hidden={section !== "send"} aria-labelledby="send-h" className={styles.section}>
             <h2 id="send-h" className={styles.panelH} tabIndex={-1}>Send Monero</h2>
             {pub.kind === "full" ? (
-              <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} synced={synced} unlocked={bal?.unlocked ?? 0n} onSent={refresh} prefill={prefill}
+              <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} settings={settings} synced={synced} unlocked={bal?.unlocked ?? 0n} onSent={refresh} prefill={prefill}
                 contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} />
             ) : (
               <p className="muted">This is a watch-only wallet: it can see payments but has no key to send. Send from the full wallet that holds your recovery words.</p>
@@ -510,7 +510,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                   {lockOnLeave && !lockOnLeave.on ? (
                     <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle. While a scan is running, it stays open in a background tab so the scan can finish.</p>
                   ) : (
-                    <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after {leaveText}.</p>
+                    <p>Locks itself after {Math.round(AUTO_LOCK_IDLE_MS / 60000)} minutes idle, or {leaveDelay ?? `${Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes`} after {leaveText}. Every payment asks for your password.</p>
                   )}
                 </div>
                 {lockOnLeave ? (
@@ -902,11 +902,14 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged }: { pub: Wal
   );
 }
 
-function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSaveContacts, hidden }: { pub: WalletPublic; wallet: LiveWallet; synced: boolean; unlocked: bigint; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean }) {
+function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contacts, onSaveContacts, hidden }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean }) {
   const [to, setTo] = useState(prefill?.address ?? "");
   const [amount, setAmount] = useState(prefill?.amount ? formatXmr(prefill.amount) : "");
   // "Send all": everything spendable, the network fee taken out of it (no amount to type).
   const [sendAll, setSendAll] = useState(false);
+  // The password (and code) that approve the reviewed payment; the wallet sends nothing without them.
+  const [sendPw, setSendPw] = useState("");
+  const [sendCode, setSendCode] = useState("");
   // The review is a frozen snapshot: what was built is what is shown and sent, whatever the form says now.
   const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; hash?: string; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean } | null>(null);
   const toRef = useRef("");
@@ -1108,6 +1111,15 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
     if (!review) return;
     setState("sending");
     setError(null);
+    // The wallet only broadcasts a payment approved with the password (and code) just now.
+    try {
+      if (!settings) throw new Error("Payments cannot be confirmed from here.");
+      await settings.approveSend(sendPw, sendCode, [review.metadata]);
+    } catch (err) {
+      setError((err as Error).message);
+      setState("idle");
+      return;
+    }
     try {
       // Always the payment built for this review. After an error this re-sends the same signed
       // transaction, which the network accepts at most once.
@@ -1145,6 +1157,7 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
         <div className="notice notice-warn" style={{ margin: "var(--s-4) 0" }}>
           <span>Once you send Monero, it cannot be undone. Check the first and last few characters of the address before you send.</span>
         </div>
+        <Credentials totp={!!settings?.totpEnabled} pw={sendPw} setPw={setSendPw} code={sendCode} setCode={setSendCode} idPrefix="send" />
         {error ? <p className="error small" role="alert">{error}</p> : null}
         {state === "checking" ? <p className="small" role="status">Checking whether the payment reached the network…</p> : null}
         {unsure ? (
@@ -1157,7 +1170,7 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
                   : "Do not make a new payment yet. Sending this one again is safe: it is the exact same signed payment, so it can never be paid twice."}
               </span>
             </div>
-            <button className="btn btn-primary btn-block" disabled={state !== "idle"} onClick={confirm}>{state === "sending" ? "Sending…" : "Try sending the same payment again"}</button>
+            <button className="btn btn-primary btn-block" disabled={state !== "idle" || !sendPw} onClick={confirm}>{state === "sending" ? "Sending…" : "Try sending the same payment again"}</button>
             {!unsure.absent ? (
               <button className="btn btn-secondary btn-block" disabled={state !== "idle"} onClick={() => void check("Still no answer from the node.")}>Check again</button>
             ) : (
@@ -1166,7 +1179,7 @@ function Send({ pub, wallet, synced, unlocked, onSent, prefill, contacts, onSave
           </div>
         ) : (
           <div style={{ display: "grid", gap: "var(--s-2)" }}>
-            <button className="btn btn-primary btn-block" disabled={state !== "idle"} onClick={confirm}>{state === "sending" ? "Sending…" : "Send now"}</button>
+            <button className="btn btn-primary btn-block" disabled={state !== "idle" || !sendPw} onClick={confirm}>{state === "sending" ? "Sending…" : "Send now"}</button>
             <button className="btn btn-ghost btn-block" disabled={state !== "idle"} onClick={() => setReview(null)}>Edit</button>
           </div>
         )}
@@ -1436,7 +1449,9 @@ function otherTotal(b: Balances): bigint {
 }
 
 /** One account's takings, with a two-step move into the main balance (fee shown first). */
-function MoveFunds({ account, balance, unlocked, wallet, canSend, hidden, onDone }: { account: number; balance: bigint; unlocked: bigint; wallet: LiveWallet; canSend: boolean; hidden: boolean; onDone: () => void }) {
+function MoveFunds({ account, balance, unlocked, wallet, settings, canSend, hidden, onDone }: { account: number; balance: bigint; unlocked: bigint; wallet: LiveWallet; settings?: SettingsActions; canSend: boolean; hidden: boolean; onDone: () => void }) {
+  const [pw, setPw] = useState("");
+  const [code, setCode] = useState("");
   const [plan, setPlan] = useState<{ fee: bigint; amount: bigint; metadata: string[] } | null>(null);
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -1447,6 +1462,7 @@ function MoveFunds({ account, balance, unlocked, wallet, canSend, hidden, onDone
         <strong>{ACCOUNT_NAME(account)}</strong>
         <p className="small muted" style={{ margin: 0 }}>{amt(balance)}{unlocked < balance ? `, ${amt(unlocked)} spendable now` : ""}</p>
         {plan ? <p className="small" style={{ margin: "var(--s-2) 0 0" }}>Move {amt(plan.amount)} to your main balance for a network fee of {formatXmr(plan.fee)} XMR?</p> : null}
+        {plan ? <Credentials totp={!!settings?.totpEnabled} pw={pw} setPw={setPw} code={code} setCode={setCode} idPrefix={`move-${account}`} /> : null}
         {state === "done" ? <p className="small" role="status" style={{ margin: "var(--s-2) 0 0" }}>Moved. It is spendable from your main balance after 10 confirmations (about 20 minutes).</p> : null}
         {error ? <p className="small" role="alert" style={{ margin: "var(--s-2) 0 0", color: "var(--clay-ink)" }}>{error}</p> : null}
       </div>
@@ -1454,9 +1470,11 @@ function MoveFunds({ account, balance, unlocked, wallet, canSend, hidden, onDone
         <span className="small muted">Move it from your full wallet</span>
       ) : plan ? (
         <span className={styles.contactActions}>
-          <button type="button" className="btn btn-primary btn-sm" disabled={state === "busy"} onClick={async () => {
+          <button type="button" className="btn btn-primary btn-sm" disabled={state === "busy" || !pw} onClick={async () => {
             setState("busy"); setError(null);
             try {
+              if (!settings) throw new Error("This move cannot be confirmed from here.");
+              await settings.approveSend(pw, code, plan.metadata);
               for (const m of plan.metadata) await wallet.relay(m);
               setPlan(null); setState("done"); onDone();
             } catch (err) {

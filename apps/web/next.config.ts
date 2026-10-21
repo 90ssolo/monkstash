@@ -54,6 +54,8 @@ const config: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   reactStrictMode: true,
   poweredByHeader: false,
+  // Dev only: a second dev server (another port) needs its own build folder. Builds use ".next".
+  ...(isDev && process.env.NEXT_DEV_DIST_DIR ? { distDir: process.env.NEXT_DEV_DIST_DIR } : {}),
   // Self-contained server bundle for the VPS (deploy/): only the files the server needs.
   output: "standalone",
   // A fixed build ID (the public source commit) instead of a random one, so two builds of the

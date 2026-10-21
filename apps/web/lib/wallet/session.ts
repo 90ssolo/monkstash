@@ -155,6 +155,10 @@ function viewFor(rec: StoredWallet | null): View {
 
 export type SaveProblem = "full" | "unavailable" | null;
 
+/** How long a password approval for a send stays valid. */
+const SEND_APPROVAL_MS = 2 * 60 * 1000;
+export const SEND_NEEDS_APPROVAL = "Confirm this payment with your wallet password first.";
+
 export class WalletController {
   view: View = { name: "boot" };
   /** Set when the browser refused to keep the scan progress (shown once as a notice). */
@@ -179,6 +183,12 @@ export class WalletController {
   private pending: { secrets: Secrets; timer: ReturnType<typeof setTimeout>; tries: number } | null = null;
   private listeners = new Set<() => void>();
   private stores: { pub: WalletPublic; requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore } | null = null;
+  /**
+   * Signed transactions the owner approved with the password (and code) in the last two minutes.
+   * The wallet handed to screens only broadcasts one of these, once: an unlocked wallet left on a
+   * screen, or a view that was tampered with, cannot send without the password.
+   */
+  private sendApprovals = new Map<string, number>();
 
   /** Calls `fn` after every change of view or notice. Returns the unsubscribe function. */
   subscribe(fn: () => void): () => void {
@@ -322,7 +332,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "simulation" });
-        this.set({ name: "open", pub, wallet, mode: "simulation", fellBack: false });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: false });
         return;
       }
       try {
@@ -350,7 +360,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "stagenet" });
-        this.set({ name: "open", pub, wallet, mode: "stagenet", fellBack: false });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "stagenet", fellBack: false });
       } catch (e) {
         if (!isDemo || stale()) throw e;
         // Node unreachable: fall back to simulation so the demo keeps working.
@@ -358,7 +368,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         setDemoSession({ assignedLabel: pub.name, mode: "stagenet", fellBackToSim: true });
-        this.set({ name: "open", pub, wallet, mode: "simulation", fellBack: true });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: true });
       }
     } catch (e) {
       if (stale()) return;
@@ -502,6 +512,23 @@ export class WalletController {
     await this.open(pub, secrets);
   };
 
+  /** The engine as screens see it: identical, except that relay() needs an approval (see sendApprovals). */
+  private guarded(w: LiveWallet): LiveWallet {
+    const relay = async (metadata: string) => {
+      const until = this.sendApprovals.get(metadata);
+      this.sendApprovals.delete(metadata);
+      if (until === undefined || Date.now() > until) throw new Error(SEND_NEEDS_APPROVAL);
+      return w.relay(metadata);
+    };
+    return new Proxy(w, {
+      get(target, key, receiver) {
+        if (key === "relay") return relay;
+        const v = Reflect.get(target, key, receiver) as unknown;
+        return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+      },
+    });
+  }
+
   /**
    * Re-checks the wallet password (and authenticator code when 2FA is on) against the stored
    * vault, even though the wallet is unlocked, before any settings action that touches secrets.
@@ -568,6 +595,11 @@ export class WalletController {
         const { s } = await this.verifyAccess(password, code);
         if (!s.seed) throw new Error("This wallet has no recovery words.");
         return s.seed;
+      },
+      approveSend: async (password, code, metadata) => {
+        await this.verifyAccess(password, code);
+        const until = Date.now() + SEND_APPROVAL_MS;
+        for (const m of metadata) this.sendApprovals.set(m, until);
       },
       checkAccess: async (password, code) => {
         await this.verifyAccess(password, code);
@@ -729,6 +761,7 @@ export class WalletController {
     this.session = null;
     // The stores' closures hold the decrypted secrets: drop them with the session.
     this.stores = null;
+    this.sendApprovals.clear();
     this.synced = false;
     this.cashierOn = false;
     await w?.close().catch(() => {});
@@ -744,6 +777,7 @@ export class WalletController {
     this.live = null;
     this.session = null;
     this.stores = null;
+    this.sendApprovals.clear();
     await w?.close().catch(() => {});
     removeWallet();
     await clearSyncStates();

@@ -30,6 +30,14 @@ declare namespace chrome {
     addListener(cb: T): void;
     removeListener(cb: T): void;
   }
+  namespace storage {
+    /** Extension storage: survives clearing browsing history (unlike an extension page's localStorage). */
+    const local: {
+      get(keys: string | string[]): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
+      remove(keys: string | string[]): Promise<void>;
+    };
+  }
   namespace permissions {
     function request(p: { origins?: string[]; permissions?: string[] }): Promise<boolean>;
     function remove(p: { origins?: string[]; permissions?: string[] }): Promise<boolean>;

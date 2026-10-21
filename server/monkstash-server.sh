@@ -13,8 +13,15 @@
 # Source and tests: https://github.com/90ssolo/monkstash/tree/main/server (BSD-3-Clause).
 set -euo pipefail
 
-SCRIPT_VERSION="0.5.0"
+SCRIPT_VERSION="0.6.0"
 SELF_URL="https://monkstash.com/server/install.sh"
+# Releases of this script are signed with the MonkStash release key (OpenSSH signature, namespace
+# "monkstash-server"). self-update installs a new version only when its signature checks out, so a
+# changed copy on the website cannot reach servers that update. Check a download yourself with:
+#   ssh-keygen -Y verify -f <(printf '%s namespaces="monkstash-server" %s\n' release@monkstash.com "<key>") \
+#     -I release@monkstash.com -n monkstash-server -s install.sh.sig < install.sh
+RELEASE_SIGNER="release@monkstash.com"
+RELEASE_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKeBONfRZkKFT1P8dA54RAOuL1mlI7E+yAF6/iw91r57"
 
 # The Monero release signing key (binaryFate), as published by the Monero project.
 MONERO_KEY_URL="https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc"
@@ -214,7 +221,7 @@ apt_install() { DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-instal
 install_packages() {
   step "Installing packages"
   DEBIAN_FRONTEND=noninteractive apt-get update -q > /dev/null
-  apt_install ca-certificates curl gnupg bzip2 tar coreutils iproute2 jq
+  apt_install ca-certificates curl gnupg bzip2 tar coreutils iproute2 jq openssh-client
   [ "$FIREWALL" -eq 1 ] && apt_install ufw
   ok "base packages"
   if ! command -v caddy > /dev/null; then
@@ -925,12 +932,26 @@ cmd_update() {
   find "$MONERO_DIR" -mindepth 1 -maxdepth 1 -type d ! -name "$version" ! -name "$cur" -exec rm -rf {} +
 }
 
+# True when file $1 carries a valid MonkStash release signature in file $2.
+release_signed() {
+  local signers; signers=$(mktemp -p "$TMP_ROOT")
+  printf '%s namespaces="monkstash-server" %s\n' "$RELEASE_SIGNER" "$RELEASE_KEY" > "$signers"
+  ssh-keygen -Y verify -f "$signers" -I "$RELEASE_SIGNER" -n monkstash-server -s "$2" < "$1" > /dev/null 2>&1
+}
+
 cmd_self_update() {
   need_root self-update
+  command -v ssh-keygen > /dev/null || apt_install openssh-client
   local tmp; tmp=$(mktemp -p "$TMP_ROOT")
   curl -fsSL "$SELF_URL" -o "$tmp" || die "could not download $SELF_URL"
+  curl -fsSL "$SELF_URL.sig" -o "$tmp.sig" || die "could not download the signature $SELF_URL.sig; keeping the current version"
+  release_signed "$tmp" "$tmp.sig" || die "the downloaded script is not signed with the MonkStash release key. Keeping the current version; please report this to security@monkstash.com."
   bash -n "$tmp" || die "the downloaded script is not valid; keeping the current one"
   local new; new=$(sed -n 's/^SCRIPT_VERSION="\(.*\)"$/\1/p' "$tmp")
+  [ -n "$new" ] || die "the downloaded script has no version; keeping the current one"
+  if [ "$new" = "$SCRIPT_VERSION" ]; then ok "monkstash-server $SCRIPT_VERSION is the latest version"; return 0; fi
+  version_lt "$new" "$SCRIPT_VERSION" && die "the website offers $new, older than the installed $SCRIPT_VERSION; not downgrading"
+  ok "signature checked: signed by the MonkStash release key"
   install -m 0755 "$tmp" "$BIN"
   ok "monkstash-server $SCRIPT_VERSION -> ${new:-unknown}. Its SHA-256 is $(sha256sum "$BIN" | awk '{print $1}'); compare it with https://wallet.monkstash.com/build.json (server/install.sh)."
 }

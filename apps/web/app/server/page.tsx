@@ -11,8 +11,8 @@ import { ServerStackArt } from "../_trust/TrustArt";
 import trust from "../_trust/trust.module.css";
 import styles from "../privacy/privacy.module.css";
 
-const UPDATED = "2026-10-21";
-const UPDATED_TEXT = "21 October 2026";
+const UPDATED = "2026-10-22";
+const UPDATED_TEXT = "22 October 2026";
 const TITLE = "Run a Monero Node in One Command";
 const DESCRIPTION =
   "MonkStash Server sets up your own pruned Monero node on a Linux server in one command: the official release with its signature checked, HTTPS, a firewall, a status page, and optional MonkStash Pay for a shop. Free and open source.";
@@ -189,7 +189,7 @@ export default function ServerPage() {
               <h2 id="trust-h">What it checks, and its limits</h2>
               <ul>
                 <li><strong>The release.</strong> It downloads the signed hash list from getmonero.org, checks the signature with the Monero release key (fingerprint <span className="mono">81AC 591F E9C4 B65C 5806 AFC3 F0AF 4D46 2A0B DF92</span>), and checks the archive&apos;s SHA-256 against it. A changed hash list or a different key stops the install.</li>
-                <li><strong>The script itself.</strong> Its SHA-256 is listed in this site&apos;s <a className={trust.inlineLink} href="https://wallet.monkstash.com/build.json">build manifest</a>, and the site can be rebuilt from the public source to check it (<Link className={trust.inlineLink} href="/verify">how</Link>). Run <span className="mono">sha256sum install.sh</span> to compare.</li>
+                <li><strong>The script itself.</strong> Its SHA-256 is listed in this site&apos;s <a className={trust.inlineLink} href="https://wallet.monkstash.com/build.json">build manifest</a>, and the site can be rebuilt from the public source to check it (<Link className={trust.inlineLink} href="/verify">how</Link>). Run <span className="mono">sha256sum install.sh</span> to compare. Each version is also signed with our release key (<a className={trust.inlineLink} href="/server/install.sh.sig">install.sh.sig</a>, key fingerprint <span className="mono">SHA256:NWoQiD5dvmNgCxQTOhvG11VsC7M00Ff+o9IbiWuHZu4</span>), and <span className="mono">monkstash-server self-update</span> installs a new version only when that signature checks out.</li>
                 <li><strong>Tested in public.</strong> Every change installs it on fresh Ubuntu machines, x86-64 and ARM64, with a test node, and checks the sync, HTTPS, browser access, the restricted RPC, the status page, the firewall and uninstall (<a className={trust.inlineLink} href={TESTS} rel="noopener">the test runs</a>).</li>
                 <li><strong>It runs as root</strong>, like any server installer, because it installs services and a firewall. Read it before you run it if you can.</li>
                 <li><strong>You run the server.</strong> Keeping its system updated, its SSH login safe and its disk from filling up is yours to do. The script has not had an independent security review yet.</li>
