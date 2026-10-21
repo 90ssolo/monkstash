@@ -13,7 +13,7 @@
 # Source and tests: https://github.com/90ssolo/monkstash/tree/main/server (BSD-3-Clause).
 set -euo pipefail
 
-SCRIPT_VERSION="0.2.0"
+SCRIPT_VERSION="0.3.0"
 SELF_URL="https://monkstash.com/server/install.sh"
 
 # The Monero release signing key (binaryFate), as published by the Monero project.
@@ -36,6 +36,11 @@ DEFAULT_ORIGIN="https://wallet.monkstash.com"
 # A new Pay release is a new commit here, delivered by "monkstash-server self-update".
 PAY_REPO="https://github.com/90ssolo/monkstash.git"
 PAY_REF="eb51024161693137fec448f9782a10ffd42eb9da"
+# Tests build the commit under test instead. Must be a full 40-character commit hash.
+if [ -n "${MONKSTASH_PAY_REF:-}" ]; then
+  [[ "$MONKSTASH_PAY_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "MONKSTASH_PAY_REF must be a full commit hash" >&2; exit 1; }
+  PAY_REF=$MONKSTASH_PAY_REF
+fi
 PAY_SRC="/opt/monkstash-pay/src"
 PAY_ENV="$CONF_DIR/pay.env"
 PAY_PORT_LOCAL=8080
@@ -67,6 +72,7 @@ Usage:
   monkstash-server update [--check]    Install a newer Monero release (signature checked)
   monkstash-server self-update         Update this script from $SELF_URL
   monkstash-server pay-info            MonkStash Pay address, API key and webhook secret (root)
+  monkstash-server link ...            Payment links and donate buttons (root, see below)
   monkstash-server uninstall [--purge] Remove the services (--purge also deletes the blockchain)
 
 Install options:
@@ -87,6 +93,14 @@ Install options:
   --auto-update        Check for new Monero releases every day and install them
   --yes                Do not ask for confirmation
   --force              Skip the disk and memory checks
+
+Payment links (MonkStash Pay): one link to share in a chat, email or profile; every payer
+gets their own invoice. Leave out --amount and the payer chooses (donations, tips).
+  monkstash-server link new "Logo design" --amount 150 [--currency EUR] [--max 1]
+  monkstash-server link new "Support my work" --min 2 --suggest 5,10,25
+      [--description TEXT] [--expires 2026-12-31] [--return-url https://...]
+  monkstash-server link list           Every link with its payments
+  monkstash-server link off ID         Stop a link taking payments (link on ID starts it again)
 
 MonkStash Pay asks for your shop wallet's primary address, private VIEW key and restore height
 (or reads MONKSTASH_PAY_ADDRESS, MONKSTASH_PAY_VIEW_KEY and MONKSTASH_PAY_RESTORE_HEIGHT).
@@ -633,6 +647,91 @@ cmd_pay_info() {
   say "Keep these two secrets private. Anyone with the API key can create invoices for your shop."
 }
 
+# Calls this server's own MonkStash Pay API. Prints the JSON reply; fails with Pay's message.
+pay_api() {
+  local method=$1 path=$2 body=${3:-} out code data=()
+  [ -n "$body" ] && data=(--data "$body")
+  out=$(mktemp -p "$TMP_ROOT")
+  code=$(curl -s --max-time 20 -o "$out" -w '%{http_code}' -X "$method" \
+    -H "Authorization: Bearer $(env_get PAY_API_KEY)" -H "Content-Type: application/json" \
+    "${data[@]}" "http://127.0.0.1:$PAY_PORT_LOCAL$path" || true)
+  if [ "${code:0:1}" != "2" ]; then
+    local msg; msg=$(jq -r '.error // empty' "$out" 2> /dev/null)
+    rm -f "$out"
+    die "MonkStash Pay answered ${code:-nothing}${msg:+: $msg}"
+  fi
+  cat "$out"; rm -f "$out"
+}
+
+print_link() {
+  jq -r '
+    "\(.title)\(if .active then "" else "   (switched off)" end)",
+    "  Link:      \(.url)",
+    "  QR code:   \(.qrUrl)",
+    "  Price:     \(if .amount then "\(.amount) \(.currency)" else "payer chooses (\(.currency))\(if .minAmount then ", at least \(.minAmount)" else "" end)" end)\(if .maxPayments then ", at most \(.maxPayments) payment(s)" else "" end)\(if .expiresAt then ", until \(.expiresAt)" else "" end)",
+    "  Payments:  \(.stats.paid) paid, \(.stats.receivedXmr) XMR\(if .stats.open > 0 then ", \(.stats.open) waiting" else "" end)",
+    "  Id:        \(.id)"'
+}
+
+cmd_link() {
+  load_conf; need_root link
+  [ -r "$PAY_ENV" ] || die "MonkStash Pay is not installed (add it with: monkstash-server install --pay)"
+  local sub=${1:-}; shift || true
+  case "$sub" in
+    new)
+      local title=${1:-}; [ -n "$title" ] && [ "${title:0:2}" != "--" ] || die 'give the link a title, for example: monkstash-server link new "Logo design" --amount 150'
+      shift
+      local amount="" currency="" min="" suggest="" max="" desc="" expires="" ret=""
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --amount) amount="${2:?}"; shift ;;
+          --currency) currency=$(printf '%s' "${2:?}" | tr 'a-z' 'A-Z'); shift ;;
+          --min) min="${2:?}"; shift ;;
+          --suggest) suggest="${2:?}"; shift ;;
+          --max) max="${2:?}"; shift ;;
+          --description) desc="${2:?}"; shift ;;
+          --expires) expires="${2:?}"; shift ;;
+          --return-url) ret="${2:?}"; shift ;;
+          *) die "unknown option for link new: $1" ;;
+        esac
+        shift
+      done
+      case "$max" in ""|*[!0-9]*) [ -z "$max" ] || die "--max must be a whole number" ;; esac
+      # A bare date means the end of that day (UTC).
+      case "$expires" in ????-??-??) expires="${expires}T23:59:59Z" ;; esac
+      local body
+      body=$(jq -n --arg title "$title" --arg amount "$amount" --arg currency "$currency" --arg min "$min" \
+        --arg suggest "$suggest" --arg max "$max" --arg desc "$desc" --arg expires "$expires" --arg ret "$ret" '
+        {title: $title}
+        + (if $amount != "" then {amount: $amount} else {} end)
+        + (if $currency != "" then {currency: $currency} else {} end)
+        + (if $min != "" then {minAmount: $min} else {} end)
+        + (if $suggest != "" then {suggested: ($suggest | split(",") | map(gsub("^ +| +$"; "")))} else {} end)
+        + (if $max != "" then {maxPayments: ($max | tonumber)} else {} end)
+        + (if $desc != "" then {description: $desc} else {} end)
+        + (if $expires != "" then {expiresAt: $expires} else {} end)
+        + (if $ret != "" then {returnUrl: $ret} else {} end)')
+      local link; link=$(pay_api POST /api/links "$body")
+      ok "payment link created"
+      print_link <<< "$link"
+      say ""
+      say "Button for your website (plain HTML, no script):"
+      jq -r '.buttonHtml' <<< "$link"
+      ;;
+    list|"")
+      local all; all=$(pay_api GET /api/links)
+      if [ "$(jq '.links | length' <<< "$all")" -eq 0 ]; then say 'No payment links yet. Create one with: monkstash-server link new "Title" --amount 10'; return 0; fi
+      jq -c '.links[]' <<< "$all" | while IFS= read -r l; do print_link <<< "$l"; say ""; done
+      ;;
+    off|on)
+      local id=${1:-}; [[ "$id" =~ ^[A-Za-z0-9_-]{16,64}$ ]] || die "give the link id, from: monkstash-server link list"
+      local active=false; [ "$sub" = on ] && active=true
+      pay_api PATCH "/api/links/$id" "{\"active\": $active}" | print_link
+      ;;
+    *) die "unknown link command: $sub (use new, list, off or on)" ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------------------------
 # Commands
 
@@ -843,6 +942,7 @@ case "${1:-}" in
   update) shift; cmd_update "$@" ;;
   self-update) shift; cmd_self_update ;;
   pay-info) shift; cmd_pay_info ;;
+  link) shift; cmd_link "$@" ;;
   uninstall) shift; cmd_uninstall "$@" ;;
   version|--version) say "monkstash-server $SCRIPT_VERSION" ;;
   help|-h|--help|"") usage ;;

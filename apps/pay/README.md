@@ -8,6 +8,7 @@ MonkStash Pay is a small open-source payment server you run yourself. Your shop 
 * **Private.** No MonkStash servers are involved. Your view key, your orders and your customers never leave your server.
 * **A fresh address per order.** Payments are matched by address, never by amount, so two orders for the same price can never be confused.
 * **Prices in your currency.** Set prices in EUR, USD, GBP and 25 more; the XMR amount is held for a set time (30 minutes by default).
+* **Payment links and donate buttons.** No shop needed: share one link in a chat, an email or a profile, or paste a button into any website. Every payer gets their own invoice. See [Payment links](#payment-links-and-donate-buttons).
 * **Light.** One small Node.js program and a JSON file. No database, no full node required (though your own node is best).
 
 ## How it works
@@ -176,6 +177,66 @@ Every invoice also has `expired` (true once `expiresAt` has passed: the customer
 
 **Grace period.** A payment first seen up to 3 minutes after `expiresAt` still counts as on time, so a customer who pressed send in the last seconds is not treated as late. For the same reason an unpaid invoice stays `waiting` (with `expired: true`) for those 3 minutes and only then turns `expired`, and a partly paid invoice is reported as expired only then.
 
+## Payment links and donate buttons
+
+A payment link is one address you can share anywhere: in a chat with a client, in an email, on a social profile, printed as a QR code at a market stall, or as a button on your website. You do not need a shop. Every visitor who pays through it gets their **own invoice** with a fresh address, so payments never get mixed up.
+
+* **Fixed price** (`amount` set): "Logo design, 150 EUR". The payer confirms and goes to the checkout page.
+* **Payer chooses** (no `amount`): donations, tips, pay-what-you-want. Offer up to four one-tap amounts (`suggested`) and an optional minimum (`minAmount`).
+* **One-off invoice links** (`maxPayments: 1`): send a client a link for one bill. If they open it twice they see the same invoice, never a second one, and once it is paid the link closes.
+
+On a server set up with [MonkStash Server](../../server/), the easiest way is the command line:
+
+```bash
+sudo monkstash-server link new "Logo design" --amount 150
+sudo monkstash-server link new "Support my podcast" --min 2 --suggest 5,10,25
+sudo monkstash-server link new "Invoice 2026-17" --amount 300 --max 1
+sudo monkstash-server link list
+sudo monkstash-server link off <id>
+```
+
+Each new link prints its address, a QR code address and a ready-made button for your website. The button is a plain link with inline styles: no script, no tracking, nothing loaded from anywhere else.
+
+### Create a link
+
+`POST /api/links` with your API key:
+
+```json
+{
+  "title": "Support my podcast",
+  "description": "Every donation goes to hosting and guests' travel.",
+  "currency": "EUR",
+  "minAmount": "2",
+  "suggested": ["5", "10", "25"]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `title` | yes | Shown on the link page and as the order name on the checkout page (80 characters) |
+| `description` | no | A line under the title (500 characters) |
+| `currency` | no | `PAY_CURRENCY` if left out. `XMR` for prices in Monero |
+| `amount` | no | Fixed price. Leave it out to let the payer choose |
+| `minAmount`, `suggested` | no | Only when the payer chooses: the smallest amount, and up to four one-tap amounts |
+| `maxPayments` | no | Stop after this many payments. `1` makes a one-off invoice link |
+| `expiresAt` | no | No new payments after this time, like `2026-12-31T23:59:00Z` |
+| `returnUrl` | no | Where the checkout page's "Back" button goes (https only) |
+| `metadata` | no | Your own data, copied to every invoice from this link and sent in its webhooks |
+
+The reply (`201`) includes `url` (share this), `qrUrl` (an SVG QR code of the link), `buttonHtml` (paste into a website), `available` and `stats` (`paid`, `receivedXmr` for fully paid invoices, `payments` that received anything, and `open` invoices still waiting).
+
+### Manage links
+
+* `GET /api/links` lists every link, newest first, with its stats.
+* `GET /api/links/:id` returns one.
+* `PATCH /api/links/:id` with `{"active": false}` switches a link off (its page then says so); `{"active": true}` switches it back on. Links are never deleted, so their history stays.
+
+Invoices made from a link carry `linkId` in the API and in webhooks, next to the link's `metadata`.
+
+### What payers see
+
+`/l/<id>` shows the title, the description and either the price or the amount choices. It works without JavaScript. After the payer confirms, they land on the usual checkout page for their own invoice. A switched-off, expired or fully used link answers with a clear page saying so (HTTP `410`). Each visitor can start at most 6 payments a minute through links; mistyped amounts do not count.
+
 ## Webhooks
 
 When an invoice changes status, MonkStash Pay sends a `POST` to `PAY_WEBHOOK_URL`:
@@ -242,6 +303,6 @@ Use the raw request body exactly as received, before any JSON parsing.
 
 * One wallet, one wallet account and one shop per server.
 * Invoices are kept in a JSON file loaded into memory: fine for thousands of orders, not for millions.
-* No admin screen yet. Use the API, or your shop's order list.
+* No admin screen yet. Use the API, the `monkstash-server link` command, or your shop's order list.
 
 License: BSD-3-Clause.

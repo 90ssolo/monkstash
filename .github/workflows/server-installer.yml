@@ -118,6 +118,8 @@ jobs:
       MONKSTASH_PAY_ADDRESS: 53GEHf6S6uNTpTUxe3Uck23miKbiDtpKZi6qvdXMGQ9PNJ6LeDRfa8eLZ7ozxw4jCf1qdRLCAom4K6amgWZDhsmSUTad2cr
       MONKSTASH_PAY_VIEW_KEY: ca3940e9c65968310caa23566cf6304df48ad71abb2d229ac89d2705cfa16008
       MONKSTASH_PAY_RESTORE_HEIGHT: "2200000"
+      # Build MonkStash Pay from the commit under test, not the release pinned in the script.
+      MONKSTASH_PAY_REF: ${{ github.sha }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -163,6 +165,25 @@ jobs:
           case "$url" in https://pay.localhost/pay/*) ;; *) echo "unexpected checkout URL $url"; exit 1 ;; esac
           curl -fsS $R "$url" | grep -qi "monero"
           curl -fsS $R "$url/qr.svg" | grep -q "<svg"
+
+      - name: Payment links from the command line and over HTTPS
+        run: |
+          R="--resolve pay.localhost:443:127.0.0.1 --cacert $CA"
+          sudo -E monkstash-server link new "Test donations" --currency XMR --min 0.01 --suggest 0.05,0.1 | tee /tmp/link.txt
+          url=$(sed -n 's/^  Link: *//p' /tmp/link.txt)
+          id=$(sed -n 's/^  Id: *//p' /tmp/link.txt)
+          case "$url" in https://pay.localhost/l/*) ;; *) echo "unexpected link URL $url"; exit 1 ;; esac
+          grep -q '<a href="https://pay.localhost/l/' /tmp/link.txt
+          curl -fsS $R "$url" | grep -q "Test donations"
+          curl -fsS $R "$url/qr.svg" | grep -q "<svg"
+          loc=$(curl -sS $R -o /dev/null -w '%{redirect_url}' -X POST --data 'amount=0.05' "$url")
+          echo "redirected to $loc"
+          case "$loc" in https://pay.localhost/pay/*) ;; *) echo "unexpected redirect $loc"; exit 1 ;; esac
+          curl -fsS $R "$loc" | grep -q "0.05"
+          sudo -E monkstash-server link list | grep -q "Test donations"
+          sudo -E monkstash-server link off "$id" | grep -q "switched off"
+          test "$(curl -s $R -o /dev/null -w '%{http_code}' "$url")" = 410
+          ! sudo -E monkstash-server link new "--amount" 2> /dev/null
 
       - name: Status shows payments
         run: |

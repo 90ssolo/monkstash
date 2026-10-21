@@ -5,6 +5,7 @@
  */
 import type { PayConfig } from "./config";
 import type { presentInvoice } from "./invoices";
+import type { StoredLink } from "./store";
 
 type View = ReturnType<typeof presentInvoice>;
 
@@ -93,6 +94,72 @@ export function checkoutPage(v: View, cfg: PayConfig): string {
 <script src="/assets/checkout.js" defer></script>`);
 }
 
+/** Formats a link amount for display: currency style for money, "0.5 XMR" for Monero. */
+function linkMoney(amount: string, currency: string): string {
+  if (currency === "XMR") return `${amount} XMR`;
+  try {
+    // Whole amounts read better without ".00" on a donation button: "€5", but "€12.50".
+    const whole = !amount.includes(".") || /\.0+$/.test(amount);
+    return new Intl.NumberFormat("en", { style: "currency", currency, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 2 }) }).format(Number(amount));
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
+
+/**
+ * The page behind a payment link. Works without JavaScript: the payer picks or types an amount
+ * and a plain form post creates their own invoice, then they land on the usual checkout page.
+ */
+export function linkPage(link: StoredLink, cfg: PayConfig, opts: { error?: string; typed?: string } = {}): string {
+  const action = `/l/${encodeURIComponent(link.id)}`;
+  const testNet = cfg.network !== "mainnet";
+  const to = cfg.shopName ? ` to ${esc(cfg.shopName)}` : "";
+  const err = opts.error ? `<p class="warn" role="alert">${esc(opts.error)}</p>` : "";
+  let choose: string;
+  if (link.amount) {
+    choose = `<form method="post" action="${esc(action)}" class="choose"><button class="btn primary" type="submit">Pay ${esc(linkMoney(link.amount, link.currency))} with Monero</button></form>`;
+  } else {
+    const quick = (link.suggested ?? []).map((a) => `<button class="btn" type="submit" name="amount" value="${esc(a)}">${esc(linkMoney(a, link.currency))}</button>`).join("");
+    choose = `${quick ? `<form method="post" action="${esc(action)}" class="amounts" aria-label="Choose an amount">${quick}</form>` : ""}
+    <form method="post" action="${esc(action)}" class="custom">
+      <label class="label" for="amount">${quick ? "Or enter your own amount" : "Amount"} (${esc(link.currency)})</label>
+      <div class="row">
+        <input id="amount" name="amount" inputmode="decimal" autocomplete="off" required maxlength="24" value="${esc(opts.typed ?? "")}">
+        <button class="btn primary" type="submit">Continue</button>
+      </div>
+      ${link.minAmount ? `<span class="hint">At least ${esc(linkMoney(link.minAmount, link.currency))}.</span>` : ""}
+    </form>`;
+  }
+  return shell(`${link.title}: pay with Monero`, `
+<main class="wrap">
+  <section class="card">
+    <p class="kicker">Monero payment${to}</p>
+    ${testNet ? `<p class="warn"><strong>Test network (${esc(cfg.network)}).</strong> Practice coins only. Do not send real Monero.</p>` : ""}
+    <h1 class="title">${esc(link.title)}</h1>
+    ${link.description ? `<p class="sub">${esc(link.description)}</p>` : ""}
+    ${err}
+    ${choose}
+    <ul class="notes">
+      <li>You get your own payment address and an exact Monero amount on the next page.</li>
+      <li>Your payment goes straight to ${esc(cfg.shopName ?? "the recipient")}'s wallet. MonkStash never holds it.</li>
+      <li>Monero payments cannot be reversed. Check the amount before you send.</li>
+    </ul>
+  </section>
+  <p class="foot">Non-custodial payments by MonkStash Pay</p>
+</main>`);
+}
+
+const UNAVAILABLE: Record<"inactive" | "expired" | "used", { title: string; text: string }> = {
+  inactive: { title: "This payment link is switched off", text: "The owner is not taking payments through it right now. Ask them for a new link." },
+  expired: { title: "This payment link has expired", text: "It no longer takes payments. Ask the owner for a new link." },
+  used: { title: "This payment link has been paid", text: "It took all the payments it was made for. If you still need to pay, ask the owner for a new link." },
+};
+
+export function linkUnavailablePage(reason: keyof typeof UNAVAILABLE): string {
+  const m = UNAVAILABLE[reason];
+  return shell(m.title, `<main class="wrap"><section class="card"><p class="kicker">Monero payment</p><h1 class="title">${esc(m.title)}</h1><p class="muted">${esc(m.text)}</p></section></main>`);
+}
+
 export const CHECKOUT_CSS = `
 :root { --bg: #efeee7; --surface: #fbfbf7; --surface-2: #f2f2ec; --ink: #121a17; --ink-2: #3e4a44; --ink-3: #6b7a70; --line: #dcdcd2; --forest: #1f4733; --forest-soft: #e7efe8; --clay: #b4532a; --clay-soft: #f1e3da; --warn-soft: #f3ead6; }
 * { box-sizing: border-box; }
@@ -129,12 +196,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 syst
 .btn.small { min-height: 44px; justify-self: start; font-size: 0.9rem; padding: 6px 14px; }
 .btn:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
 .notes { margin: 4px 0 0; padding: 14px 16px 14px 34px; background: var(--forest-soft); border-left: 4px solid var(--forest); border-radius: 0 6px 6px 0; font-size: 0.88rem; color: var(--ink-2); display: grid; gap: 4px; }
+.choose { display: grid; }
+.amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.custom { display: grid; gap: 8px; }
+.row { display: flex; gap: 10px; }
+.row input { flex: 1; min-width: 0; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ink-3); border-radius: 7px; background: #fff; color: var(--ink); font: 500 1.05rem/1.2 inherit; font-variant-numeric: tabular-nums; }
+.row input:focus-visible { outline: 3px solid var(--clay); outline-offset: 1px; }
 .foot { text-align: center; font-size: 0.8rem; color: var(--ink-3); margin: 20px 0 0; }
 @media (max-width: 640px) {
   .wrap { padding: 16px 16px 40px; }
   .card { padding: 22px 16px; box-shadow: none; }
   .pay { grid-template-columns: minmax(0, 1fr); }
   .btn.ghost, .btn.small { justify-self: stretch; }
+  .row { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
 `;

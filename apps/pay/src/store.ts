@@ -24,6 +24,31 @@ export interface StoredInvoice {
   notified?: string;
   /** Hashes of locked payments (see IncomingPayment.locked) the shop was already told about. */
   lockedNotified?: string[];
+  /** The payment link this invoice was made from, when a visitor paid through one. */
+  linkId?: string;
+}
+
+/** A reusable payment link: every visitor who pays through it gets their own fresh invoice. */
+export interface StoredLink {
+  id: string;
+  title: string;
+  description?: string;
+  currency: string;
+  /** Fixed price. Absent when the payer chooses the amount (donations, tips). */
+  amount?: string;
+  /** Lowest amount a payer may choose, for links without a fixed price. */
+  minAmount?: string;
+  /** Up to four amounts offered as one-tap buttons, for links without a fixed price. */
+  suggested?: string[];
+  /** Stop taking payments after this many (1 for a one-off invoice link). */
+  maxPayments?: number;
+  /** No new payments after this time (ms). */
+  expiresAt?: number;
+  active: boolean;
+  createdAt: number;
+  returnUrl?: string;
+  /** The shop's own opaque data, copied to every invoice made from this link. */
+  metadata?: string;
 }
 
 export interface OutboxItem {
@@ -42,6 +67,8 @@ export interface StoreData {
   outbox: OutboxItem[];
   /** Time (ms) of the last successful wallet sync. Absent in files from older versions. */
   lastSyncAt?: number;
+  /** Payment links. Absent in files from older versions. */
+  links?: Record<string, StoredLink>;
 }
 
 /** Reads one store file: null when it does not exist; throws when it cannot be read or parsed. */
@@ -121,6 +148,20 @@ export class Store {
 
   all(): StoredInvoice[] {
     return Object.values(this.data.invoices);
+  }
+
+  getLink(id: string): StoredLink | undefined {
+    const links = this.data.links ?? {};
+    return Object.prototype.hasOwnProperty.call(links, id) ? links[id] : undefined;
+  }
+
+  allLinks(): StoredLink[] {
+    return Object.values(this.data.links ?? {});
+  }
+
+  async putLink(link: StoredLink): Promise<void> {
+    (this.data.links ??= {})[link.id] = link;
+    await this.save();
   }
 
   get outbox(): OutboxItem[] {

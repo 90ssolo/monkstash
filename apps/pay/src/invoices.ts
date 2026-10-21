@@ -99,7 +99,23 @@ const str = (v: unknown, name: string, max: number): string | undefined => {
   return s || undefined;
 };
 
-export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: PayConfig; store: Store; watcher: Watcher; prices: PriceService; now?: number }): Promise<StoredInvoice> {
+/**
+ * Checks a price for a currency and returns it normalized ("12.5" stays "12.5"). XMR takes up to
+ * 12 decimals, other currencies up to 2. Throws BadRequest with a message fit for the caller.
+ */
+export function checkAmount(amount: string, currency: string, name = "amount"): string {
+  const a = amount.trim();
+  if (currency === "XMR") {
+    if (/^\d{10,}(\.\d*)?$/.test(a)) throw new BadRequest(`${name} is too large.`);
+    if (!/^\d{1,9}(\.\d{1,12})?$/.test(a)) throw new BadRequest(`${name} must be a number of XMR like "0.25", with at most 12 decimals.`);
+    if (!/[1-9]/.test(a)) throw new BadRequest(`${name} must be more than 0.`);
+    return a;
+  }
+  if (!/^\d{1,9}(\.\d{1,2})?$/.test(a) || Number(a) <= 0) throw new BadRequest(`${name} must be a price like "12.50".`);
+  return a;
+}
+
+export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: PayConfig; store: Store; watcher: Watcher; prices: PriceService; now?: number }, opts: { linkId?: string } = {}): Promise<StoredInvoice> {
   const { cfg, store, watcher, prices } = deps;
   // Every open invoice holds a fresh subaddress. Cap them, so a flood of fake checkouts cannot
   // fill the disk or push new subaddresses far past the wallet's lookahead.
@@ -124,15 +140,11 @@ export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: 
   }
 
   let price: { xmr: bigint } | { fiat: string; quote: Awaited<ReturnType<PriceService["quote"]>> };
+  checkAmount(amount, currency);
   if (currency === "XMR") {
-    if (/^\d{10,}(\.\d*)?$/.test(amount)) throw new BadRequest("amount is too large.");
-    if (!/^\d{1,9}(\.\d{1,12})?$/.test(amount)) throw new BadRequest("amount must be a number of XMR like \"0.25\", with at most 12 decimals.");
     const [w, f = ""] = amount.split(".");
-    const atomic = BigInt(w!) * 1_000_000_000_000n + BigInt(f.padEnd(12, "0"));
-    if (atomic <= 0n) throw new BadRequest("amount must be more than 0.");
-    price = { xmr: atomic };
+    price = { xmr: BigInt(w!) * 1_000_000_000_000n + BigInt(f.padEnd(12, "0")) };
   } else {
-    if (!/^\d{1,9}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) throw new BadRequest("amount must be a price like \"12.50\".");
     price = { fiat: amount, quote: await prices.quote(currency) };
   }
 
@@ -149,7 +161,7 @@ export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: 
     if (err instanceof InvoiceError) throw new BadRequest(err.message);
     throw err;
   }
-  const rec: StoredInvoice = { invoice: invoiceToJson(invoice), account: cfg.account, seen: {}, ...(returnUrl ? { returnUrl } : {}), ...(metadata ? { metadata } : {}) };
+  const rec: StoredInvoice = { invoice: invoiceToJson(invoice), account: cfg.account, seen: {}, ...(returnUrl ? { returnUrl } : {}), ...(metadata ? { metadata } : {}), ...(opts.linkId ? { linkId: opts.linkId } : {}) };
   await store.put(rec);
   return rec;
 }
@@ -238,6 +250,7 @@ export function presentInvoice(rec: StoredInvoice, incoming: IncomingPayment[], 
     ...(opts.withMetadata
       ? {
           metadata: rec.metadata ?? null,
+          linkId: rec.linkId ?? null,
           txHashes: paymentsFor(rec, incoming).map((p) => p.hash),
           /** Received but not counted: the sender locked the coins (see the README). */
           lockedPayments: lockedPaymentsFor(rec, incoming).map((p) => ({ txHash: p.hash, amount: formatXmr(p.amount), unlockTime: p.unlockTime ?? null, confirmations: p.confirmations })),
