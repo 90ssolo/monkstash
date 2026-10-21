@@ -51,6 +51,7 @@ const data: PlatformData = {
         body: "Ledger's own Monero GUI page describes the GUI as a third-party wallet that connects to your Ledger, so you keep control of your private keys while the wallet shows balances and sends.",
         points: ["Longest list of companion wallets on the Monero project's page", "Ledger Stax and Flex are not on that list, so confirm before you buy one"],
         trade: "You depend on a third-party wallet for the screen and the sync, and a full sync takes time. Check Ledger's current notes before you buy.",
+        shop: "ledger",
       },
       {
         name: "Trezor", kind: "Hardware",
@@ -63,6 +64,7 @@ const data: PlatformData = {
         body: "Trezor lists Monero as supported on its Safe family and Model T, through third-party wallets. Trezor's own app, Trezor Suite, does not support Monero, and the Model One does not either.",
         points: ["Trezor says Cake Wallet works with its Safe 7 on iPhone and Android", "Trezor derives Monero keys with SLIP-0010, which not every wallet supports"],
         trade: "Because of that key derivation, Trezor warns that its backup may not restore Monero in a wallet from another brand. Restoring onto another Trezor works. Test a restore with a small amount.",
+        shop: "trezor",
       },
       {
         name: "Monero GUI and Feather", kind: "Companion wallets",

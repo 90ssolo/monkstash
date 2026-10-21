@@ -8,6 +8,8 @@ export const PLATFORMS: { key: PlatformKey; path: string; label: string; blurb: 
   { key: "hardware", path: "/monero-wallets/hardware", label: "Hardware", blurb: "Ledger and Trezor, and what they work with." },
 ];
 
+import type { PartnerKey } from "@/lib/partners";
+
 export interface Fact { k: string; v: string }
 
 export interface WalletEntry {
@@ -17,6 +19,8 @@ export interface WalletEntry {
   body: string;
   points: string[];
   trade: string;
+  /** A device maker: the card links to its own shop (see lib/partners.ts). */
+  shop?: PartnerKey;
 }
 
 export interface QuickPick { need: string; pick: string; trade: string }

@@ -538,6 +538,14 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 </section>
               ) : null}
 
+              <section className={styles.setBlock} aria-labelledby="set-support">
+                <h3 id="set-support">Support MonkStash</h3>
+                <p className="small muted" style={{ margin: "0 0 var(--s-3)" }}>
+                  MonkStash is free, open source and takes no fee on your payments. If it is useful to you, a donation in XMR keeps it going. The donation wallet is public, so anyone can check what comes in.
+                </p>
+                <a className="btn btn-secondary btn-sm" href={siteHref("/donate")} target="_blank" rel="noopener">Donate to MonkStash</a>
+              </section>
+
               <section className={`${styles.setBlock} ${styles.setDanger}`} aria-labelledby="set-remove">
                 <h3 id="set-remove">Remove from this browser</h3>
                 <details className={styles.danger}>

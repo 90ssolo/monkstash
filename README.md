@@ -53,6 +53,16 @@ Set `NEXT_PUBLIC_MONERO_NETWORK` to `stagenet`, `testnet` or `mainnet`, and `MON
 
 See [deploy/README.md](deploy/README.md) for a step by step guide: one small Debian or Ubuntu server, Docker, automatic HTTPS and an optional onion mirror.
 
+## Support the project
+
+MonkStash is free and takes no fee on payments. Donations in XMR pay for its development:
+
+```
+49e3LYdPPHjgf27mSUD6ya8P5zcgwa8CWaBRjgEq44EtHqppMhLTSVsRuWpW4zCNeFWrGPvnxakAccZjtQBMQtLeJAYou4F
+```
+
+The wallet is public: its private view key and a live total are on [monkstash.com/donate](https://monkstash.com/donate), so anyone can check every donation. Always compare the address with that page before sending.
+
 ## License
 
 BSD-3-Clause. See [LICENSE](LICENSE).

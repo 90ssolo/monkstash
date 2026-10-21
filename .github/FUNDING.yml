@@ -1,0 +1,2 @@
+# Shows a "Sponsor" button on the repository page. Donations go to the public XMR donation wallet.
+custom: ["https://monkstash.com/donate"]

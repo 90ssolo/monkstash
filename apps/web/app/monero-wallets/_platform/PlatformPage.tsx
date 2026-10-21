@@ -5,6 +5,7 @@ import { HeroArt, FitArt, StoreArt, ArrowIcon } from "./PlatformArt";
 import { PLATFORMS, type PlatformData } from "./types";
 import styles from "./platform.module.css";
 import { walletUrl } from "@/lib/site";
+import { partnerLink } from "@/lib/partners";
 
 const NUMERALS = ["i", "ii", "iii", "iv", "v", "vi"];
 
@@ -93,6 +94,7 @@ export function PlatformPage({ data: d }: { data: PlatformData }) {
                     {w.points.map((pt) => <li key={pt}>{pt}</li>)}
                   </ul>
                   <p className={styles.trade}><b>The honest trade-off</b>{w.trade}</p>
+                  {w.shop ? <ShopLink shop={w.shop} /> : null}
                 </article>
               ))}
             </div>
@@ -253,5 +255,22 @@ export function PlatformPage({ data: d }: { data: PlatformData }) {
       </main>
       <SiteFooter />
     </>
+  );
+}
+
+/** "Buy from the official shop", with the affiliate note when the link earns us a commission. */
+function ShopLink({ shop }: { shop: Parameters<typeof partnerLink>[0] }) {
+  const l = partnerLink(shop);
+  return (
+    <div className={styles.shop}>
+      <a className="btn btn-secondary btn-sm" href={l.href} rel={l.affiliate ? "sponsored noopener" : "noopener"}>
+        Buy from the official {l.name} shop <ArrowIcon />
+      </a>
+      <p className={styles.shopNote}>
+        {l.affiliate
+          ? <>Affiliate link: MonkStash may earn a commission, at no cost to you. It does not change what we recommend. <Link href="/about#funding">How we are funded</Link>.</>
+          : <>Buy only from the maker or an authorised reseller, never a used device.</>}
+      </p>
+    </div>
   );
 }

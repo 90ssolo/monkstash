@@ -59,6 +59,9 @@
 .points li { position: relative; padding-left: 20px; }
 .points li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 10px; height: 2px; background: var(--forest); }
 .wcard .trade { margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+.shop { margin-top: 14px; display: grid; gap: 8px; justify-items: start; }
+.shopNote { margin: 0; font-size: 0.82rem; line-height: 1.45; color: var(--ink-3); }
+.shopNote a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------- Where MonkStash fits ---------- */
 .fitGrid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 64px; align-items: start; }

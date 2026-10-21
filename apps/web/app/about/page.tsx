@@ -29,7 +29,7 @@ export default function AboutPage() {
       <JsonLd data={[
         {
           "@context": "https://schema.org", "@type": "AboutPage", name: "About MonkStash", url: absoluteUrl("/about"),
-          dateModified: "2026-10-17",
+          dateModified: "2026-10-21",
           publisher: { "@type": "Organization", name: site.name, url: site.url, sameAs: [...officialProfiles] },
         },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
@@ -184,6 +184,32 @@ export default function AboutPage() {
               </article>
             </div>
             <p className={styles.micro} style={{ marginTop: "var(--s-5)" }}>Found something wrong or out of date? Email <a className={styles.inlineLink} href="mailto:hello@monkstash.com">hello@monkstash.com</a> and we will fix it. For wallet problems, see <Link className={styles.inlineLink} href="/support">support</Link>.</p>
+          </div>
+        </section>
+
+        {/* 6b. HOW WE ARE FUNDED */}
+        <section className={styles.sec} id="funding" aria-labelledby="fundingH">
+          <div className="container-wide">
+            <div className={styles.secHead}>
+              <p className="eyebrow">How we are funded</p>
+              <h2 id="fundingH">The wallet is free. Here is how we pay for it.</h2>
+              <p className="lede">We never charge a fee on your payments, never see your keys and never sell data. The money comes from three places, and you can see each one.</p>
+            </div>
+            <div className={styles.cards}>
+              <article className={styles.card}>
+                <h3>Donations</h3>
+                <p>People who find MonkStash useful can <Link className={styles.inlineLink} href="/donate">donate in XMR</Link>. The donation wallet is public: anyone can check every amount that comes in.</p>
+              </article>
+              <article className={styles.card}>
+                <h3>Labelled affiliate links</h3>
+                <p>Some guides link to products we recommend anyway, such as hardware wallets. When a link earns us a commission, it says &quot;Affiliate link&quot; right next to it. It costs you nothing, and it never decides what we recommend: products without a programme are judged the same way.</p>
+              </article>
+              <article className={styles.card}>
+                <h3>Services for shops</h3>
+                <p>Setting up Monero payments for a shop takes work. We plan to offer paid setup and support for <Link className={styles.inlineLink} href="/business">MonkStash Pay</Link>. The software itself stays free and open source.</p>
+              </article>
+            </div>
+            <p className={styles.micro} style={{ marginTop: "var(--s-5)" }}>Wallet pages never show ads or partner links.</p>
           </div>
         </section>
 
