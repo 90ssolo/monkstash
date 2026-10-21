@@ -8,7 +8,7 @@ import { loadConfig, ConfigError, type PayConfig } from "../src/config";
 import { createApp, SYNCING_MESSAGE, type AppState } from "../src/app";
 import { accountsInUse, createShopInvoice, highestIndexes, presentInvoice, reconcile, subaddressUsage } from "../src/invoices";
 import { Store, type StoredInvoice } from "../src/store";
-import type { IncomingPayment, Watcher } from "../src/wallet";
+import { isLockedPayment, type IncomingPayment, type Watcher } from "../src/wallet";
 import { deliverDue, RETRY_DELAYS_MS, sign, verifySignature } from "../src/webhooks";
 import { createPriceService, ecbWarning, type PriceService } from "../src/prices";
 
@@ -381,6 +381,75 @@ describe("payments and webhooks", () => {
     expect(await reconcile(store, [], cfg, later + 2000)).toBe(1);
     expect(await reconcile(store, [], cfg, later + 3000)).toBe(0);
     expect(eventsOf(store).map((e) => e.type)).toEqual(["invoice.expired", "invoice.late", "invoice.reverted"]);
+  });
+
+  it("never counts a payment whose coins the sender locked, and tells the shop once", async () => {
+    const inv = await (await create({ amount: "0.5", currency: "XMR" })).json();
+    const idx = idxOf(inv.id);
+    const ts = Math.floor(Date.now() / 1000);
+    // Confirmed many times over, but spendable only at block 5,000,000.
+    const trap = pay(idx, XMR / 2n, { pending: false, confirmations: 30, timestamp: ts, hash: "trap", locked: true, unlockTime: "5000000" });
+    expect(await reconcile(store, [trap], cfg)).toBe(1);
+    expect(await reconcile(store, [trap], cfg)).toBe(0);
+    expect(presentInvoice(store.get(inv.id)!, [trap], cfg, { withMetadata: true })).toMatchObject({
+      status: "waiting", received: "0", txHashes: [],
+      lockedPayments: [{ txHash: "trap", amount: "0.5", unlockTime: "5000000", confirmations: 30 }],
+    });
+    // A normal payment afterwards still completes the order.
+    const good = pay(idx, XMR / 2n, { pending: false, confirmations: 2, timestamp: ts, hash: "good" });
+    expect(await reconcile(store, [trap, good], cfg)).toBe(1);
+    const ev = eventsOf(store);
+    expect(ev.map((e) => e.type)).toEqual(["invoice.locked", "invoice.paid"]);
+    expect(ev[0]!.data).toMatchObject({ status: "waiting", lockedPayments: [{ txHash: "trap" }] });
+    expect(ev[1]!.data).toMatchObject({ status: "paid", received: "0.5", txHashes: ["good"] });
+  });
+
+  it("treats any non-zero unlock time, or coins locked past 10 blocks, as locked", () => {
+    expect(isLockedPayment(0n, true, 3)).toBe(false); // the normal 10-block lock
+    expect(isLockedPayment(0n, false, 30)).toBe(false);
+    expect(isLockedPayment(0n, true, 11)).toBe(true);
+    expect(isLockedPayment(1n, false, 30)).toBe(true);
+    expect(isLockedPayment(1_800_000_000n, false, 0)).toBe(true); // a Unix time
+  });
+
+  it("sends invoice.reverted when a reorganization removes a payment past the safe 10 confirmations", async () => {
+    const safe = await startApp({ PAY_CONFIRMATIONS: "safe" });
+    const inv = await (await createAt(safe.url, { amount: "0.5", currency: "XMR" })).json();
+    expect(inv.requiredConfirmations).toBe(10);
+    const idx = safe.store.get(inv.id)!.invoice.subaddressIndex;
+    const ts = Math.floor(Date.now() / 1000);
+    expect(await reconcile(safe.store, [pay(idx, XMR / 2n, { pending: false, confirmations: 15, timestamp: ts, hash: "rg" })], safe.cfg)).toBe(1);
+    // 18 blocks replaced, and the new chain does not contain the payment.
+    expect(await reconcile(safe.store, [], safe.cfg)).toBe(1);
+    expect(await reconcile(safe.store, [], safe.cfg)).toBe(0);
+    const ev = eventsOf(safe.store);
+    expect(ev.map((e) => e.type)).toEqual(["invoice.paid", "invoice.reverted"]);
+    expect(ev[1]!.data).toMatchObject({ status: "waiting", received: "0" });
+  });
+
+  it("sends invoice.reverted when a reorganization sends a paid invoice back to confirming, then paid again", async () => {
+    const safe = await startApp({ PAY_CONFIRMATIONS: "safe" });
+    const inv = await (await createAt(safe.url, { amount: "0.5", currency: "XMR" })).json();
+    const idx = safe.store.get(inv.id)!.invoice.subaddressIndex;
+    const ts = Math.floor(Date.now() / 1000);
+    const at = (confirmations: number) => pay(idx, XMR / 2n, { pending: confirmations === 0, confirmations, hash: "rc", ...(confirmations ? { timestamp: ts } : {}) });
+    await reconcile(safe.store, [at(12)], safe.cfg);
+    // Back in the mempool after the reorganization, then mined again.
+    expect(await reconcile(safe.store, [at(0)], safe.cfg)).toBe(1);
+    expect(await reconcile(safe.store, [at(3)], safe.cfg)).toBe(0);
+    expect(await reconcile(safe.store, [at(10)], safe.cfg)).toBe(1);
+    const ev = eventsOf(safe.store);
+    expect(ev.map((e) => e.type)).toEqual(["invoice.paid", "invoice.reverted", "invoice.paid"]);
+    expect(ev[1]!.data).toMatchObject({ status: "confirming", confirmations: 0, pending: true });
+  });
+
+  it("stops re-checking a paid invoice a week after it was made", async () => {
+    const inv = await (await create({ amount: "0.5", currency: "XMR" })).json();
+    const idx = idxOf(inv.id);
+    const ts = Math.floor(Date.now() / 1000);
+    await reconcile(store, [pay(idx, XMR / 2n, { pending: false, confirmations: 2, timestamp: ts, hash: "old" })], cfg);
+    expect(await reconcile(store, [], cfg, Date.now() + 8 * 24 * 3600_000)).toBe(0);
+    expect(eventsOf(store).map((e) => e.type)).toEqual(["invoice.paid"]);
   });
 
   it("decides status as of the last successful sync, not the wall clock", async () => {

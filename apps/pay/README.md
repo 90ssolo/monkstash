@@ -66,9 +66,13 @@ The first start scans the chain from your restore height, which can take a while
 | `standard` | 1 confirmation. Over 5 XMR: 10 confirmations |
 | `safe` | 10 confirmations (about 20 minutes), when the coins become spendable |
 
-**Do not use `quick` for goods delivered instantly** (downloads, licence keys, gift cards, account credit). A payment with no confirmations can still be dropped from the network, for example by a double spend. `quick` suits sales where you can stop handing over the goods, like a coffee or an order you ship later. If an unconfirmed payment disappears after the order was reported paid or confirming, MonkStash Pay sends `invoice.reverted` (see [Webhooks](#webhooks)).
+**Do not use `quick` for goods delivered instantly** (downloads, licence keys, gift cards, account credit). A payment with no confirmations can still be dropped from the network, for example by a double spend. `quick` suits sales where you can stop handing over the goods, like a coffee or an order you ship later. If an unconfirmed payment disappears after the order was reported paid or confirming, MonkStash Pay sends `invoice.reverted` (see [Webhooks](#webhooks)). The same happens if a chain reorganization removes a confirmed payment (see below).
 
 Once an invoice is `paid`, it stays paid: more money sent to the same address later counts as overpayment and never sends it back to `confirming`. Only the payments that brought the total up to the amount due need confirmations.
+
+**Locked payments never count.** A sender can attach an "unlock time" to a Monero payment. The payment then confirms like any other, but the coins cannot be spent until a chosen block or date, which can be days or years away. Normal wallets never do this, so it is almost always an attempt to get goods for money you cannot use. MonkStash Pay never counts a payment with any unlock time (or one the wallet still reports locked after the usual 10 blocks) toward an invoice. The invoice stays unpaid, the payment is listed in `lockedPayments` in the API, and you get one `invoice.locked` webhook per such payment. Do not deliver the order for it; agree with the customer what happens to the locked coins.
+
+**Chain reorganizations.** Now and then the Monero network replaces its most recent blocks with a different version. On 14 September 2025 it replaced 18 blocks, about 36 minutes of history, so even a payment with 10 confirmations can disappear or lose its confirmations. MonkStash Pay re-reads every invoice's payments after each sync for a week after the invoice was made. If a payment that made an invoice `paid` (or `confirming` or `late`) is gone from the new chain, or a `paid` invoice falls back below its required confirmations, you get `invoice.reverted` with the current status. When the payment confirms again, you get `invoice.paid` again. Invoices older than a week are not re-checked.
 
 ### One account per Pay server
 
@@ -130,9 +134,12 @@ Response `201`:
   "checkoutUrl": "https://pay.yourshop.com/pay/SKqy6lEvr9TElqiK17G9euyG_R4OcUef",
   "returnUrl": "https://yourshop.com/orders/1001",
   "metadata": "{\"orderId\":1001}",
-  "txHashes": []
+  "txHashes": [],
+  "lockedPayments": []
 }
 ```
+
+`txHashes` lists the payments counted toward the invoice. `lockedPayments` lists payments that arrived but are not counted because the sender locked the coins (see [Locked payments never count](#when-is-an-order-paid)), each with `txHash`, `amount`, `unlockTime` and `confirmations`.
 
 Send your customer to `checkoutUrl`.
 
@@ -184,7 +191,8 @@ When an invoice changes status, MonkStash Pay sends a `POST` to `PAY_WEBHOOK_URL
 | `invoice.partial` | Part of the amount arrived (again each time more arrives) |
 | `invoice.late` | Money arrived after the price hold and grace period |
 | `invoice.expired` | The hold and grace period ended. If nothing arrived, `data.status` is `expired`. If part arrived, `data.status` is `partial` with `expired: true` and the amount in `data.received`: refund it or follow up |
-| `invoice.reverted` | An invoice you were told is `paid` or `confirming` went back (to `waiting` or `partial`) because an unconfirmed payment disappeared. Stop the order if you have not delivered it |
+| `invoice.reverted` | An invoice you were told is `paid`, `confirming` or `late` went back: an unconfirmed payment disappeared, or a chain reorganization removed a payment or took its confirmations away. `data.status` says where it stands now (`waiting`, `partial`, `expired`, or `confirming` for a paid invoice that must confirm again). Stop the order if you have not delivered it |
+| `invoice.locked` | A payment arrived with coins the sender locked for later (an unlock time). It is not counted; it is listed in `data.lockedPayments`. Sent once per payment |
 
 A failed delivery is retried after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours: 6 attempts in all, the last about 8 hours 36 minutes after the first. After that the event is dropped. The API always has the current status, so you can also poll it.
 

@@ -157,11 +157,16 @@ export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: 
 const belongsTo = (rec: StoredInvoice, e: IncomingPayment) =>
   e.subaddressIndex === rec.invoice.subaddressIndex && e.accountIndex === accountOf(rec);
 
+/** Payments that count toward the invoice: locked ones (see IncomingPayment.locked) never do. */
 function paymentsFor(rec: StoredInvoice, incoming: IncomingPayment[]) {
   return incoming
-    .filter((e) => belongsTo(rec, e))
+    .filter((e) => belongsTo(rec, e) && !e.locked)
     .map((e) => ({ ...e, seenAt: rec.seen[e.hash] ?? (e.timestamp ? e.timestamp * 1000 : undefined) }));
 }
+
+/** Payments to the invoice's address the merchant cannot spend yet, so they are not counted. */
+export const lockedPaymentsFor = (rec: StoredInvoice, incoming: IncomingPayment[]) =>
+  incoming.filter((e) => belongsTo(rec, e) && e.locked);
 
 export function statusOf(rec: StoredInvoice, incoming: IncomingPayment[], now = Date.now()): InvoiceStatus {
   return invoiceStatus(invoiceFromJson(rec.invoice), paymentsFor(rec, incoming), now);
@@ -230,7 +235,14 @@ export function presentInvoice(rec: StoredInvoice, incoming: IncomingPayment[], 
     expiresAt: inv.expiresAt ? new Date(inv.expiresAt).toISOString() : null,
     checkoutUrl: `${cfg.publicUrl}/pay/${encodeURIComponent(inv.id)}`,
     returnUrl: rec.returnUrl ?? null,
-    ...(opts.withMetadata ? { metadata: rec.metadata ?? null, txHashes: paymentsFor(rec, incoming).map((p) => p.hash) } : {}),
+    ...(opts.withMetadata
+      ? {
+          metadata: rec.metadata ?? null,
+          txHashes: paymentsFor(rec, incoming).map((p) => p.hash),
+          /** Received but not counted: the sender locked the coins (see the README). */
+          lockedPayments: lockedPaymentsFor(rec, incoming).map((p) => ({ txHash: p.hash, amount: formatXmr(p.amount), unlockTime: p.unlockTime ?? null, confirmations: p.confirmations })),
+        }
+      : {}),
   };
 }
 
@@ -258,8 +270,16 @@ export interface ReconcileOptions {
  * Besides the plain status events:
  *  - a partial invoice whose price hold (plus grace period) has ended queues `invoice.expired`,
  *    with the partial amount in the data, so the shop can refund or follow up;
- *  - an invoice the shop was told is paid, confirming or late that drops back (an unconfirmed
- *    payment disappeared from the mempool) queues `invoice.reverted`.
+ *  - an invoice the shop was told is paid, confirming or late that drops back queues
+ *    `invoice.reverted`: an unconfirmed payment disappeared from the mempool, or a chain
+ *    reorganization removed a confirmed payment (the wallet engine drops transfers from
+ *    replaced blocks when it syncs) or sent a paid invoice back to too few confirmations;
+ *  - a payment whose coins the sender locked (an unlock time) is never counted and queues
+ *    `invoice.locked` once per transaction, so the shop can follow up.
+ *
+ * Settled invoices are re-checked for ACTIVE_FOR_MS after they were created, which covers any
+ * realistic reorganization (the one on 14 September 2025 replaced 18 blocks, about 36 minutes
+ * of chain), without re-checking old invoices for ever.
  *
  * A mempool payment's first-seen time is normally now. After a gap in syncing (a restart or a
  * node outage) it could have arrived any time since the previous successful sync, so it gets
@@ -284,6 +304,15 @@ export async function reconcile(store: Store, incoming: IncomingPayment[], cfg: 
       else rec.seen[e.hash] = afterGap ? Math.min(at, Math.max(prevSync!, inv.createdAt)) : at;
       changed = true;
     }
+    for (const e of lockedPaymentsFor(rec, incoming)) {
+      if (rec.lockedNotified?.includes(e.hash)) continue;
+      (rec.lockedNotified ??= []).push(e.hash);
+      changed = true;
+      if (cfg.webhookUrl) {
+        queueEvent(store, inv.id, "invoice.locked", presentInvoice(rec, incoming, cfg, { withMetadata: true, now, syncedAt }), now);
+        queued++;
+      }
+    }
     const st = statusOf(rec, incoming, at);
     const kind = publicStatus(rec, st, at);
     let key: string = kind;
@@ -295,7 +324,11 @@ export async function reconcile(store: Store, incoming: IncomingPayment[], cfg: 
       event = over ? "invoice.expired" : "invoice.partial";
     }
     const prev = rec.notified ?? "";
-    const reverted = (prev === "paid" || prev === "confirming" || prev === "late") && (kind === "waiting" || kind === "partial" || kind === "expired");
+    // A paid invoice back at `confirming` means a reorganization moved its payment to a later
+    // block or back to the mempool: the shop must hold the order until it is paid again.
+    const reverted =
+      ((prev === "paid" || prev === "confirming" || prev === "late") && (kind === "waiting" || kind === "partial" || kind === "expired")) ||
+      (prev === "paid" && kind === "confirming");
     if (reverted) {
       event = "invoice.reverted";
     } else {

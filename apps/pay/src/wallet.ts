@@ -19,6 +19,25 @@ export interface IncomingPayment {
   hash: string;
   /** Block time (seconds) once confirmed. */
   timestamp?: number;
+  /**
+   * The merchant cannot spend this money yet beyond the normal 10-block lock: the sender set an
+   * unlock time, which can hold the coins for days or years. Never counted toward an invoice.
+   */
+  locked?: boolean;
+  /** The unlock time the sender set (a block height, or a Unix time from 500000000 up), when not 0. */
+  unlockTime?: string;
+}
+
+/** Every Monero output is locked for 10 blocks after the block it is in. */
+export const NORMAL_LOCK_BLOCKS = 10;
+
+/**
+ * True when a payment must not count: the sender set any unlock time other than the default 0
+ * (BTCPay Server was tricked this way until v1.7.0), or the wallet still reports the coins
+ * locked after more than the normal 10 blocks.
+ */
+export function isLockedPayment(unlockTime: bigint, walletSaysLocked: boolean, confirmations: number): boolean {
+  return unlockTime !== 0n || (walletSaysLocked && confirmations > NORMAL_LOCK_BLOCKS);
 }
 
 /** What the rest of the server needs from a wallet (a fake one is used in tests). */
@@ -136,14 +155,19 @@ async function openVia(cfg: PayConfig, highestIndexes: Record<number, number>, f
         for (const t of transfers) {
           const tx = t.getTx();
           const ts = tx.getBlock()?.getTimestamp();
+          const confirmations = Number(tx.getNumConfirmations() ?? 0);
+          const unlockTime = BigInt(tx.getUnlockTime() ?? 0);
+          const locked = isLockedPayment(unlockTime, tx.getIsLocked() === true, confirmations);
           out.push({
             accountIndex,
             subaddressIndex: t.getSubaddressIndex(),
             amount: BigInt(t.getAmount()),
-            confirmations: Number(tx.getNumConfirmations() ?? 0),
+            confirmations,
             pending: !tx.getIsConfirmed(),
             hash: tx.getHash(),
             ...(ts ? { timestamp: ts } : {}),
+            ...(locked ? { locked: true } : {}),
+            ...(unlockTime !== 0n ? { unlockTime: unlockTime.toString() } : {}),
           });
         }
       }

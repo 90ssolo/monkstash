@@ -9,7 +9,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { InvoiceJson } from "@quietmint/wallet-core";
 
-export type InvoiceEvent = "invoice.paid" | "invoice.partial" | "invoice.late" | "invoice.expired" | "invoice.confirming" | "invoice.reverted";
+export type InvoiceEvent = "invoice.paid" | "invoice.partial" | "invoice.late" | "invoice.expired" | "invoice.confirming" | "invoice.reverted" | "invoice.locked";
 
 export interface StoredInvoice {
   invoice: InvoiceJson;
@@ -22,6 +22,8 @@ export interface StoredInvoice {
   metadata?: string;
   /** Last status a webhook was queued for, so each change is sent once. */
   notified?: string;
+  /** Hashes of locked payments (see IncomingPayment.locked) the shop was already told about. */
+  lockedNotified?: string[];
 }
 
 export interface OutboxItem {

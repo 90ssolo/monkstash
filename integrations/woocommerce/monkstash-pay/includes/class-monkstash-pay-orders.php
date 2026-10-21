@@ -15,6 +15,9 @@ class MonkStash_Pay_Orders {
 	/** Earlier invoices of this order (replaced by a newer one), as invoice id => last status seen. */
 	const META_PREVIOUS = '_monkstash_previous_invoices';
 
+	/** Hashes of locked payments (any invoice of this order) already noted on the order. */
+	const META_LOCKED = '_monkstash_locked_seen';
+
 	/** How many earlier invoices to remember per order. */
 	const MAX_PREVIOUS = 20;
 
@@ -229,6 +232,46 @@ class MonkStash_Pay_Orders {
 	}
 
 	/**
+	 * Notes payments the sender locked for later (an unlock time). MonkStash Pay never counts
+	 * them, so the invoice status does not change; without this the shop would never hear that
+	 * money arrived. Each payment is noted once, and an unpaid order goes on hold so it is not
+	 * cancelled while a person decides. Saves the order when something was noted.
+	 *
+	 * @param array<string, mixed> $invoice
+	 */
+	private static function note_locked( WC_Order $order, array $invoice ): void {
+		if ( empty( $invoice['lockedPayments'] ) || ! is_array( $invoice['lockedPayments'] ) ) {
+			return;
+		}
+		$seen = $order->get_meta( self::META_LOCKED );
+		$seen = is_array( $seen ) ? $seen : array();
+		$new  = false;
+		foreach ( $invoice['lockedPayments'] as $p ) {
+			$hash = is_array( $p ) && isset( $p['txHash'] ) ? (string) $p['txHash'] : '';
+			if ( ! preg_match( '/^[0-9a-f]{64}$/', $hash ) || in_array( $hash, $seen, true ) ) {
+				continue;
+			}
+			$seen[] = $hash;
+			$new    = true;
+			$note   = sprintf(
+				/* translators: 1: XMR amount, 2: transaction hash */
+				__( 'A Monero payment of %1$s XMR arrived for this order, but the sender locked the coins so they cannot be spent until a later block or date (transaction %2$s). It does not count as payment. Do not deliver the order for it; contact the customer.', 'monkstash-pay' ),
+				isset( $p['amount'] ) ? (string) $p['amount'] : '?',
+				$hash
+			);
+			if ( $order->is_paid() ) {
+				$order->add_order_note( $note );
+			} else {
+				self::hold( $order, $note );
+			}
+		}
+		if ( $new ) {
+			$order->update_meta_data( self::META_LOCKED, array_slice( $seen, -50 ) );
+			$order->save();
+		}
+	}
+
+	/**
 	 * Applies an invoice (as returned by the API) to its order. Handles the order's current
 	 * invoice and any earlier invoice it had; ignores invoices that belong to other orders.
 	 *
@@ -239,7 +282,11 @@ class MonkStash_Pay_Orders {
 		if ( '' === $id ) {
 			return;
 		}
-		if ( $id !== (string) $order->get_meta( self::META_INVOICE ) ) {
+		$is_current = $id === (string) $order->get_meta( self::META_INVOICE );
+		if ( $is_current || array_key_exists( $id, self::previous_invoices( $order ) ) ) {
+			self::note_locked( $order, $invoice );
+		}
+		if ( ! $is_current ) {
 			// Not the current invoice: it may be one this order had before.
 			if ( array_key_exists( $id, self::previous_invoices( $order ) ) ) {
 				self::apply_previous( $order, $id, $invoice );

@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       MonkStash Pay for WooCommerce
+ * Plugin Name:       MonkStash Pay
  * Plugin URI:        https://monkstash.com/
- * Description:       Accept Monero (XMR) through your own MonkStash Pay server. Non-custodial: payments go straight to your wallet, with a fresh address for every order.
- * Version:           0.1.0
+ * Description:       Accept Monero (XMR) on WooCommerce through your own MonkStash Pay server. Non-custodial: payments go straight to your wallet, with a fresh address for every order.
+ * Version:           0.1.1
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * WC requires at least: 8.0
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'MONKSTASH_PAY_VERSION', '0.1.0' );
+define( 'MONKSTASH_PAY_VERSION', '0.1.1' );
 define( 'MONKSTASH_PAY_FILE', __FILE__ );
 define( 'MONKSTASH_PAY_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MONKSTASH_PAY_URL', plugin_dir_url( __FILE__ ) );

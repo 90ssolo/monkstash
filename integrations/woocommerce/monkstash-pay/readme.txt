@@ -1,11 +1,11 @@
-=== MonkStash Pay for WooCommerce ===
+=== MonkStash Pay ===
 Contributors: monkstash
 Tags: monero, xmr, crypto, payments, privacy
 Requires at least: 6.4
 Tested up to: 6.6
 Requires PHP: 7.4
 WC requires at least: 8.0
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: BSD-3-Clause
 License URI: https://opensource.org/licenses/BSD-3-Clause
 
@@ -35,7 +35,21 @@ If a customer starts the payment again, the order gets a new payment request. Th
 
 If an unconfirmed payment disappears from the network after it was reported (as confirming, or as paid with the "quick" setting in MonkStash Pay), the order goes on hold with a note. Do not use "quick" for goods delivered instantly.
 
+If a reorganization of the Monero chain moves a paid order's payment back to too few confirmations, the order goes on hold with a note until it is confirmed again.
+
+A sender can lock a Monero payment so the coins cannot be spent until a later block or date. MonkStash Pay never counts such a payment. The plugin adds a note to the order, once per payment, and puts an unpaid order on hold so it is not cancelled. Do not deliver the order for it; contact the customer.
+
 The five-minute check goes through every open MonkStash order from the last 7 days, not only the newest ones.
+
+== External services ==
+
+This plugin connects to one service: **your own MonkStash Pay server**, at the HTTPS address you enter in the settings. MonkStash Pay is open-source software you install and run yourself; no MonkStash company server is involved.
+
+* When a customer chooses Monero, the plugin sends the order total, currency, order number and a return link to your MonkStash Pay server to create a payment request, then sends the customer to its checkout page.
+* To confirm a payment, and every five minutes for open Monero orders, the plugin asks your MonkStash Pay server for the payment request's status.
+* When you save the settings, it asks your server for its status to check the connection.
+
+Your MonkStash Pay server sends signed status messages (webhooks) back to your shop. No customer names, emails or addresses are sent. The server's terms and privacy policy are your own, because you run it. The MonkStash Pay software and its licence: https://github.com/90ssolo/monkstash
 
 == Installation ==
 
@@ -64,6 +78,9 @@ Monero hides the sender, so ask the customer for a refund address and send the r
 Each visitor address can start at most 10 Monero payments in 10 minutes, and the whole shop at most 100 (change that with the `monkstash_pay_max_invoices_per_10_minutes` filter). The visitor address is the address of the connection. If your shop sits behind a proxy or CDN you control, turn on "Behind a trusted proxy" so the address the proxy reports is used instead.
 
 == Changelog ==
+
+= 0.1.1 =
+* Locked payments (coins the sender locked for later) are noted on the order and put an unpaid order on hold. Needs MonkStash Pay with locked-payment support.
 
 = 0.1.0 =
 * First version: checkout, webhooks with signature and status confirmation, five-minute fallback check, block checkout, HPOS.
