@@ -45,16 +45,34 @@ jobs:
 
       - name: Node answers and syncs
         run: |
-          for i in $(seq 1 60); do curl -fs http://127.0.0.1:38081/get_info > /dev/null && break; sleep 5; done
-          # Stagenet has few peers, so finding them can take a few minutes.
-          h1=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
+          info() { curl -fs http://127.0.0.1:38081/get_info; }
+          # The node must answer RPC. If it never does, the install is broken: fail at once.
+          for i in $(seq 1 60); do info > /dev/null && break; sleep 5; done
+          info | jq -e '.status == "OK"' > /dev/null
+          # Stagenet has few peers and only five hardcoded seed nodes, so finding them can take a
+          # few minutes and a runner sometimes finds none. If the height has not moved after 120 s,
+          # restart monerod once to retry the seeds, with a warning so the retry stays visible.
+          h1=$(info | jq .height); h2=$h1
           for i in $(seq 1 30); do
             sleep 10
-            h2=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
-            echo "after $((i * 10)) s: height $h2, peers $(curl -fs http://127.0.0.1:38081/get_info | jq .outgoing_connections_count)"
+            j=$(info) || j='{}'
+            h2=$(echo "$j" | jq '.height // 0')
+            peers=$(echo "$j" | jq '.outgoing_connections_count // 0')
+            known=$(echo "$j" | jq '(.white_peerlist_size // 0) + (.grey_peerlist_size // 0)')
+            echo "after $((i * 10)) s: height $h2, peers $peers, known peers $known"
             [ "$h2" -gt "$h1" ] && [ "$h2" -gt 100 ] && break
+            if [ "$i" -eq 12 ] && [ "$h2" -le "$h1" ]; then
+              echo "::warning::No stagenet sync after 120 s; restarting monerod once to retry the seed nodes"
+              sudo systemctl restart monerod
+              for k in $(seq 1 30); do info > /dev/null && break; sleep 2; done
+            fi
           done
-          test "$h2" -gt "$h1"
+          if [ "$h2" -le "$h1" ]; then
+            echo "::error::monerod did not sync on stagenet; the end of its log follows"
+            systemctl status monerod --no-pager || true
+            sudo tail -n 80 /var/log/monero/monerod.log || true
+            exit 1
+          fi
           /opt/monero/current/monerod --version
 
       - name: Status command and page
