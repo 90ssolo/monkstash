@@ -23,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
-      CA: /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
+      CA: /tmp/caddy-local-root.crt
       ORIGIN: https://wallet.monkstash.com
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -37,6 +37,11 @@ jobs:
 
       - name: Install (stagenet, local HTTPS)
         run: sudo bash server/monkstash-server.sh install --network stagenet --domain localhost --yes
+
+      - name: Trust Caddy's local certificate for these tests
+        run: |
+          for i in $(seq 1 30); do sudo test -f /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt && break; sleep 2; done
+          sudo cp /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt "$CA" && sudo chmod 0644 "$CA"
 
       - name: Node answers and syncs
         run: |

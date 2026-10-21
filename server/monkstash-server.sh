@@ -35,6 +35,9 @@ DEFAULT_ORIGIN="https://wallet.monkstash.com"
 # Temporary files live under one directory that is removed on exit, whatever happens.
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
+# If a command fails, say where, so a support request can point at the step.
+trap 'printf "error: stopped at line %s (%s). Nothing was half-removed; it is safe to run the command again.
+" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 # ---------------------------------------------------------------------------------------------
 # Output
@@ -454,15 +457,18 @@ EOF
 configure_firewall() {
   [ "$FIREWALL" -eq 1 ] || { warn "firewall not configured (--no-firewall)"; return; }
   local ssh_port
-  ssh_port=$(sshd -T 2> /dev/null | awk '/^port / {print $2; exit}')
-  ufw allow "${ssh_port:-22}/tcp" comment "SSH" > /dev/null
+  # The port sshd really listens on, so the firewall never locks you out. sshd -T can fail
+  # (no host keys yet, or no sshd at all); then the usual port 22 is kept open.
+  ssh_port=$( { sshd -T 2> /dev/null || true; } | awk '/^port / {print $2; exit}')
+  case "$ssh_port" in ""|*[!0-9]*) ssh_port=22 ;; esac
+  ufw allow "$ssh_port/tcp" comment "SSH" > /dev/null
   ufw allow 80/tcp comment "HTTPS certificate" > /dev/null
   ufw allow 443/tcp comment "Monero node over HTTPS" > /dev/null
   ufw allow "$P2P/tcp" comment "Monero peers" > /dev/null
   ufw default deny incoming > /dev/null
   ufw default allow outgoing > /dev/null
   ufw --force enable > /dev/null
-  ok "firewall: SSH (${ssh_port:-22}), 80, 443 and $P2P open; everything else closed"
+  ok "firewall: SSH ($ssh_port), 80, 443 and $P2P open; everything else closed"
 }
 
 # ---------------------------------------------------------------------------------------------
