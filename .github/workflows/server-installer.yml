@@ -46,10 +46,14 @@ jobs:
       - name: Node answers and syncs
         run: |
           for i in $(seq 1 60); do curl -fs http://127.0.0.1:38081/get_info > /dev/null && break; sleep 5; done
+          # Stagenet has few peers, so finding them can take a few minutes.
           h1=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
-          sleep 90
-          h2=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
-          echo "height $h1 -> $h2"
+          for i in $(seq 1 30); do
+            sleep 10
+            h2=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
+            echo "after $((i * 10)) s: height $h2, peers $(curl -fs http://127.0.0.1:38081/get_info | jq .outgoing_connections_count)"
+            [ "$h2" -gt "$h1" ] && [ "$h2" -gt 100 ] && break
+          done
           test "$h2" -gt "$h1"
           /opt/monero/current/monerod --version
 
