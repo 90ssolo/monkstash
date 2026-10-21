@@ -228,6 +228,9 @@ function NodeSettingsForm({ actions }: { actions: SettingsActions }) {
 
       <details className={styles.inlineDetails}>
         <summary>How to set up your node for this</summary>
+        <p className="small" style={{ margin: "0 0 var(--s-2)" }}>
+          Easiest: <a href={siteHref("/server")} target="_blank" rel="noopener">MonkStash Server</a> sets up a node on a Linux server in one command, ready for this wallet. By hand:
+        </p>
         <ol className="small">
           <li>Run <span className="mono">monerod</span> on {actions.network} with restricted RPC, for example <span className="mono">--restricted-rpc --rpc-bind-port 18089</span>.</li>
           <li>Allow this site to connect from a browser: <span className="mono">--rpc-access-control-origins {origin}</span></li>

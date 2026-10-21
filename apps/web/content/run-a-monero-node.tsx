@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "How to Run a Monero Node, Step by Step",
   summary: "How to run a Monero node: what it costs in disk and bandwidth, the official download, the monerod command, sync times, and connecting your wallet.",
   keyword: "how to run a monero node",
-  updated: "2026-10-15",
+  updated: "2026-10-21",
   readingMinutes: 12,
   toc: [
     { id: "short", label: "The short version" },
@@ -66,6 +66,11 @@ export function Body() {
         <li>Run <code>monerod --prune-blockchain</code> and let it sync.</li>
         <li>Enter your node&apos;s address and port in your wallet.</li>
       </ol>
+      <Callout title="Want it done in one command?">
+        <Link href="/server">MonkStash Server</Link> does all of this on a Debian or Ubuntu server: it checks the official release
+        signature, runs a pruned node, adds HTTPS, a firewall and a status page, and prints the address for your wallet. This guide
+        stays useful if you prefer to do each step yourself, or run the node at home.
+      </Callout>
 
       <h2 id="why">Why run your own node</h2>
       <p>

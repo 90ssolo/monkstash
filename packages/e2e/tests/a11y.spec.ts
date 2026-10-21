@@ -42,7 +42,7 @@ test("wallet screens pass automated accessibility checks", async ({ page }) => {
   await axe(page, "unlock");
 });
 
-for (const path of ["/", "/verify", "/faq", "/monero-wallets", "/monero-chrome-extension", "/donate", "/tools/monero-address-validator", "/what-is-monero", "/business"]) {
+for (const path of ["/", "/verify", "/server", "/faq", "/monero-wallets", "/monero-chrome-extension", "/donate", "/tools/monero-address-validator", "/what-is-monero", "/business"]) {
   test(`content page ${path} passes automated accessibility checks`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");

@@ -41,6 +41,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/monero-payment-link", label: "Payment links" },
       { href: "/monero-pos", label: "A till for your counter" },
       { href: "/accept-monero-payments", label: "Accept payments" },
+      { href: "/server", label: "Run your own node" },
     ],
   },
   {

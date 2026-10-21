@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero WooCommerce Plugin for WordPress",
   summary: "A Monero WordPress plugin for WooCommerce: a fresh address per order, prices in your shop currency, and orders that complete themselves.",
   keyword: "monero woocommerce",
-  updated: "2026-10-17",
+  updated: "2026-10-21",
   readingMinutes: 7,
   toc: [
     { id: "what", label: "What the plugin does" },
@@ -79,7 +79,7 @@ export function Body() {
 
       <h2 id="install">Install and connect it</h2>
       <Steps items={[
-        { title: "Run MonkStash Pay", body: <>On your server, with your shop wallet&apos;s address and view key. See <Link href="/monero-payment-gateway">the gateway guide</Link>.</> },
+        { title: "Run MonkStash Pay", body: <>On your server, with your shop wallet&apos;s address and view key. The quick way is <Link href="/server#shop">MonkStash Server</Link>: one command sets up your own node and Pay, and adding <code>--shop-url</code> points the webhook at your shop for you. By hand: <Link href="/monero-payment-gateway">the gateway guide</Link>.</> },
         { title: "Install the plugin", body: <>Upload it in WordPress under <em>Plugins, Add New, Upload Plugin</em>, then activate it.</> },
         { title: "Enter three settings", body: <>In <em>WooCommerce, Settings, Payments, MonkStash Pay (Monero)</em>: the server address, API key and webhook secret. Saving tests the connection and shows the sync height.</> },
         { title: "Point the webhook at your shop", body: <>The settings page shows your webhook address (ending in <code>/wp-json/monkstash-pay/v1/webhook</code>). Put it in MonkStash Pay&apos;s <code>PAY_WEBHOOK_URL</code>.</> },

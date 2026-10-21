@@ -293,3 +293,36 @@ export function PipeArt(p: P) {
     </svg>
   );
 }
+
+/** MonkStash Server: what runs on your own server, between your wallet and the Monero network. */
+export function ServerStackArt(p: P) {
+  const box = (y: number, title: string, sub: string, key: string, dashed = false) => (
+    <g key={key}>
+      <rect x="40" y={y} width="250" height="50" rx="7" fill="#1b2a22" stroke={dashed ? CLAY_DIM : "#4a6a55"} strokeWidth="1.6" strokeDasharray={dashed ? "5 4" : undefined} />
+      <text x="56" y={y + 22} fontFamily={F} fontWeight="600" fontSize="15" fill="#f6f5ec">{title}</text>
+      <text x="56" y={y + 39} fontFamily={F} fontStyle="italic" fontSize="12.5" fill="#b7c4b8">{sub}</text>
+    </g>
+  );
+  const arrow = (y: number) => <path d={`M165 ${y}v12m-5-5l5 5 5-5`} fill="none" stroke="#9fb0a2" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />;
+  return (
+    <svg viewBox="0 0 420 330" role="img" aria-label="Your wallet connects over HTTPS to your own server. On it run Caddy for HTTPS and the status page, a pruned Monero node from the official release, and optionally MonkStash Pay for a shop. The node talks to the Monero network." {...p}>
+      <rect x="10" y="6" width="310" height="44" rx="8" fill="#f1e3da" stroke="#e2c7b7" strokeWidth="1.4" />
+      <text x="26" y="33" fontFamily={F} fontWeight="600" fontSize="15" fill="#1b2a22">Your wallet, on your device</text>
+      {arrow(54)}
+      <rect x="20" y="72" width="290" height="186" rx="10" fill="none" stroke="#9fb0a2" strokeWidth="1.4" />
+      <text x="30" y="90" fontFamily={F} fontStyle="italic" fontSize="12.5" fill="#566459">your server</text>
+      {box(98, "HTTPS and status page", "Caddy, automatic certificate", "a")}
+      {box(154, "Monero node, pruned", "official release, signature checked", "b")}
+      {box(210, "MonkStash Pay (optional)", "view-only payments for a shop", "c", true)}
+      {arrow(262)}
+      <g>
+        <rect x="10" y="280" width="310" height="44" rx="8" fill="#1b2a22" stroke="#4a6a55" strokeWidth="1.6" />
+        <MoneroSymbol size={26} x={22} y={289} variant="mono" style={{ color: CLAY_DIM }} />
+        <text x="58" y="307" fontFamily={F} fontWeight="600" fontSize="15" fill="#f6f5ec">The Monero network</text>
+      </g>
+      <text x="334" y="130" fontFamily={F} fontStyle="italic" fontSize="14" fill={CLAY_DIM}>yours,</text>
+      <text x="334" y="149" fontFamily={F} fontStyle="italic" fontSize="14" fill={CLAY_DIM}>no account,</text>
+      <text x="334" y="168" fontFamily={F} fontStyle="italic" fontSize="14" fill={CLAY_DIM}>no telemetry</text>
+    </svg>
+  );
+}

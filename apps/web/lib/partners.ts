@@ -4,7 +4,7 @@
  * `ref` is always shown with an "Affiliate link" note and rel="sponsored", and it never changes
  * what a guide recommends. Content pages only: wallet pages never carry partner links.
  */
-export type PartnerKey = "trezor" | "ledger";
+export type PartnerKey = "trezor" | "ledger" | "contabo" | "netcup";
 
 export interface Partner {
   name: string;
@@ -17,6 +17,9 @@ export interface Partner {
 export const partners: Record<PartnerKey, Partner> = {
   trezor: { name: "Trezor", shop: "https://trezor.io/trezor-safe-5", ref: "" },
   ledger: { name: "Ledger", shop: "https://shop.ledger.com/", ref: "" },
+  // Hosts that fit a pruned node and allow running one (checked 2026-10-21).
+  contabo: { name: "Contabo", shop: "https://contabo.com/en/vps/", ref: "" },
+  netcup: { name: "Netcup", shop: "https://www.netcup.com/en/server/vps", ref: "" },
 };
 
 export function partnerLink(key: PartnerKey): { href: string; affiliate: boolean; name: string } {
