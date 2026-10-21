@@ -13,7 +13,7 @@
 # Source and tests: https://github.com/90ssolo/monkstash/tree/main/server (BSD-3-Clause).
 set -euo pipefail
 
-SCRIPT_VERSION="0.3.0"
+SCRIPT_VERSION="0.4.0"
 SELF_URL="https://monkstash.com/server/install.sh"
 
 # The Monero release signing key (binaryFate), as published by the Monero project.
@@ -35,7 +35,7 @@ DEFAULT_ORIGIN="https://wallet.monkstash.com"
 # MonkStash Pay is built on this server from this exact public commit (git checks it by hash).
 # A new Pay release is a new commit here, delivered by "monkstash-server self-update".
 PAY_REPO="https://github.com/90ssolo/monkstash.git"
-PAY_REF="5681af96b1f78b6ed6d4d4047898437c79f384b1"
+PAY_REF="713be1c23ea9675d9a994e7dad77309441e62484"
 # Tests build the commit under test instead. Must be a full 40-character commit hash.
 if [ -n "${MONKSTASH_PAY_REF:-}" ]; then
   [[ "$MONKSTASH_PAY_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "MONKSTASH_PAY_REF must be a full commit hash" >&2; exit 1; }
