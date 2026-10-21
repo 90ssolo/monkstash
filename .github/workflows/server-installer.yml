@@ -1,0 +1,96 @@
+# Installs MonkStash Server on fresh Ubuntu machines (x86-64 and ARM64) with a stagenet node and
+# checks what a user relies on: the official release is verified, the node syncs, HTTPS works,
+# the web wallet may connect from a browser and other sites may not, the public port is the
+# restricted RPC, the status page and command work, and re-install, update check and uninstall
+# behave.
+name: Server installer
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", ".github/workflows/server-installer.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, ubuntu-22.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      CA: /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
+      ORIGIN: https://wallet.monkstash.com
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Syntax and lint
+        run: |
+          bash -n server/monkstash-server.sh
+          shellcheck -S warning server/monkstash-server.sh
+
+      - name: Install (stagenet, local HTTPS)
+        run: sudo bash server/monkstash-server.sh install --network stagenet --domain localhost --yes
+
+      - name: Node answers and syncs
+        run: |
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:38081/get_info > /dev/null && break; sleep 5; done
+          h1=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
+          sleep 90
+          h2=$(curl -fs http://127.0.0.1:38081/get_info | jq .height)
+          echo "height $h1 -> $h2"
+          test "$h2" -gt "$h1"
+          /opt/monero/current/monerod --version
+
+      - name: Status command and page
+        run: |
+          monkstash-server status
+          monkstash-server status --json | jq -e '.running == true and .network == "stagenet" and .pruned == true'
+          sudo systemctl start monkstash-status.service
+          curl -fsS --cacert "$CA" https://localhost/status | grep -q "Your Monero node"
+          curl -fsS --cacert "$CA" https://localhost/status.json | jq -e '.height > 0'
+
+      - name: HTTPS reaches the restricted RPC
+        run: |
+          curl -fsS --cacert "$CA" https://localhost/get_info | jq -e '.status == "OK" and .restricted == true'
+          # An admin call is refused on the public port, and the node keeps running.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --cacert "$CA" -X POST https://localhost/stop_daemon)
+          echo "stop_daemon over HTTPS: $code"
+          test "$code" != "200"
+          sleep 3; systemctl is-active --quiet monerod
+
+      - name: Browser access for the web wallet only
+        run: |
+          body='{"jsonrpc":"2.0","id":"0","method":"get_info"}'
+          curl -sS --cacert "$CA" -D - -o /dev/null -X POST https://localhost/json_rpc -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -d "$body" \
+            | tee /tmp/allowed.txt | grep -qi "^access-control-allow-origin: $ORIGIN"
+          curl -sS --cacert "$CA" -D - -o /dev/null -X OPTIONS https://localhost/json_rpc -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type' | tee /tmp/preflight.txt | grep -qi "^access-control-allow-origin: $ORIGIN"
+          if curl -sS --cacert "$CA" -D - -o /dev/null -X POST https://localhost/json_rpc -H "Origin: https://other.example" -H 'Content-Type: application/json' -d "$body" \
+            | grep -qi "^access-control-allow-origin: https://other.example"; then echo "another site was allowed"; exit 1; fi
+
+      - name: Firewall
+        run: |
+          sudo ufw status | tee /tmp/ufw.txt
+          grep -q "38080/tcp" /tmp/ufw.txt && grep -q "443/tcp" /tmp/ufw.txt && grep -qE "^Status: active" /tmp/ufw.txt
+
+      - name: Running install again keeps the node
+        run: |
+          sudo monkstash-server install --yes
+          sleep 5; systemctl is-active --quiet monerod
+          grep -q 'NETWORK="stagenet"' /etc/monkstash-server/config
+
+      - name: Update check
+        run: sudo monkstash-server update --check
+
+      - name: Uninstall keeps the blockchain unless asked
+        run: |
+          sudo monkstash-server uninstall
+          ! systemctl is-active --quiet monerod
+          test -d /var/lib/monero
