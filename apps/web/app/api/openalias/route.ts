@@ -25,6 +25,7 @@ async function lookup(fqdn: string): Promise<DohResponse> {
         headers: { accept: "application/dns-json" },
         signal: AbortSignal.timeout(TIMEOUT_MS),
         cache: "no-store",
+        redirect: "error",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return (await res.json()) as DohResponse;

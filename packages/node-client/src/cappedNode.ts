@@ -55,6 +55,7 @@ export async function startCappedNode(nodeUrl: string, opts: CappedNodeOptions =
     const raw = req.method === "POST" || req.method === "PUT" ? await readRequest(req) : undefined;
     if (raw === null) { res.writeHead(413).end(); return; }
     const body = raw && BLOCK_ENDPOINTS.has(pathname.replace(/^\//, "")) ? capBlockBatch(raw, maxBlocks) : raw;
+    if (body === null) { res.writeHead(400).end(); return; }
     const headers: Record<string, string> = {};
     for (const h of PASS_REQUEST) {
       const v = req.headers[h];
@@ -62,7 +63,7 @@ export async function startCappedNode(nodeUrl: string, opts: CappedNodeOptions =
     }
     let answer: Response;
     try {
-      answer = await fetch(upstream + (req.url ?? "/"), { method: req.method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
+      answer = await fetch(upstream + (req.url ?? "/"), { method: req.method, headers, body, signal: AbortSignal.timeout(timeoutMs), redirect: "manual" });
     } catch {
       res.writeHead(502).end();
       return;

@@ -15,7 +15,7 @@
     "@quietmint/node-client": "workspace:*",
     "@quietmint/wallet-core": "workspace:*",
     "monero-ts": "0.11.20",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "qrcode": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"

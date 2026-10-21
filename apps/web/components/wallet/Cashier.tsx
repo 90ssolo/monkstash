@@ -249,7 +249,8 @@ function Setup({ pub, initial, settings, onSave }: { pub: WalletPublic; initial:
       setBusy(true);
       try {
         // Staff at the till must not be able to change which addresses it uses (or its prices).
-        if (settings) await settings.checkAccess(pw, code);
+        if (!settings) throw new Error("The till cannot be set up from here.");
+        await settings.checkAccess(pw, code);
         await onSave({ currency, speed, tillNumber, ...(shopName.trim() ? { shopName: shopName.trim().slice(0, 60) } : {}) });
       } catch (err) {
         setError((err as Error).message);

@@ -329,7 +329,7 @@ function CreateSteps({ keys, onKeys, onReady, onCancel }: {
         keep the paper somewhere safe. Do not take a screenshot or save them in a notes app.
       </p>
       <div className={styles.seedWrap}>
-        <ol className={`${styles.seed} ${revealed ? "" : styles.blurred}`} aria-hidden={!revealed}>
+        <ol className={`${styles.seed} ${revealed ? "" : styles.blurred}`} aria-hidden={!revealed} translate="no">
           {/* Words are only put in the DOM once revealed, so nothing can read them early. */}
           {words.map((w, i) => (
             <li key={i}><span>{i + 1}</span>{revealed ? w : "••••••"}</li>

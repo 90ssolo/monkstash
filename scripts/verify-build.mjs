@@ -3,7 +3,8 @@
 //
 //   node scripts/verify-build.mjs https://wallet.monkstash.com
 //     Downloads build.json and every file it lists, and checks each one's SHA-256. Also checks that
-//     every script the wallet page loads from /_next/static is one of those files.
+//     every script the home and wallet pages load is one of those files, served from the site
+//     itself, and that their security policy allows no other script source.
 //
 //   node scripts/verify-build.mjs https://wallet.monkstash.com --compare my-build.json
 //     Also compares the site's files with your own build of the same commit (see /verify for the
@@ -26,11 +27,12 @@ const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 const fingerprintOf = (files) =>
   sha256(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : 1)).map(([url, h]) => `${h}  ${url}\n`).join(""));
 
-async function get(url) {
+async function fetchOk(url) {
   const res = await fetch(url, { redirect: "follow", headers: { "Cache-Control": "no-cache" } });
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  return res;
 }
+const get = async (url) => Buffer.from(await (await fetchOk(url)).arrayBuffer());
 
 let problems = 0;
 const fail = (msg) => { problems++; console.log(`  FAIL ${msg}`); };
@@ -57,21 +59,58 @@ for (const [url, expected] of Object.entries(files)) {
 }
 console.log(`  ${checked} files checked`);
 
-// 2. The pages only load script files that are in the build. Inline scripts (the page's data,
-// which differs per request) are counted but cannot be covered by a build hash.
+// 2. The pages only load script files that are in the build, from this site, and their security
+// policy allows no other script source. Inline scripts (the page's data, which differs per
+// request) are counted but cannot be covered by a build hash.
+const attr = (tag, name) => {
+  const m = new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i").exec(tag);
+  return m ? (m[1] ?? m[2] ?? m[3] ?? "") : null;
+};
 for (const page of [`${site}/`, `${site}/wallet`]) {
-  let html;
+  let res, html;
   try {
-    html = (await get(page)).toString("utf8");
+    res = await fetchOk(page);
+    html = await res.text();
   } catch (e) {
     fail(`${page}: ${e.message}`);
     continue;
   }
-  const refs = new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+)/g)].map((m) => m[1]));
-  const missing = [...refs].filter((r) => !(r in files));
-  for (const r of missing) fail(`${page} loads ${r}, which is not in the build`);
-  const inline = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>/g)].length;
-  console.log(`  ${page}: ${refs.size - missing.length} of ${refs.size} files in the build; ${inline} inline data scripts (not covered)`);
+  const origin = new URL(res.url).origin;
+  // Every script the page can load: <script src>, and <link> preloads of scripts or modules.
+  const sources = [];
+  for (const [tag] of html.matchAll(/<script\b[^>]*>/gi)) {
+    const src = attr(tag, "src");
+    if (src !== null) sources.push(src);
+  }
+  for (const [tag] of html.matchAll(/<link\b[^>]*>/gi)) {
+    const rel = (attr(tag, "rel") ?? "").toLowerCase();
+    const as = (attr(tag, "as") ?? "").toLowerCase();
+    if (rel.includes("modulepreload") || (rel.includes("preload") && as === "script")) sources.push(attr(tag, "href") ?? "");
+  }
+  let inBuild = 0;
+  for (const src of new Set(sources)) {
+    let u;
+    try { u = new URL(src, res.url); } catch { fail(`${page} loads a script with an unreadable address: ${src}`); continue; }
+    if (u.origin !== origin) fail(`${page} loads a script from another site: ${u.href}`);
+    else if (!(u.pathname in files)) fail(`${page} loads ${u.pathname}, which is not in the build`);
+    else inBuild++;
+  }
+  const inline = [...html.matchAll(/<script\b[^>]*>/gi)].filter(([tag]) => attr(tag, "src") === null).length;
+  console.log(`  ${page}: ${inBuild} of ${new Set(sources).size} scripts in the build; ${inline} inline data scripts (not covered)`);
+
+  // The security policy the browser enforces on this page.
+  const csp = res.headers.get("content-security-policy");
+  if (!csp) { fail(`${page} has no Content-Security-Policy`); continue; }
+  const directive = (name) => (csp.split(";").map((d) => d.trim().split(/\s+/)).find(([n]) => n === name) ?? []).slice(1);
+  const scriptSrc = directive("script-src").length ? directive("script-src") : directive("default-src");
+  const allowedTokens = new Set(["'self'", "'strict-dynamic'", "'wasm-unsafe-eval'", "'unsafe-inline'", "'none'"]);
+  const foreign = scriptSrc.filter((t) => !allowedTokens.has(t) && !t.startsWith("'nonce-"));
+  if (foreign.length) fail(`${page}: the security policy lets scripts come from ${foreign.join(" ")}`);
+  if (/\/wallet$/.test(page) || new URL(res.url).hostname.startsWith("wallet.")) {
+    if (!scriptSrc.some((t) => t.startsWith("'nonce-"))) fail(`${page}: the wallet page's policy has no per-request nonce`);
+    if (scriptSrc.includes("'unsafe-inline'") && !scriptSrc.includes("'strict-dynamic'")) fail(`${page}: the wallet page's policy allows any inline script`);
+  }
+  console.log(`  ${page}: script policy ${scriptSrc.map((t) => (t.startsWith("'nonce-") ? "'nonce-...'" : t)).join(" ")}`);
 }
 
 // 3. Optional: compare with your own build.

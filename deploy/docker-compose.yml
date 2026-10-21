@@ -25,7 +25,7 @@ services:
       - no-new-privileges:true
 
   caddy:
-    image: caddy:2.8.4
+    image: caddy:2.8.4@sha256:226d1f059b75399fe19182893c7184591c07b97afc8dfcf44eeb80c9a77a530f
     depends_on: [web]
     # Only what the Caddyfile reads: Caddy never sees API keys or node settings.
     environment:

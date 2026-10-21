@@ -24,6 +24,69 @@ const MAX_BODY = 2 * 1024 * 1024; // 2 MB; wallet requests are small, responses 
 const PER_MINUTE = 900;
 const SENDS_PER_MINUTE = 20;
 const SEND_ENDPOINTS = new Set(["send_raw_transaction", "sendrawtransaction"]);
+// Bulk downloads are the expensive part: a few at a time per visitor, and a ceiling for the server.
+const BULK_PER_IP = 4;
+const BULK_TOTAL = 64;
+// Answers that are collected before they are passed on (everything except bulk downloads).
+const MAX_BUFFERED = 16 * 1024 * 1024;
+// JSON-RPC requests are small. One call per request (no batches), and never the node's admin
+// methods: restricted public nodes refuse them anyway, but a node configured without
+// --restricted-rpc must not be controllable through the relay.
+const MAX_JSON_RPC_BODY = 64 * 1024;
+const DENIED_RPC = new Set([
+  "set_bans", "get_bans", "banned", "flush_txpool", "flush_cache", "relay_tx", "prune_blockchain", "pop_blocks",
+  "sync_info", "get_connections", "get_peer_list", "set_log_level", "set_log_categories", "set_log_hash_rate",
+  "set_limit", "out_peers", "in_peers", "start_mining", "stop_mining", "mining_status", "stop_daemon",
+  "save_bc", "generateblocks", "submit_block", "submitblock", "update", "set_bootstrap_daemon",
+  "get_alternate_chains", "get_coinbase_tx_sum", "rpc_access_info", "rpc_access_submit_nonce",
+  "rpc_access_pay", "rpc_access_tracking", "rpc_access_data", "rpc_access_account",
+]);
+/**
+ * Answers are typed by the relay, never by the node: a node that answered with text/html could
+ * otherwise run script on this origin. Every answer is also sandboxed and marked as a download.
+ */
+const answerType = (endpoint: string) => (endpoint.endsWith(".bin") ? "application/octet-stream" : "application/json");
+const ANSWER_HEADERS = {
+  "Cache-Control": "no-store",
+  "Content-Security-Policy": "default-src 'none'; sandbox; frame-ancestors 'none'",
+  "Content-Disposition": "attachment",
+  "X-Content-Type-Options": "nosniff",
+};
+
+let bulkTotal = 0;
+const bulkByIp = new Map<string, number>();
+function clientKey(req: NextRequest): string {
+  return (req.headers.get("x-forwarded-for") ?? "").split(",")[0]!.trim() || "unknown";
+}
+/** Reserves a bulk download slot; returns the release function, or null when none is free. */
+function takeBulkSlot(req: NextRequest): (() => void) | null {
+  const key = clientKey(req);
+  const mine = bulkByIp.get(key) ?? 0;
+  if (bulkTotal >= BULK_TOTAL || mine >= BULK_PER_IP) return null;
+  bulkTotal++;
+  bulkByIp.set(key, mine + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    bulkTotal--;
+    const left = (bulkByIp.get(key) ?? 1) - 1;
+    if (left > 0) bulkByIp.set(key, left);
+    else bulkByIp.delete(key);
+  };
+}
+
+/** True when a JSON-RPC body asks for one allowed method. */
+function rpcAllowed(body: Uint8Array): boolean {
+  try {
+    const call = JSON.parse(new TextDecoder().decode(body)) as unknown;
+    if (!call || typeof call !== "object" || Array.isArray(call)) return false;
+    const method = (call as { method?: unknown }).method;
+    return typeof method === "string" && !DENIED_RPC.has(method);
+  } catch {
+    return false;
+  }
+}
 
 /** Reads at most `max` bytes of the body; null when it is larger (without buffering the rest). */
 async function readBody(req: NextRequest, max: number): Promise<Uint8Array<ArrayBuffer> | null> {
@@ -114,13 +177,22 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   if (!ALLOWED.has(endpoint)) return new Response("Endpoint not allowed", { status: 403 });
   if (SEND_ENDPOINTS.has(endpoint) && !allow("node-send", req, SENDS_PER_MINUTE)) return tooMany();
 
-  const raw = req.method === "POST" ? await readBody(req, MAX_BODY) : undefined;
+  const isRpc = endpoint === "json_rpc";
+  const raw = req.method === "POST" ? await readBody(req, isRpc ? MAX_JSON_RPC_BODY : MAX_BODY) : undefined;
   if (raw === null) return new Response("Request too large", { status: 413 });
+  if (isRpc && (!raw || !rpcAllowed(raw))) return new Response("Method not allowed", { status: 403 });
   // Small block batches, so a wallet can stop and save every few seconds (packages/node-client).
   const body = raw && BLOCK_ENDPOINTS.has(endpoint) ? capBlockBatch(raw, BLOCKS_PER_ANSWER) : raw;
+  if (body === null) return new Response("Request not allowed", { status: 400 });
 
   const nodes = healthyFirst(upstreams());
-  if (nodes.length === 0) return new Response("No Monero node configured (MONERO_NODE_URLS)", { status: 503 });
+  if (nodes.length === 0) return new Response("No Monero node configured", { status: 503 });
+
+  const stream = BULK.has(endpoint);
+  const release = stream ? takeBulkSlot(req) : () => {};
+  if (!release) return tooMany();
+  let handedOver = false;
+  try {
 
   // A broadcast must reach the network at most once from here. If a node may have received it
   // (timeout, dropped answer, 5xx), asking the next node would at best get "double spend" back
@@ -129,7 +201,6 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   let lastError = "unknown error";
   for (const base of nodes) {
     try {
-      const stream = BULK.has(endpoint);
       const abort = new AbortController();
       const firstByte = setTimeout(() => abort.abort(new Error("no answer in time")), stream ? FIRST_BYTE_MS : TIMEOUT_MS);
       let res: Response;
@@ -140,22 +211,22 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
           body,
           signal: abort.signal,
           cache: "no-store",
+          // A node that redirects is treated as failing: following it could make this server
+          // fetch an address of the node's choosing (internal services included).
+          redirect: "manual",
         });
       } finally {
         if (stream) clearTimeout(firstByte);
       }
-      if (res.status >= 500) {
+      if (res.status >= 500 || (res.status >= 300 && res.status < 400)) {
         clearTimeout(firstByte);
+        void res.body?.cancel().catch(() => {});
         lastError = `${base} returned ${res.status}`;
         markDown(base);
         if (isSend) break;
         continue; // try the next node
       }
-      const headers = {
-        "Content-Type": res.headers.get("content-type") ?? "application/octet-stream",
-        "Cache-Control": "no-store",
-        "X-MonkStash-Node": new URL(base).host,
-      };
+      const headers = { ...ANSWER_HEADERS, "Content-Type": answerType(endpoint) };
       if (stream && res.body) {
         downUntil.delete(base);
         // Pass bytes on as they arrive; cut the stream if the node goes quiet for too long.
@@ -169,14 +240,43 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
           flush() { clearTimeout(idle); },
         });
         const node = base;
-        const body = res.body.pipeThrough(watchdog, { signal: abort.signal });
-        abort.signal.addEventListener("abort", () => { clearTimeout(idle); markDown(node); console.warn(`[node-proxy] stream from ${new URL(node).host} cut: ${String(abort.signal.reason?.message ?? "aborted")}`); });
+        let clientGone = false;
+        const reader = res.body.pipeThrough(watchdog, { signal: abort.signal }).getReader();
+        // When the wallet stops reading (it closed or moved on), stop the node download too. That
+        // is the client's doing, so the node is not marked as failing.
+        const body = new ReadableStream<Uint8Array>({
+          async pull(ctrl) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) { release(); ctrl.close(); } else ctrl.enqueue(value);
+            } catch (e) {
+              release();
+              ctrl.error(e);
+            }
+          },
+          cancel() {
+            clientGone = true;
+            clearTimeout(idle);
+            release();
+            abort.abort(new Error("client went away"));
+          },
+        });
+        abort.signal.addEventListener("abort", () => {
+          clearTimeout(idle);
+          release();
+          if (clientGone) return;
+          markDown(node);
+          console.warn(`[node-proxy] stream from ${new URL(node).host} cut: ${String(abort.signal.reason?.message ?? "aborted")}`);
+        });
+        handedOver = true;
         return new Response(body, { status: res.status, headers });
       }
       // Small answers are collected first: a node that drops the socket mid-answer then fails
       // here, where the next node can be tried, instead of reaching the wallet half-written.
+      if (Number(res.headers.get("content-length") ?? "0") > MAX_BUFFERED) throw new Error("answer too large");
       const payload = await res.arrayBuffer();
       clearTimeout(firstByte);
+      if (payload.byteLength > MAX_BUFFERED) throw new Error("answer too large");
       downUntil.delete(base);
       return new Response(payload, {
         status: res.status,
@@ -193,6 +293,9 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   }
   console.warn("[node-proxy] all nodes failed:", lastError);
   return new Response("All configured Monero nodes are unreachable", { status: 502 });
+  } finally {
+    if (!handedOver) release();
+  }
 }
 
 type Ctx = { params: Promise<{ path: string[] }> };

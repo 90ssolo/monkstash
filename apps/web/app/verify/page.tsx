@@ -10,8 +10,8 @@ import trust from "../_trust/trust.module.css";
 import styles from "../privacy/privacy.module.css";
 import { LiveBuild } from "./LiveBuild";
 
-const UPDATED = "2026-10-21";
-const UPDATED_TEXT = "21 October 2026";
+const UPDATED = "2026-10-22";
+const UPDATED_TEXT = "22 October 2026";
 const DESCRIPTION =
   "Check that the MonkStash wallet your browser loads is exactly the open-source code on GitHub: rebuild it yourself and compare fingerprints, or run the one-minute checker.";
 
@@ -112,6 +112,7 @@ export default function VerifyPage() {
               <ul>
                 <li><strong>It checks what you were served, when you checked.</strong> A web server could in theory send different files to one visitor at one moment. The <Link className={trust.inlineLink} href="/monero-chrome-extension">browser extension</Link> closes this gap: its code is installed once, shows its own fingerprint in Settings, and can be checked file by file against the same source.</li>
                 <li><strong>Each page also carries a little inline data.</strong> Next.js adds small inline scripts with the page&apos;s data, which differ per request, so a build hash cannot cover them. On wallet pages a strict security policy lets only scripts carrying a one-time code from our server run.</li>
+                <li><strong>It covers the code your browser runs, not our server&apos;s own code.</strong> The check compares the files sent to your browser, plus the security policy that decides which scripts may run. The server&apos;s relay to Monero nodes is open source too, but nobody outside can prove which version of it is running. It never sees your keys; what it can see is listed in the <Link className={trust.inlineLink} href="/privacy">privacy policy</Link>.</li>
                 <li><strong>Rebuild on Linux, in Docker.</strong> Builds match on x86-64 and ARM64 Linux, checked on every change. Builds of the extension on Windows have matched too; macOS is not checked yet. The Docker build is the reference.</li>
                 <li><strong>Matching code is not the same as safe code.</strong> A match proves the site runs the published source, not that the source has no bugs. An independent security review is a separate step on our <Link className={trust.inlineLink} href="/donate">roadmap</Link>.</li>
               </ul>

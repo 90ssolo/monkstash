@@ -9,8 +9,8 @@ import { KeysOnDeviceArt } from "../_trust/TrustArt";
 import trust from "../_trust/trust.module.css";
 import styles from "./privacy.module.css";
 
-const UPDATED = "2026-10-20";
-const UPDATED_TEXT = "20 October 2026";
+const UPDATED = "2026-10-22";
+const UPDATED_TEXT = "22 October 2026";
 const DESCRIPTION =
   "What MonkStash can and cannot see: no accounts, no cookies, no tracking. Your keys never leave your device. Here is exactly what passes through our server.";
 
@@ -208,6 +208,7 @@ export default function PrivacyPage() {
                 <li><strong>Monero nodes.</strong> The relay forwards wallet requests to public Monero nodes run by others. They see our server&apos;s address, not yours.</li>
                 <li><strong>Our hosting company.</strong> The site runs on a server we rent and manage ourselves. The hosting company provides the machine and the network connection.</li>
                 <li><strong>Cloudflare.</strong> Forwards our email, and answers name lookups for OpenAlias as described above.</li>
+                <li><strong>Affiliate links.</strong> A few article pages link to hardware wallet shops, marked &quot;Affiliate link&quot;. Nothing is loaded from the shop until you click. If you do, the link passes through the shop&apos;s affiliate service (for Trezor, affil.trezor.io) on its way to the shop, which records the visit under its own privacy policy. We receive only a commission report, never who you are or what you bought. Wallet pages never carry these links.</li>
               </ul>
               <p>We do not sell, rent or share data with anyone, and we have none to sell.</p>
             </section>

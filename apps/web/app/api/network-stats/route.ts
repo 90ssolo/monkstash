@@ -23,6 +23,7 @@ async function rpc<T>(base: string, path: string, body?: unknown): Promise<T> {
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cache: "no-store",
+    redirect: "error", // never follow a node to another address
   });
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return (await res.json()) as T;

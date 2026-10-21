@@ -39,14 +39,14 @@ function readRoot(b: Uint8Array): Map<string, Field> {
 describe("capBlockBatch", () => {
   it("adds max_block_count and keeps every original field", () => {
     const before = readRoot(REAL);
-    const after = readRoot(capBlockBatch(REAL, 100));
+    const after = readRoot(capBlockBatch(REAL, 100)!);
     expect(after.get("max_block_count")).toBe(100n);
     expect(after.size).toBe(before.size + 1);
     for (const [k, v] of before) expect(after.get(k)).toEqual(v);
   });
 
   it("keeps a batch size the wallet already chose", () => {
-    const once = capBlockBatch(REAL, 50);
+    const once = capBlockBatch(REAL, 50)!;
     expect(capBlockBatch(once, 100)).toBe(once);
     expect(readRoot(once).get("max_block_count")).toBe(50n);
   });
@@ -57,7 +57,7 @@ describe("capBlockBatch", () => {
     const entries: number[] = [];
     for (let i = 0; i < 63; i++) entries.push(2, 0x61 + Math.floor(i / 10), 0x30 + (i % 10), 8, i);
     const body = Uint8Array.from([...header, 63 << 2, ...entries]);
-    const after = readRoot(capBlockBatch(body, 100));
+    const after = readRoot(capBlockBatch(body, 100)!);
     expect(after.size).toBe(64);
     expect(after.get("max_block_count")).toBe(100n);
   });
@@ -72,5 +72,16 @@ describe("capBlockBatch", () => {
   it("ignores a nonsensical cap", () => {
     expect(capBlockBatch(REAL, 0)).toBe(REAL);
     expect(capBlockBatch(REAL, 1.5)).toBe(REAL);
+  });
+  it("lowers a limit the client set above the cap, and refuses one it cannot read", () => {
+    const big = capBlockBatch(REAL, 5000)!;
+    expect(readRoot(big).get("max_block_count")).toBe(5000n);
+    const capped = capBlockBatch(big, 100)!;
+    expect(readRoot(capped).get("max_block_count")).toBe(100n);
+    expect(readRoot(big).get("max_block_count")).toBe(5000n); // the input is not changed
+    const odd = big.slice();
+    const at = Buffer.from(odd).indexOf(Buffer.from("max_block_count")) + "max_block_count".length;
+    odd[at] = 6; // uint32 instead of uint64
+    expect(capBlockBatch(odd, 100)).toBeNull();
   });
 });

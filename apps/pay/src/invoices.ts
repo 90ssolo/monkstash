@@ -46,6 +46,27 @@ export function openInvoiceCount(store: Store, now = Date.now()): number {
   return n;
 }
 
+/**
+ * Payment links are public, so their invoices get a share of the open-invoice cap and a limit per
+ * link: a flood through one shared donate link must not block the shop's own checkout.
+ */
+export const LINK_OPEN_PER_LINK = 20;
+export const linkOpenShare = (maxOpen: number) => Math.max(1, Math.floor(maxOpen / 5));
+
+/** Open (unpaid, unexpired) invoices made through payment links: in total, and for one link. */
+export function openLinkInvoiceCount(store: Store, linkId: string, now = Date.now()): { all: number; link: number } {
+  let all = 0;
+  let link = 0;
+  for (const rec of store.all()) {
+    if (!rec.linkId || Object.keys(rec.seen).length) continue;
+    const exp = rec.invoice.expiresAt;
+    if (exp !== undefined && now >= exp) continue;
+    all++;
+    if (rec.linkId === linkId) link++;
+  }
+  return { all, link };
+}
+
 /** Every account the watcher must read: the configured one, plus any that older invoices use. */
 export function accountsInUse(store: Store, cfg: PayConfig): number[] {
   return [...new Set([cfg.account, ...store.all().map(accountOf)])].sort((a, b) => a - b);
@@ -119,8 +140,15 @@ export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: 
   const { cfg, store, watcher, prices } = deps;
   // Every open invoice holds a fresh subaddress. Cap them, so a flood of fake checkouts cannot
   // fill the disk or push new subaddresses far past the wallet's lookahead.
-  if (openInvoiceCount(store, deps.now ?? Date.now()) >= cfg.maxOpenInvoices) {
+  const now = deps.now ?? Date.now();
+  if (openInvoiceCount(store, now) >= cfg.maxOpenInvoices) {
     throw new TooManyOpen(`This payment server already has ${cfg.maxOpenInvoices} unpaid payment requests open. Try again once some have been paid or have expired.`);
+  }
+  if (opts.linkId) {
+    const open = openLinkInvoiceCount(store, opts.linkId, now);
+    if (open.all >= linkOpenShare(cfg.maxOpenInvoices) || open.link >= LINK_OPEN_PER_LINK) {
+      throw new TooManyOpen("Too many unpaid payment requests are open for payment links right now. Try again in a few minutes.");
+    }
   }
   const currency = (str(input.currency, "currency", 16) ?? cfg.defaultCurrency).toUpperCase();
   if (!isCurrencyCode(currency)) throw new BadRequest("currency must be a 3-letter code like EUR or XMR.");
@@ -149,7 +177,6 @@ export async function createShopInvoice(input: CreateInvoiceInput, deps: { cfg: 
   }
 
   const id = newInvoiceId();
-  const now = deps.now ?? Date.now();
   // Never reuse a subaddress: a second order on it would see the first order's payment.
   const used = new Set(store.all().filter((r) => accountOf(r) === cfg.account).map((r) => r.invoice.subaddressIndex));
   const sub = await watcher.newSubaddress(`MonkStash Pay ${reference ?? id.slice(0, 8)}`, Math.max(0, ...used));

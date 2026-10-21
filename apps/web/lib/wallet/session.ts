@@ -727,6 +727,8 @@ export class WalletController {
     const w = this.live;
     this.live = null;
     this.session = null;
+    // The stores' closures hold the decrypted secrets: drop them with the session.
+    this.stores = null;
     this.synced = false;
     this.cashierOn = false;
     await w?.close().catch(() => {});
@@ -741,6 +743,7 @@ export class WalletController {
     const w = this.live;
     this.live = null;
     this.session = null;
+    this.stores = null;
     await w?.close().catch(() => {});
     removeWallet();
     await clearSyncStates();

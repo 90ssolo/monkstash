@@ -61,11 +61,32 @@ const SECURITY_HEADERS: Record<string, string> = {
   "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 };
 
-/** A small fixed-window rate limiter per client address. Memory only; nothing is logged. */
+/**
+ * A small fixed-window rate limiter per client address. Memory only; nothing is logged. Expired
+ * entries are swept at most once a minute, and the map never holds more than MAX_KEYS addresses
+ * (the oldest are dropped first), so a flood from many addresses costs neither CPU nor memory.
+ */
+const MAX_KEYS = 20_000;
+/** One IPv6 connection usually owns a whole /64, so limits count per /64; IPv4 per address. */
+export function limitKey(ip: string): string {
+  const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (v4) return v4[1]!;
+  if (!ip.includes(":")) return ip;
+  const [head = "", tail = ""] = ip.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right] : left;
+  return groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, "")).join(":") + "::/64";
+}
 function limiter(perMinute: number) {
   const hits = new Map<string, { n: number; reset: number }>();
+  let nextSweep = 0;
   return (key: string, now = Date.now()): boolean => {
-    if (hits.size > 10_000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+    if (now >= nextSweep) {
+      nextSweep = now + 60_000;
+      for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+    }
+    while (hits.size >= MAX_KEYS) hits.delete(hits.keys().next().value!);
     const h = hits.get(key);
     if (!h || h.reset < now) { hits.set(key, { n: 1, reset: now + 60_000 }); return true; }
     h.n += 1;
@@ -150,12 +171,13 @@ export function createApp(deps: AppDeps) {
   // Per invoice too: a checkout page polls a few times a minute; far more means abuse.
   const invoiceLimit = limiter(240);
   const clientOf = (req: IncomingMessage) => {
+    let ip = req.socket.remoteAddress ?? "unknown";
     if (cfg.trustProxy) {
       // The proxy appends the address it saw, so the last entry is the one we can trust.
       const fwd = String(req.headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      if (fwd.length) return fwd[fwd.length - 1]!.slice(0, 64);
+      if (fwd.length) ip = fwd[fwd.length - 1]!.slice(0, 64);
     }
-    return req.socket.remoteAddress ?? "unknown";
+    return limitKey(ip);
   };
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

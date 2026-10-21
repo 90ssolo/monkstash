@@ -3,7 +3,7 @@
 # Run (settings in a .env file, invoices and wallet state in a volume):
 #   docker run -d --name monkstash-pay --env-file apps/pay/.env -v monkstash-pay-data:/data -p 127.0.0.1:8080:8080 monkstash-pay
 
-FROM node:24.18.0-slim AS build
+FROM node:24.18.0-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS build
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -15,7 +15,7 @@ RUN pnpm install --frozen-lockfile --filter @quietmint/pay... \
  && pnpm --filter @quietmint/pay deploy --prod --legacy /out \
  && cp -r apps/pay/dist /out/dist
 
-FROM node:24.18.0-slim
+FROM node:24.18.0-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 ENV NODE_ENV=production PAY_DATA_DIR=/data PAY_HOST=0.0.0.0 PAY_PORT=8080
 WORKDIR /app
 COPY --from=build /out/node_modules ./node_modules

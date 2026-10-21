@@ -243,12 +243,21 @@ latest_release() {
   gpg --batch --quiet --import "$tmp/key.asc" 2> /dev/null
   fpr=$(gpg --batch --with-colons --fingerprint 2> /dev/null | awk -F: '/^fpr/ {print $10; exit}')
   [ "$fpr" = "$MONERO_KEY_FPR" ] || die "the downloaded release key has fingerprint $fpr, expected $MONERO_KEY_FPR. Stopping."
-  gpg --batch --status-fd 1 --verify "$tmp/hashes.txt" 2> /dev/null | grep -q "^\[GNUPG:\] VALIDSIG $MONERO_KEY_FPR " \
+  # Only the signed text counts: gpg writes exactly the part the signature covers, so lines added
+  # before or after the signed block (by whoever controls the download server) are ignored.
+  gpg --batch --yes --status-fd 3 --output "$tmp/signed.txt" --decrypt "$tmp/hashes.txt" 3> "$tmp/status" 2> /dev/null || true
+  grep -q "^\[GNUPG:\] VALIDSIG $MONERO_KEY_FPR " "$tmp/status" \
     || die "the hash list is not signed by the Monero release key. Stopping."
   unset GNUPGHOME
-  awk -v tag="$tag" '$2 ~ "^monero-" tag "-v[0-9.]+\\.tar\\.bz2$" {v = $2; sub("^monero-" tag "-v", "", v); sub("\\.tar\\.bz2$", "", v); print v, $1, $2; exit}' "$tmp/hashes.txt" \
-    | grep . || die "no Monero release for $tag in the signed hash list"
+  local found
+  found=$(awk -v tag="$tag" '$2 ~ "^monero-" tag "-v[0-9.]+\\.tar\\.bz2$" {v = $2; sub("^monero-" tag "-v", "", v); sub("\\.tar\\.bz2$", "", v); print v, $1, $2}' "$tmp/signed.txt")
+  [ -n "$found" ] || die "no Monero release for $tag in the signed hash list"
+  [ "$(printf '%s\n' "$found" | wc -l)" -eq 1 ] || die "the signed hash list names more than one Monero release for $tag. Stopping."
+  printf '%s\n' "$found"
 }
+
+# True when version $1 is lower than version $2 (dotted numbers).
+version_lt() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n 1)" = "$1" ]; }
 
 installed_version() { readlink "$MONERO_DIR/current" 2> /dev/null | sed -n 's#.*/v\{0,1\}\([0-9.]*\)$#\1#p'; }
 
@@ -506,19 +515,21 @@ EOF
 
 configure_firewall() {
   [ "$FIREWALL" -eq 1 ] || { warn "firewall not configured (--no-firewall)"; return; }
-  local ssh_port
-  # The port sshd really listens on, so the firewall never locks you out. sshd -T can fail
-  # (no host keys yet, or no sshd at all); then the usual port 22 is kept open.
-  ssh_port=$( { sshd -T 2> /dev/null || true; } | awk '/^port / {print $2; exit}')
-  case "$ssh_port" in ""|*[!0-9]*) ssh_port=22 ;; esac
-  ufw allow "$ssh_port/tcp" comment "SSH" > /dev/null
+  local ssh_ports p
+  # Every port sshd really listens on (sshd -T lists each Port line; a socket-activated sshd can
+  # listen elsewhere, so the listening sockets count too), so the firewall never locks you out.
+  # sshd -T can fail (no host keys yet, or no sshd at all); then the usual port 22 is kept open.
+  ssh_ports=$( { { sshd -T 2> /dev/null || true; } | awk '/^port / {print $2}'
+    { ss -Hltnp 2> /dev/null || true; } | awk '/"sshd"|sshd/ {n = split($4, a, ":"); print a[n]}'; } | sort -un)
+  for p in $ssh_ports; do case "$p" in *[!0-9]*) ;; *) ufw allow "$p/tcp" comment "SSH" > /dev/null ;; esac; done
+  [ -n "$ssh_ports" ] || { ssh_ports=22; ufw allow 22/tcp comment "SSH" > /dev/null; }
   ufw allow 80/tcp comment "HTTPS certificate" > /dev/null
   ufw allow 443/tcp comment "Monero node over HTTPS" > /dev/null
   ufw allow "$P2P/tcp" comment "Monero peers" > /dev/null
   ufw default deny incoming > /dev/null
   ufw default allow outgoing > /dev/null
   ufw --force enable > /dev/null
-  ok "firewall: SSH ($ssh_port), 80, 443 and $P2P open; everything else closed"
+  ok "firewall: SSH ($(echo $ssh_ports | tr ' ' ',')), 80, 443 and $P2P open; everything else closed"
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -745,11 +756,11 @@ cmd_install() {
       --network) NETWORK="${2:?}"; shift ;;
       --full) PRUNED=0 ;;
       --pruned) PRUNED=1 ;;
-      --origin) case "$2" in https://*) ORIGINS="$ORIGINS ${2%/}" ;; *) die "--origin must start with https://" ;; esac; shift ;;
+      --origin) case "$2" in https://*[!A-Za-z0-9.:/-]*) die "--origin may only contain letters, digits, dots, dashes, colons and slashes" ;; https://?*) ORIGINS="$ORIGINS ${2%/}" ;; *) die "--origin must start with https://" ;; esac; shift ;;
       --pay) PAY=1 ;;
       --no-pay) PAY=0 ;;
       --pay-domain) PAY_DOMAIN="${2:?}"; shift ;;
-      --shop-url) case "$2" in https://*) SHOP_URL="${2%/}" ;; *) die "--shop-url must start with https://" ;; esac; shift ;;
+      --shop-url) case "$2" in https://*[!A-Za-z0-9._~:/?#@\&=%+,-]*) die "--shop-url may only contain letters, digits and . _ ~ : / ? # @ & = % + , -" ;; https://?*) SHOP_URL="${2%/}" ;; *) die "--shop-url must start with https://" ;; esac; shift ;;
       --shop-name) SHOP_NAME="${2:?}"; shift ;;
       --currency) CURRENCY=$(printf '%s' "${2:?}" | tr 'a-z' 'A-Z'); shift ;;
       --no-firewall) FIREWALL=0 ;;
@@ -772,10 +783,12 @@ cmd_install() {
   check_resources
   pick_domain
   case "$DOMAIN" in ""|*[!A-Za-z0-9.-]*|.*|*..*) die "invalid domain: $DOMAIN" ;; esac
+  # The settings file is read back by the shell, and the address goes into the Caddyfile.
+  case "$EMAIL" in "") ;; *[!A-Za-z0-9._%+@-]*|*@*@*|@*|*@) die "invalid --email: $EMAIL" ;; *@*.*) ;; *) die "invalid --email: $EMAIL" ;; esac
   if [ "$PAY" -eq 1 ]; then
     [ -n "$PAY_DOMAIN" ] || PAY_DOMAIN="pay.$DOMAIN"
     case "$PAY_DOMAIN" in *[!A-Za-z0-9.-]*|.*|*..*) die "invalid --pay-domain: $PAY_DOMAIN" ;; esac
-    case "$SHOP_NAME" in *[[:cntrl:]]*|*'"'*) die "the shop name cannot contain quotes or control characters" ;; esac
+    case "$SHOP_NAME" in *[[:cntrl:]]*|*'"'*|*'$'*|*'`'*|*'\'*) die "the shop name cannot contain quotes, \$, backticks, backslashes or control characters" ;; esac
     case "$CURRENCY" in [A-Z][A-Z][A-Z]) ;; *) die "--currency is a three-letter code like EUR or USD" ;; esac
     collect_pay_wallet
     ok "MonkStash Pay at https://$PAY_DOMAIN$([ -n "$SHOP_URL" ] && echo ", webhooks to $SHOP_URL")"
@@ -896,6 +909,12 @@ cmd_update() {
     build_pay; write_pay_unit; systemctl daemon-reload; systemctl restart monkstash-pay.service; ok "MonkStash Pay restarted"
   fi
   if [ "$cur" = "$version" ]; then ok "Monero $cur is the latest release"; return 0; fi
+  # An old, validly signed hash list served again must not roll the node back to a version with
+  # known bugs.
+  if [ -n "$cur" ] && version_lt "$version" "$cur"; then
+    say "The signed hash list offers Monero $version, older than the installed $cur. Not downgrading."
+    return 0
+  fi
   if [ "$check" -eq 1 ]; then say "Monero $version is available (installed: ${cur:-none}). Run: monkstash-server update"; return 0; fi
   step "Updating Monero ${cur:-none} to $version"
   # shellcheck disable=SC2086

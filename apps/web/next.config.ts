@@ -45,6 +45,8 @@ const securityHeaders = [
 ];
 
 const nodeStub = { browser: "./lib/empty-module.ts" };
+// The node endpoints served at the root (rewritten to the relay), as a regex alternation.
+const relayPaths = NODE_ENDPOINTS.map((e) => e.replace(/\./g, "\\.")).join("|");
 
 
 const config: NextConfig = {
@@ -101,8 +103,9 @@ const config: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
-      // Everything except the wallet, /pay (strict policy in proxy.ts) and the engine files.
-      { source: "/:path((?!wallet(?:/|$)|pay(?:/|$)|monero/).*)", ...notWalletHost, headers: [{ key: "Content-Security-Policy", value: contentCsp }] },
+      // Everything except the wallet, /pay (strict policy in proxy.ts), the engine files and the
+      // node relay (its answers carry their own sandbox policy, see app/api/node).
+      { source: `/:path((?!wallet(?:/|$)|pay(?:/|$)|monero/|api/node/|(?:${relayPaths})$).*)`, ...notWalletHost, headers: [{ key: "Content-Security-Policy", value: contentCsp }] },
       { source: "/monero/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=86400" }, { key: "Content-Security-Policy", value: workerCsp }] },
     ];
   },

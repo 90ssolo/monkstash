@@ -4,7 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadConfig, type PayConfig } from "../src/config";
-import { createApp, type AppState } from "../src/app";
+import { createApp, limitKey, type AppState } from "../src/app";
+import { createShopInvoice, LINK_OPEN_PER_LINK } from "../src/invoices";
 import { compareAmounts } from "../src/links";
 import { Store } from "../src/store";
 import type { IncomingPayment, Watcher } from "../src/wallet";
@@ -260,5 +261,23 @@ describe("payment link limits", () => {
     for (let i = 0; i < 7; i++) codes.push((await payVia(app, l.id, "1")).status);
     expect(codes.slice(0, 6).every((c) => c === 303)).toBe(true);
     expect(codes[6]).toBe(429);
+  });
+  it("keeps shop checkout open when a public link is flooded", async () => {
+    const app = await startApp();
+    const l = await newLink(app, { title: "Tips", minAmount: "1" });
+    const deps = { cfg: app.cfg, store: app.store, watcher: fakeWatcher(), prices: fakePrices };
+    for (let i = 0; i < LINK_OPEN_PER_LINK; i++) await createShopInvoice({ amount: "1", currency: "XMR" }, deps, { linkId: l.id });
+    await expect(createShopInvoice({ amount: "1", currency: "XMR" }, deps, { linkId: l.id })).rejects.toThrow(/payment links/);
+    // The shop's own checkout is not affected.
+    const res = await api(app, "/api/invoices", { method: "POST", body: JSON.stringify({ amount: "1", currency: "XMR" }) });
+    expect(res.status).toBe(201);
+  });
+
+  it("counts rate limits per IPv4 address and per IPv6 /64", () => {
+    expect(limitKey("203.0.113.7")).toBe("203.0.113.7");
+    expect(limitKey("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(limitKey("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(limitKey("2001:db8:1:2:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(limitKey("2001:db8::5")).toBe("2001:db8:0:0::/64");
   });
 });

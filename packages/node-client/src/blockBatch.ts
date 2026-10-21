@@ -42,23 +42,36 @@ function writeVarint(value: number): Uint8Array {
   return out;
 }
 
-/** True when the key (preceded by its length byte, as epee writes keys) occurs in `b`. */
-function hasKey(b: Uint8Array, from: number): boolean {
+/** Where the key (preceded by its length byte, as epee writes keys) starts in `b`, or -1. */
+function findKey(b: Uint8Array, from: number): number {
   outer: for (let i = from; i + KEY.length < b.length; i++) {
     if (b[i] !== KEY.length) continue;
     for (let j = 0; j < KEY.length; j++) if (b[i + 1 + j] !== KEY[j]) continue outer;
-    return true;
+    return i;
   }
-  return false;
+  return -1;
 }
 
-/** Returns a getblocks.bin request body that asks for at most `maxBlocks` blocks. */
-export function capBlockBatch(body: Uint8Array<ArrayBuffer>, maxBlocks: number): Uint8Array<ArrayBuffer> {
+/**
+ * Returns a getblocks.bin request body that asks for at most `maxBlocks` blocks, or null when the
+ * body sets the limit in a form that cannot be checked (the caller refuses the request).
+ */
+export function capBlockBatch(body: Uint8Array<ArrayBuffer>, maxBlocks: number): Uint8Array<ArrayBuffer> | null {
   if (!Number.isInteger(maxBlocks) || maxBlocks < 1) return body;
   if (body.length <= HEADER_SIZE) return body;
   for (let i = 0; i < HEADER_SIZE; i++) if (body[i] !== SIGNATURE[i]) return body;
-  // The wallet (or a newer wallet) already chose a batch size: keep its choice.
-  if (hasKey(body, HEADER_SIZE)) return body;
+  // The client already chose a batch size: keep it if it is within the cap, lower it if not, so
+  // nobody can use the relay to pull the node's largest batches. Any other value type is refused.
+  const keyAt = findKey(body, HEADER_SIZE);
+  if (keyAt >= 0) {
+    const typeAt = keyAt + 1 + KEY.length;
+    if (body[typeAt] !== TYPE_UINT64 || typeAt + 9 > body.length) return null;
+    const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
+    if (view.getBigUint64(typeAt + 1, true) <= BigInt(maxBlocks)) return body;
+    const out = body.slice();
+    new DataView(out.buffer).setBigUint64(typeAt + 1, BigInt(maxBlocks), true);
+    return out;
+  }
   const count = readVarint(body, HEADER_SIZE);
   if (!count) return body;
   let newCount: Uint8Array;

@@ -114,7 +114,7 @@ export function RevealWords({ actions }: { actions: SettingsActions }) {
         <div className="notice notice-warn" role="alert">
           <span><strong>Anyone who sees these words can take your money.</strong> Check that nobody is watching and that your screen is not being shared or recorded.</span>
         </div>
-        <ol className={styles.wordGrid} aria-label={`Your ${words.length} recovery words`}>
+        <ol className={styles.wordGrid} aria-label={`Your ${words.length} recovery words`} translate="no">
           {words.map((w, i) => <li key={i}><span className={styles.wordNum}>{i + 1}</span><span className="mono">{w}</span></li>)}
         </ol>
         <p className="small muted">Write them on paper, in order. Hiding in {left} seconds.</p>

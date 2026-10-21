@@ -15,7 +15,7 @@ export interface Partner {
 }
 
 export const partners: Record<PartnerKey, Partner> = {
-  trezor: { name: "Trezor", shop: "https://trezor.io/trezor-safe-5", ref: "" },
+  trezor: { name: "Trezor", shop: "https://trezor.io/trezor-safe-5", ref: "https://affil.trezor.io/SH177" },
   ledger: { name: "Ledger", shop: "https://shop.ledger.com/", ref: "" },
   // Hosts that fit a pruned node and allow running one (checked 2026-10-21).
   contabo: { name: "Contabo", shop: "https://contabo.com/en/vps/", ref: "" },

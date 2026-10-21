@@ -10,7 +10,7 @@ import type { StoredWallet, WalletPublic } from "@quietmint/wallet-core";
 import { warmEngine } from "@/lib/wallet/engine";
 import { CODE_EXPIRED, CODE_TOO_MANY, CODE_WAIT_MS, STATE_SAVE_EVERY_MS, WalletController, type SaveProblem, type View } from "@/lib/wallet/session";
 import { DEV_TOOLS_ENABLED, NETWORK } from "@/lib/wallet/config";
-import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS, readLockOnLeave, writeLockOnLeave } from "@/lib/wallet/autolock";
+import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS, AUTO_LOCK_SCAN_MAX_MS, readLockOnLeave, writeLockOnLeave } from "@/lib/wallet/autolock";
 import { fetchTestWallets } from "@/lib/wallet/testWallets";
 import { isDemo } from "@/lib/wallet/demo";
 import { BrandMark } from "@/components/BrandMark";
@@ -56,6 +56,8 @@ export function WalletApp() {
     // Elapsed time comes from performance.now(), which a clock change cannot move.
     const clock = () => performance.now();
     let lastActive = clock();
+    // Last real interaction: a running scan only stands in for activity for a limited time.
+    let lastTouched = lastActive;
     let hiddenSince: number | null = document.hidden ? clock() : null;
     let locking = false;
     const lockNow = () => {
@@ -71,11 +73,14 @@ export function WalletApp() {
       // While the first scan runs, waiting is not idleness: locking would stop the scan. By default
       // leaving the tab still locks (progress is saved on the way out); with lock-on-leave turned
       // off, a running scan also keeps a background tab open. Once it is done, idle lock applies.
-      if (controller.syncBusy && (!document.hidden || !lockOnLeave)) lastActive = now;
+      // With lock on leave on, an untouched screen still locks after AUTO_LOCK_SCAN_MAX_MS: a
+      // spending wallet must not stay open for hours on an unattended screen.
+      const scanKeepsOpen = lockOnLeave ? !document.hidden && now - lastTouched < AUTO_LOCK_SCAN_MAX_MS : true;
+      if (controller.syncBusy && scanKeepsOpen) lastActive = now;
       if (now - lastActive >= AUTO_LOCK_IDLE_MS) lockNow();
       else if (lockOnLeave && hiddenSince !== null && now - hiddenSince >= AUTO_LOCK_HIDDEN_MS) lockNow();
     };
-    const onActivity = () => { lastActive = clock(); };
+    const onActivity = () => { lastActive = clock(); lastTouched = lastActive; };
     const onVisibility = () => {
       if (document.hidden) {
         hiddenSince = clock();
@@ -83,6 +88,7 @@ export function WalletApp() {
         check();
         hiddenSince = null;
         lastActive = clock();
+        lastTouched = lastActive;
       }
     };
     for (const ev of ACTIVITY_EVENTS) window.addEventListener(ev, onActivity, { passive: true });

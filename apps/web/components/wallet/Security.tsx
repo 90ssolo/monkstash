@@ -159,13 +159,13 @@ export function WatchOnlyKeys({ actions }: { actions: SettingsActions }) {
         <div className="notice notice-warn" role="alert">
           <span><strong>The view key shows every payment you receive.</strong> It cannot spend, but share it only with a device you trust, such as your own till.</span>
         </div>
-        <dl className={styles.facts}>
+        <dl className={styles.facts} translate="no">
           <dt>Address</dt><dd className="mono" style={{ wordBreak: "break-all" }}>{keys.address}</dd>
           <dt>Private view key</dt><dd className="mono" style={{ wordBreak: "break-all" }}>{keys.viewKey}</dd>
           <dt>Restore height</dt><dd className="tnum">{keys.restoreHeight.toLocaleString()}</dd>
         </dl>
         <div style={{ display: "flex", gap: "var(--s-2)", flexWrap: "wrap" }}>
-          <CopyButton value={keys.viewKey} label="Copy view key" />
+          <CopyButton value={keys.viewKey} label="Copy view key" sensitive />
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setKeys(null)}>Hide now</button>
         </div>
         <p className="small muted">On the till, choose &quot;Add a watch-only wallet&quot;, paste the address and view key, then choose &quot;A block height&quot; and enter the restore height. Hiding in {left} seconds.</p>

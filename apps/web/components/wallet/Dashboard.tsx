@@ -1403,7 +1403,9 @@ function RemoveWallet({ onRemove, settings, kind }: { onRemove: () => void; sett
       setBusy(true);
       try {
         // Only the owner may remove it (a till or a borrowed device must not be wiped by anyone).
-        if (settings) await settings.checkAccess(pw, code);
+        // Fails closed: without the settings actions there is no way to check, so no removal.
+        if (!settings) throw new Error("This wallet cannot be removed from here.");
+        await settings.checkAccess(pw, code);
         onRemove();
       } catch (err) {
         setError((err as Error).message);
