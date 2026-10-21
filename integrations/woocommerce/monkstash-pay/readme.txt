@@ -6,7 +6,7 @@ Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 8.0
 Stable tag: 0.1.1
-License: New BSD License
+License: BSD-3-Clause OR GPL-2.0-or-later
 License URI: https://opensource.org/licenses/BSD-3-Clause
 
 Accept Monero on your WooCommerce shop through your own MonkStash Pay server. Non-custodial, with a fresh address for every order.
@@ -82,6 +82,7 @@ Each visitor address can start at most 10 Monero payments in 10 minutes, and the
 = 0.1.1 =
 * Locked payments (coins the sender locked for later) are noted on the order and put an unpaid order on hold. Needs MonkStash Pay with locked-payment support.
 * Tested with WordPress 7.1 and WooCommerce 11.2. Error messages are escaped; the gateway class is now MonkStash_Pay_Gateway (settings are kept).
+* Licence: you may use this plugin under BSD-3-Clause or GPL-2.0-or-later, whichever you prefer.
 
 = 0.1.0 =
 * First version: checkout, webhooks with signature and status confirmation, five-minute fallback check, block checkout, HPOS.

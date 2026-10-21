@@ -9,7 +9,7 @@
  * WC requires at least: 8.0
  * WC tested up to:   11.2
  * Author:            The MonkStash developers
- * License:           New BSD License
+ * License:           BSD-3-Clause OR GPL-2.0-or-later
  * License URI:       https://opensource.org/licenses/BSD-3-Clause
  * Text Domain:       monkstash-pay
  */
