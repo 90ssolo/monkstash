@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MonkStash preview</title>
+<style>
+  /* README hero: real wallet screenshots in simple device frames. Rendered to preview.png at 1800x1000 (2x). */
+  html, body { margin:0; }
+  .b { position:relative; width:1800px; height:1000px; overflow:hidden; background:#edeee6; }
+  .glow { position:absolute; inset:auto -10% -40% -10%; height:70%; background:#1b2a22; border-radius:50% 50% 0 0 / 30% 30% 0 0; }
+  .laptop { position:absolute; left:110px; top:120px; width:1300px; }
+  .screen { background:#1b2a22; border-radius:22px 22px 0 0; padding:18px 18px 0; box-shadow:0 30px 70px rgba(27,42,34,0.35); }
+  .screen img { display:block; width:100%; height:auto; border-radius:8px 8px 0 0; }
+  .base { height:28px; margin:0 -60px; background:linear-gradient(#c9ccc0, #a9ada1); border-radius:0 0 22px 22px; }
+  .phone { position:absolute; right:120px; top:230px; width:360px; background:#1b2a22; border-radius:48px; padding:16px; box-shadow:0 30px 70px rgba(27,42,34,0.45); }
+  .phone img { display:block; width:100%; height:auto; border-radius:34px; }
+</style>
+</head>
+<body>
+<div class="b">
+  <div class="glow"></div>
+  <div class="laptop"><div class="screen"><img src="home.png" alt=""></div><div class="base"></div></div>
+  <div class="phone"><img src="mobile.png" alt=""></div>
+</div>
+</body>
+</html>
