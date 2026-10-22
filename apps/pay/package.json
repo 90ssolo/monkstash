@@ -23,6 +23,6 @@
     "@types/qrcode": "1.5.5",
     "rolldown": "1.2.13",
     "typescript": "6.0.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.3"
   }
 }

@@ -2,3 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
 onlyBuiltDependencies: []
+# monero-ts lists these but never loads them; pinned to releases without known advisories.
+overrides:
+  serialize-javascript: 7.1.2
+  uuid: 14.0.2

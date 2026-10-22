@@ -2,7 +2,7 @@
 #   docker compose -f deploy/docker-compose.yml build
 # The base image is pinned by digest and the build ID is the source commit, so anyone can rebuild
 # a release and get byte-identical files (see scripts/verify-build.mjs and /verify).
-ARG NODE_IMAGE=node:24.18.0-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+ARG NODE_IMAGE=node:24.22.1-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
 FROM ${NODE_IMAGE} AS build
 WORKDIR /src
 RUN corepack enable
