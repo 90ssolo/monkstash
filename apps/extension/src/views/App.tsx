@@ -7,11 +7,11 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { WalletPublic, StoredWallet } from "@quietmint/wallet-core";
-import { Dashboard } from "@/components/wallet/Dashboard";
+import { Dashboard, type WalletMenu } from "@/components/wallet/Dashboard";
 import { Loading, Onboarding, Welcome, type OnboardingResult } from "@/components/wallet/Onboarding";
 import { Fatal, Opening, OtherNetwork, SaveProblemNotice, Unlock } from "@/components/wallet/WalletApp";
 import { Stage } from "@/components/wallet/Stage";
-import type { SetupMode } from "@/lib/wallet/session";
+import type { SetupMode, WalletSummary } from "@/lib/wallet/session";
 import { ArtLock } from "@/components/wallet/WalletArt";
 import { BrandMark } from "@/components/BrandMark";
 import styles from "@/components/wallet/wallet.module.css";
@@ -108,14 +108,15 @@ function Screen({ surface }: { surface: Surface }) {
   const controller = <T,>(method: string, ...args: unknown[]) => host.call<T>("controller", method, ...args);
 
   if (view.name === "welcome") {
-    if (surface !== "tab") return <SetUpInTab />;
-    return <Welcome moveFirst onPick={(mode) => void controller("pick", mode)} />;
+    if (surface !== "tab") return <SetUpInTab continuing={!!view.adding} />;
+    return <Welcome moveFirst={!view.adding} adding={!!view.adding} onCancel={() => void controller("cancelAdd")} onPick={(mode) => void controller("pick", mode)} />;
   }
   if (view.name === "onboard") {
     if (surface !== "tab") return <SetUpInTab continuing />;
     return (
       <Onboarding
         mode={view.mode as SetupMode}
+        adding={!!view.adding}
         onCancel={() => void controller("pick", null)}
         onSwitchMode={(mode) => void controller("pick", mode)}
         onDone={(r: OnboardingResult) => controller("onboarded", r)}
@@ -126,9 +127,10 @@ function Screen({ surface }: { surface: Surface }) {
     return (
       <Unlock
         record={view.record as Pick<StoredWallet, "pub">}
+        count={typeof view.count === "number" ? view.count : 1}
         unlock={(pw) => controller<"open" | "code">("unlock", pw)}
         submitCode={(code) => controller("submitCode", code)}
-        onForget={() => void controller("remove")}
+        onForget={() => void controller("forgetAll")}
         warm={noop}
       />
     );
@@ -163,6 +165,18 @@ function OpenWallet({ surface }: { surface: Surface }) {
   const settingsJson = JSON.stringify(state.settings);
   const settings = useMemo(() => remoteSettings(host, pub, surface === "tab" ? undefined : () => (surface === "popup" ? openFull("settings") : openTab("settings"))), [settingsJson, pub, surface]); // eslint-disable-line react-hooks/exhaustive-deps
   const compact = useMemo(() => (surface === "popup" ? { openFull } : undefined), [surface]);
+  const walletsJson = JSON.stringify(state.view.wallets ?? []);
+  const walletMenu = useMemo<WalletMenu>(() => ({
+    wallets: JSON.parse(walletsJson) as WalletSummary[],
+    onSwitch: (id: string) => host.call<void>("controller", "switchTo", id),
+    // Adding a wallet shows recovery words: that happens in a full tab, never in the popup.
+    onAdd: () => {
+      void host.call("controller", "startAdd").then(() => {
+        if (surface !== "tab") { openTab(); if (surface === "popup") window.close(); }
+      });
+    },
+    onRename: (name: string) => host.call<void>("controller", "rename", name),
+  }), [walletsJson, surface]);
   return (
     <>
       {state.saveProblem ? <SaveProblemNotice problem={state.saveProblem} /> : null}
@@ -181,6 +195,7 @@ function OpenWallet({ surface }: { surface: Surface }) {
         compact={compact}
         leaveText="you close every MonkStash window"
         leaveDelay={__FIREFOX__ ? "a few seconds" : "1 minute"}
+        walletMenu={walletMenu}
       />
     </>
   );

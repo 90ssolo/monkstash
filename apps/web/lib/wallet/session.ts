@@ -11,17 +11,17 @@
  * (opened from its own real seed). Simulation mode replaces the node with canned data, and is also
  * the automatic fallback when the node is unreachable.
  */
-import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, type Contact, type NodeConfig, type StoredWallet, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
+import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, type Contact, type NodeConfig, type StoredWallet, type WalletKind, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
 import type { OnboardingResult } from "@/components/wallet/Onboarding";
 import type { SettingsActions } from "@/components/wallet/WalletSettings";
 import { normalizeSeed, NodeTestError, openWallet, testNode, type EngineState, type LiveWallet } from "./engine";
 import { recordHandedOut, type HandedOut, type HandedOutStore } from "./addresses";
-import { clearSyncStates, deleteSyncState, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "./stateStore";
+import { clearSyncStates, deleteSyncState, deleteWalletData, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "./stateStore";
 import type { PaymentRequest, RequestStore } from "./requests";
 import { EMPTY_CASHIER, type CashierData, type CashierStore } from "./cashier";
 import type { ContactStore } from "./contacts";
 import { createSimWallet } from "./sim";
-import { loadStoredWallet, removeWallet, saveWallet, StorageUnavailableError, unlockWallet, updatePublic } from "./storage";
+import { loadWallets, putWallets, removeWallet, removeWalletRecord, saveWallet, sealWallet, setActiveWallet, StorageUnavailableError, unlockWallet, updatePublic, type WalletList } from "./storage";
 import { NETWORK } from "./config";
 import type { TestWallet } from "./testWallets";
 import { clearDemoSession, isDemo, pickRandom, preferredMode, setDemoSession, type TestMode } from "./demo";
@@ -137,20 +137,44 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
   return Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
 }
 
+/** A wallet in the switcher (public data only). */
+export interface WalletSummary { id: string; name: string; kind: WalletKind; active: boolean }
+
 export type View =
   | { name: "boot" }
-  | { name: "welcome" }
-  | { name: "onboard"; mode: SetupMode }
-  | { name: "locked"; record: StoredWallet }
+  /** `adding`: another wallet is being added while one is unlocked (no new password). */
+  | { name: "welcome"; adding?: boolean }
+  | { name: "onboard"; mode: SetupMode; adding?: boolean }
+  /** `count`: wallets on this network that the password unlocks. */
+  | { name: "locked"; record: StoredWallet; count: number }
   | { name: "otherNetwork"; record: StoredWallet }
   | { name: "opening"; pub: WalletPublic }
-  | { name: "open"; pub: WalletPublic; wallet: LiveWallet; mode: TestMode; fellBack: boolean }
+  | { name: "open"; pub: WalletPublic; wallet: LiveWallet; mode: TestMode; fellBack: boolean; wallets: WalletSummary[] }
   | { name: "fatal"; message: string };
 
-/** A wallet saved for another network (for example a stagenet test wallet on the mainnet site) cannot sync here. */
-function viewFor(rec: StoredWallet | null): View {
-  if (!rec) return { name: "welcome" };
-  return rec.pub.network !== NETWORK ? { name: "otherNetwork", record: rec } : { name: "locked", record: rec };
+/** Wallets for this network (a stagenet test wallet cannot sync on the mainnet site, and the other way round). */
+const onThisNetwork = (list: WalletList | null) => (list?.wallets ?? []).filter((w) => w.pub.network === NETWORK);
+
+/** The first screen for what is stored: unlock the last used wallet, or explain one for another network. */
+function viewFor(list: WalletList | null): View {
+  const here = onThisNetwork(list);
+  if (list && !here.length) return { name: "otherNetwork", record: list.wallets[0]! };
+  if (!here.length) return { name: "welcome" };
+  return { name: "locked", record: here.find((w) => w.pub.id === list!.active) ?? here[0]!, count: here.length };
+}
+
+/** The wallet that opens on unlock (on this network). */
+function activeRecord(): StoredWallet | null {
+  const list = loadWallets();
+  const here = onThisNetwork(list);
+  return here.find((w) => w.pub.id === list!.active) ?? here[0] ?? null;
+}
+
+/** Default name for a new wallet: "Wallet", then "Wallet 2", "Wallet 3"... */
+function nextWalletName(list: WalletList | null): string {
+  const names = new Set((list?.wallets ?? []).map((w) => w.pub.name));
+  if (!names.has("Wallet")) return "Wallet";
+  for (let n = 2; ; n++) if (!names.has(`Wallet ${n}`)) return `Wallet ${n}`;
 }
 
 export type SaveProblem = "full" | "unavailable" | null;
@@ -180,7 +204,12 @@ export class WalletController {
   /** Bumped by every open, lock and remove: an open() that was overtaken stops and closes its engine. */
   private openGen = 0;
   /** Decrypted keys waiting for the authenticator code. */
-  private pending: { secrets: Secrets; timer: ReturnType<typeof setTimeout>; tries: number } | null = null;
+  private pending: { secrets: Secrets; password: string; timer: ReturnType<typeof setTimeout>; tries: number } | null = null;
+  /**
+   * The wallet password, held in memory only while unlocked (like the decrypted keys), so switching
+   * to another wallet in this browser needs no new password. Dropped on lock and removal.
+   */
+  private password: string | null = null;
   private listeners = new Set<() => void>();
   private stores: { pub: WalletPublic; requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore } | null = null;
   /**
@@ -213,18 +242,25 @@ export class WalletController {
 
   /** Reads the stored wallet and shows the matching first screen. */
   start() {
-    this.set(viewFor(loadStoredWallet()));
+    this.set(viewFor(loadWallets()));
   }
 
   /** Shows onboarding (or goes back to the welcome screen). */
   pick(mode: SetupMode | null) {
     // Only from the welcome and setup screens: a stray call must never hide a stored wallet.
     if (this.view.name !== "welcome" && this.view.name !== "onboard") return;
-    this.set(mode ? { name: "onboard", mode } : { name: "welcome" });
+    const adding = !!this.view.adding;
+    this.set(mode ? { name: "onboard", mode, adding } : { name: "welcome", adding });
   }
 
+  /** True while a wallet is unlocked: open, or while another wallet is being added. */
   get unlocked(): boolean {
-    return this.view.name === "open";
+    return this.view.name === "open" || (!!this.session && (this.view.name === "welcome" || this.view.name === "onboard") && !!this.view.adding);
+  }
+
+  /** The wallets of this network for the switcher. */
+  private summaries(activeId: string): WalletSummary[] {
+    return onThisNetwork(loadWallets()).map((w) => ({ id: w.pub.id, name: w.pub.name, kind: w.pub.kind, active: w.pub.id === activeId }));
   }
 
   /** Seals and saves the engine state if new blocks were synced since the last save. Best effort. */
@@ -332,7 +368,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "simulation" });
-        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: false });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: false, wallets: this.summaries(pub.id) });
         return;
       }
       try {
@@ -360,7 +396,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         if (isDemo) setDemoSession({ assignedLabel: pub.name, mode: "stagenet" });
-        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "stagenet", fellBack: false });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "stagenet", fellBack: false, wallets: this.summaries(pub.id) });
       } catch (e) {
         if (!isDemo || stale()) throw e;
         // Node unreachable: fall back to simulation so the demo keeps working.
@@ -368,7 +404,7 @@ export class WalletController {
         this.saveAfterNewAddress(wallet);
         this.live = wallet;
         setDemoSession({ assignedLabel: pub.name, mode: "stagenet", fellBackToSim: true });
-        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: true });
+        this.set({ name: "open", pub, wallet: this.guarded(wallet), mode: "simulation", fellBack: true, wallets: this.summaries(pub.id) });
       }
     } catch (e) {
       if (stale()) return;
@@ -385,7 +421,7 @@ export class WalletController {
    * authenticator secret; the keys then wait (two minutes at most) for submitCode().
    */
   unlock = async (password: string): Promise<"open" | "code"> => {
-    const record = loadStoredWallet();
+    const record = activeRecord();
     if (!record) throw new Error("This wallet is no longer stored in this browser.");
     this.dropPending();
     let s: Secrets;
@@ -396,16 +432,17 @@ export class WalletController {
     }
     // Ask for the code whenever the encrypted vault holds an authenticator secret.
     if (s.totp) {
-      this.pending = { secrets: s, timer: setTimeout(() => this.dropPending(), CODE_WAIT_MS), tries: 0 };
+      this.pending = { secrets: s, password, timer: setTimeout(() => this.dropPending(), CODE_WAIT_MS), tries: 0 };
       return "code";
     }
+    this.password = password;
     void this.open({ ...record.pub, totpEnabled: false }, s);
     return "open";
   };
 
   /** Second unlock step. Throws when the code is wrong, or when the keys stopped waiting. */
   submitCode = async (code: string): Promise<void> => {
-    const record = loadStoredWallet();
+    const record = activeRecord();
     const p = this.pending;
     if (!record || !p) throw new Error(CODE_EXPIRED);
     if (!p.secrets.totp || !verifyTotp(p.secrets.totp, code)) {
@@ -417,6 +454,7 @@ export class WalletController {
       throw new Error(WRONG_CODE);
     }
     this.dropPending();
+    this.password = p.password;
     void this.open({ ...record.pub, totpEnabled: true }, p.secrets);
   };
 
@@ -459,6 +497,15 @@ export class WalletController {
   onboarded = async (r: OnboardingResult) => {
     // Only from setup: saving a new vault over a stored wallet would lose it.
     if (this.view.name !== "onboard") throw new Error("Wallet setup is not open. Start again from the welcome screen.");
+    const list = loadWallets();
+    // An added wallet uses the password (and authenticator) of the wallets already here.
+    const adding = !!this.view.adding;
+    if (adding && (!this.password || !this.session)) throw new Error("The wallet locked while you were adding one. Unlock it and try again.");
+    const password = adding ? this.password! : r.password;
+    const totp = adding ? this.session!.secrets.totp : r.totp;
+    if (onThisNetwork(list).some((w) => w.pub.primaryAddress === r.primaryAddress && w.pub.kind === r.kind)) {
+      throw new Error("This wallet is already in MonkStash in this browser. Choose it from the wallet menu.");
+    }
     if (isDemo && r.origin === "create") {
       // Demo create flow: the sample words are discarded (disclosed as non-recovery).
       // Restores and watch-only imports are real, so they open exactly what the user entered.
@@ -470,15 +517,16 @@ export class WalletController {
       }
       const pub: WalletPublic = {
         id: crypto.randomUUID(), name: `Demo ${w.label}`, kind: "full", network: "stagenet",
-        primaryAddress: w.primaryAddress, restoreHeight: w.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
+        primaryAddress: w.primaryAddress, restoreHeight: w.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!totp,
       };
       try {
-        await saveWallet(pub, { seed: w.seed, privateViewKey: w.privateViewKey, totp: r.totp }, r.password);
+        await saveWallet(pub, { seed: w.seed, privateViewKey: w.privateViewKey, totp }, password, true);
       } catch (e) {
         if (e instanceof StorageUnavailableError) throw e;
         throw new Error("Could not save the wallet on this device.");
       }
-      await this.open(pub, { seed: w.seed, privateViewKey: w.privateViewKey });
+      this.password = password;
+      await this.open(pub, { seed: w.seed, privateViewKey: w.privateViewKey, totp });
       return;
     }
 
@@ -488,11 +536,11 @@ export class WalletController {
       ? await openMoveFile(r.moveFile, moveSecretOf(r.kind, secrets), { primaryAddress: r.primaryAddress, network: r.network, kind: r.kind })
       : null;
     const pub: WalletPublic = {
-      id: crypto.randomUUID(), name: "Wallet", kind: r.kind, network: r.network, primaryAddress: r.primaryAddress,
-      restoreHeight: moved ? moved.restoreHeight : r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!r.totp,
+      id: crypto.randomUUID(), name: nextWalletName(list), kind: r.kind, network: r.network, primaryAddress: r.primaryAddress,
+      restoreHeight: moved ? moved.restoreHeight : r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!totp,
     };
     try {
-      await saveWallet(pub, { seed: r.seed, privateViewKey: r.privateViewKey, totp: r.totp }, r.password);
+      await saveWallet(pub, { seed: r.seed, privateViewKey: r.privateViewKey, totp }, password, true);
     } catch (e) {
       if (e instanceof StorageUnavailableError) throw e;
       throw new Error("Could not save the wallet on this device.");
@@ -509,8 +557,76 @@ export class WalletController {
       const blob = await sealBytes(packParts([utf8.encode(moved.engine.password), moved.engine.keysData, moved.engine.cacheData]), sealSecretOf(secrets), sealContextOf(pub));
       await saveSyncState(pub.id, blob).catch(() => {});
     }
-    await this.open(pub, secrets);
+    this.password = password;
+    await this.open(pub, { ...secrets, totp });
   };
+
+  /** Starts adding another wallet: the open one is saved and closed, and setup opens without a password step. */
+  startAdd = async () => {
+    if (this.view.name !== "open" || !this.password) return;
+    await this.closeEngine();
+    this.set({ name: "welcome", adding: true });
+  };
+
+  /** Leaves "add a wallet" and opens the wallet that was open before. */
+  cancelAdd = async () => {
+    if ((this.view.name !== "welcome" && this.view.name !== "onboard") || !this.view.adding) return;
+    if (this.session) await this.open(this.session.pub, this.session.secrets);
+    else this.set(viewFor(loadWallets()));
+  };
+
+  /** Opens another wallet of this browser with the password already given. */
+  switchTo = async (id: string) => {
+    if (this.view.name !== "open" || this.view.pub.id === id || !this.password) return;
+    const rec = onThisNetwork(loadWallets()).find((w) => w.pub.id === id);
+    if (!rec) throw new Error("That wallet is no longer in this browser.");
+    let s: Secrets;
+    try {
+      s = await unlockWallet(rec, this.password);
+    } catch {
+      throw new Error("That wallet could not be opened with the current password.");
+    }
+    await this.closeEngine();
+    setActiveWallet(id);
+    await this.open({ ...rec.pub, totpEnabled: !!s.totp }, s);
+  };
+
+  /** Renames the open wallet (shown in the wallet menu). */
+  rename = async (name: string) => {
+    const clean = name.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!clean) throw new Error("Give the wallet a name.");
+    if (this.view.name !== "open") return;
+    const openId = this.view.pub.id;
+    const rec = loadWallets()?.wallets.find((w) => w.pub.id === openId);
+    if (!rec) throw new Error("This wallet is no longer stored in this browser.");
+    const next = updatePublic(rec, { name: clean }).pub;
+    if (this.session) this.session = { ...this.session, pub: next };
+    if (this.view.name === "open") this.set({ ...this.view, pub: next, wallets: this.summaries(next.id) });
+  };
+
+  /**
+   * Saves the open engine's progress (bounded) and closes it, keeping the unlocked session. Used
+   * before switching wallets or adding one.
+   */
+  private async closeEngine() {
+    this.openGen++;
+    this.dropPending();
+    await this.settleSave();
+    const running = this.live;
+    if (running?.syncing?.()) {
+      await withTimeout(running.haltSync?.() ?? Promise.resolve(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
+      await withTimeout(this.persistState(true), SAVE_IN_FLIGHT_TIMEOUT_MS);
+    } else {
+      await withTimeout(this.persistState(!this.synced), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
+    }
+    const w = this.live;
+    this.live = null;
+    this.stores = null;
+    this.sendApprovals.clear();
+    this.synced = false;
+    this.cashierOn = false;
+    await w?.close().catch(() => {});
+  }
 
   /** The engine as screens see it: identical, except that relay() needs an approval (see sendApprovals). */
   private guarded(w: LiveWallet): LiveWallet {
@@ -534,7 +650,8 @@ export class WalletController {
    * vault, even though the wallet is unlocked, before any settings action that touches secrets.
    */
   private async verifyAccess(password: string, code: string) {
-    const rec = loadStoredWallet();
+    const openId = this.session?.pub.id;
+    const rec = (openId ? loadWallets()?.wallets.find((w) => w.pub.id === openId) : null) ?? activeRecord();
     if (!rec) throw new Error("This wallet is no longer stored in this browser.");
     let s: WalletSecrets;
     try {
@@ -554,7 +671,37 @@ export class WalletController {
   private async rewriteVault(pub: WalletPublic, secrets: WalletSecrets, password: string) {
     await saveWallet(pub, secrets, password);
     if (this.session) this.session = { pub, secrets };
-    if (this.view.name === "open") this.set({ ...this.view, pub });
+    if (this.view.name === "open") this.set({ ...this.view, pub, wallets: this.summaries(pub.id) });
+  }
+
+  /**
+   * Re-encrypts every wallet in this browser: the password and the authenticator are shared by all
+   * of them. All vaults are decrypted and re-sealed first, then saved in one write, so a failure
+   * leaves every wallet as it was.
+   */
+  private async rewriteAll(password: string, newPassword: string, change: (pub: WalletPublic, s: WalletSecrets) => [WalletPublic, WalletSecrets]) {
+    const list = loadWallets();
+    if (!list) throw new Error("This wallet is no longer stored in this browser.");
+    const resealed: StoredWallet[] = [];
+    for (const rec of list.wallets) {
+      let s: WalletSecrets;
+      try {
+        s = await unlockWallet(rec, password);
+      } catch {
+        throw new Error(`"${rec.pub.name}" in this browser uses a different password, so nothing was changed.`);
+      }
+      const [pub, next] = change(rec.pub, s);
+      resealed.push(await sealWallet(pub, next, newPassword));
+    }
+    putWallets(resealed);
+    this.password = newPassword;
+    const openId = this.session?.pub.id;
+    const mine = resealed.find((r) => r.pub.id === openId);
+    if (mine && this.session) {
+      const s = await unlockWallet(mine, newPassword);
+      this.session = { pub: mine.pub, secrets: s };
+      if (this.view.name === "open") this.set({ ...this.view, pub: mine.pub, wallets: this.summaries(mine.pub.id) });
+    }
   }
 
   /** Payment requests, sealed with this wallet's secret (readable only while unlocked). */
@@ -605,8 +752,8 @@ export class WalletController {
         await this.verifyAccess(password, code);
       },
       changePassword: async (password, code, newPassword) => {
-        const { rec, s } = await this.verifyAccess(password, code);
-        await this.rewriteVault(rec.pub, s, newPassword);
+        await this.verifyAccess(password, code);
+        await this.rewriteAll(password, newPassword, (p, s) => [p, s]);
       },
       newTotp() {
         const config = createTotpSecret();
@@ -614,14 +761,16 @@ export class WalletController {
       },
       enableTotp: async (config, newCode, password) => {
         if (!verifyTotp(config, newCode)) throw new Error("That code does not match. Check the time on your phone and try the newest code.");
-        const { rec, s } = await this.verifyAccess(password, "");
-        await this.rewriteVault({ ...rec.pub, totpEnabled: true }, { ...s, totp: config }, password);
+        await this.verifyAccess(password, "");
+        await this.rewriteAll(password, password, (p, s) => [{ ...p, totpEnabled: true }, { ...s, totp: config }]);
       },
       disableTotp: async (password, code) => {
-        const { rec, s } = await this.verifyAccess(password, code);
-        const next: WalletSecrets = { ...s };
-        delete next.totp;
-        await this.rewriteVault({ ...rec.pub, totpEnabled: false }, next, password);
+        await this.verifyAccess(password, code);
+        await this.rewriteAll(password, password, (p, s) => {
+          const next: WalletSecrets = { ...s };
+          delete next.totp;
+          return [{ ...p, totpEnabled: false }, next];
+        });
       },
       watchOnlyKeys: async (password, code) => {
         const { rec, s } = await this.verifyAccess(password, code);
@@ -764,11 +913,18 @@ export class WalletController {
     this.sendApprovals.clear();
     this.synced = false;
     this.cashierOn = false;
+    this.password = null;
     await w?.close().catch(() => {});
-    this.set(viewFor(loadStoredWallet()));
+    this.set(viewFor(loadWallets()));
   }
 
+  /**
+   * Removes one wallet from this browser: the open one, or the one shown for another network. The
+   * other wallets stay; the next one opens if the wallet was unlocked.
+   */
   remove = async () => {
+    const id = this.session?.pub.id ?? (this.view.name === "otherNetwork" || this.view.name === "locked" ? this.view.record.pub.id : null);
+    if (!id) return;
     this.openGen++;
     this.dropPending();
     await this.settleSave();
@@ -778,6 +934,38 @@ export class WalletController {
     this.session = null;
     this.stores = null;
     this.sendApprovals.clear();
+    this.synced = false;
+    this.cashierOn = false;
+    await w?.close().catch(() => {});
+    const left = removeWalletRecord(id);
+    await deleteWalletData(id);
+    if (isDemo && !left) clearDemoSession();
+    const next = onThisNetwork(left).find((r) => r.pub.id === left!.active) ?? onThisNetwork(left)[0];
+    if (next && this.password) {
+      try {
+        const s = await unlockWallet(next, this.password);
+        await this.open({ ...next.pub, totpEnabled: !!s.totp }, s);
+        return;
+      } catch {
+        /* falls through to the unlock screen */
+      }
+    }
+    this.password = null;
+    this.set(viewFor(left));
+  };
+
+  /** Removes every wallet from this browser (a forgotten password: they all share it). */
+  forgetAll = async () => {
+    this.openGen++;
+    this.dropPending();
+    await this.settleSave();
+    this.stateGen++;
+    const w = this.live;
+    this.live = null;
+    this.session = null;
+    this.stores = null;
+    this.sendApprovals.clear();
+    this.password = null;
     await w?.close().catch(() => {});
     removeWallet();
     await clearSyncStates();

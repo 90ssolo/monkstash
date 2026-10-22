@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Credentials, LoadMoveFile, NodeSettings, RescanFrom, RevealWords, SaveMoveFile, type SettingsActions } from "./WalletSettings";
+import { WalletSwitcher } from "./WalletSwitcher";
+import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
 import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, type WalletPublic } from "@quietmint/wallet-core";
@@ -91,7 +93,15 @@ function NavIcon({ s }: { s: Section }) {
 /** The web wallet's choice to lock after the tab is left; the extension has no such toggle. */
 export interface LockOnLeave { on: boolean; onChange: (on: boolean) => void }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave }) {
+/** The wallets in this browser and what the wallet menu can do with them. */
+export interface WalletMenu {
+  wallets: WalletSummary[];
+  onSwitch: (id: string) => Promise<void>;
+  onAdd: () => void;
+  onRename: (name: string) => Promise<void>;
+}
+
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave, walletMenu }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave; walletMenu?: WalletMenu }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
@@ -300,6 +310,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
         <div className={styles.content} ref={mainRef}>
           <h1 className="visually-hidden">Your MonkStash wallet</h1>
           <div className={styles.strip}>
+            {walletMenu ? <WalletSwitcher current={pub.name} wallets={walletMenu.wallets} onSwitch={walletMenu.onSwitch} onAdd={walletMenu.onAdd} /> : null}
             {/* Only when it tells you something: a test network, or a watch-only wallet. */}
             {pub.network !== "mainnet" || pub.kind === "view-only" ? (
               <span className={styles.heroChip}>{[pub.kind === "view-only" ? "Watch-only" : null, pub.network !== "mainnet" ? pub.network : null].filter(Boolean).join(", ")}</span>
@@ -477,6 +488,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
             <div className={styles.setGrid}>
               <section className={styles.setBlock} aria-labelledby="set-details">
                 <h3 id="set-details">This wallet</h3>
+                {walletMenu ? <RenameWallet name={pub.name} onRename={walletMenu.onRename} /> : null}
                 <dl className={styles.facts}>
                   <dt>Type</dt><dd>{pub.kind === "view-only" ? "Watch-only" : "Full wallet"}</dd>
                   <dt>Network</dt><dd>{pub.network}</dd>
@@ -564,6 +576,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
               <section className={`${styles.setBlock} ${styles.setDanger}`} aria-labelledby="set-remove">
                 <h3 id="set-remove">Remove from this browser</h3>
+                {walletMenu && walletMenu.wallets.length > 1 ? (
+                  <p className="small muted" style={{ margin: "0 0 var(--s-2)" }}>Removes only &quot;{pub.name}&quot;. Your other wallets in this browser stay.</p>
+                ) : null}
                 <details className={styles.danger}>
                   <summary>Remove wallet</summary>
                   <RemoveWallet onRemove={onRemove} settings={settings} kind={pub.kind} />
@@ -1400,6 +1415,35 @@ function AddressCheck({ address }: { address: string }) {
       <span><mark>{head}</mark>{" "}{middle.join(" ")}{" "}<mark>{tail}</mark></span>
       <span className={styles.addrCheckHint}>Check the highlighted start and end against where you copied it from.</span>
     </span>
+  );
+}
+
+/** The wallet's name in the wallet menu. */
+function RenameWallet({ name, onRename }: { name: string; onRename: (name: string) => Promise<void> }) {
+  const [value, setValue] = useState(name);
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setValue(name); }, [name]);
+  return (
+    <form className={styles.renameRow} onSubmit={async (e) => {
+      e.preventDefault();
+      setError(null);
+      setState("saving");
+      try {
+        await onRename(value);
+        setState("saved");
+      } catch (err) {
+        setError((err as Error).message);
+        setState("idle");
+      }
+    }}>
+      <div className="field" style={{ margin: 0, flex: 1, minWidth: 0 }}>
+        <label htmlFor="wallet-name">Wallet name</label>
+        <input id="wallet-name" className="input" value={value} maxLength={40} autoComplete="off" onChange={(e) => { setValue(e.target.value); setState("idle"); }} />
+      </div>
+      <button type="submit" className="btn btn-secondary btn-sm" disabled={state === "saving" || !value.trim() || value.trim() === name}>{state === "saved" ? "Saved" : "Rename"}</button>
+      {error ? <p className="error small" role="alert" style={{ flexBasis: "100%", margin: 0 }}>{error}</p> : null}
+    </form>
   );
 }
 

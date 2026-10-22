@@ -14,7 +14,7 @@ import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS, AUTO_LOCK_SCAN_MAX_MS, readLock
 import { fetchTestWallets } from "@/lib/wallet/testWallets";
 import { isDemo } from "@/lib/wallet/demo";
 import { BrandMark } from "@/components/BrandMark";
-import { Dashboard, type LockOnLeave } from "./Dashboard";
+import { Dashboard, type LockOnLeave, type WalletMenu } from "./Dashboard";
 import { Loading, Onboarding, Welcome } from "./Onboarding";
 import { Stage } from "./Stage";
 import { ArtEngine, ArtLock } from "./WalletArt";
@@ -50,7 +50,8 @@ export function WalletApp() {
   // after AUTO_LOCK_IDLE_MS without interaction, or once the tab has been hidden for
   // AUTO_LOCK_HIDDEN_MS. Uses timestamps, not a single long timer, because browsers throttle
   // timers in background tabs; the check also runs the moment the tab becomes visible again.
-  const isOpen = view.name === "open";
+  // Unlocked: a wallet is open, or another one is being added (the keys are still in memory).
+  const isOpen = view.name === "open" || ((view.name === "welcome" || view.name === "onboard") && !!view.adding);
   useEffect(() => {
     if (!isOpen) return;
     // Elapsed time comes from performance.now(), which a clock change cannot move.
@@ -149,13 +150,13 @@ export function WalletApp() {
             {view.name === "welcome" ? (
               <>
                 {isDemo ? <DemoIntro walletCount={testWalletCount} /> : null}
-                <Welcome onPick={(mode) => controller.pick(mode)} />
+                <Welcome onPick={(mode) => controller.pick(mode)} adding={view.adding} onCancel={() => void controller.cancelAdd()} />
               </>
             ) : null}
             {view.name === "onboard" ? (
-              <Onboarding mode={view.mode} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} onSwitchMode={(m) => controller.pick(m)} />
+              <Onboarding mode={view.mode} adding={view.adding} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} onSwitchMode={(m) => controller.pick(m)} />
             ) : null}
-            {view.name === "locked" ? <Unlock record={view.record} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.remove} /> : null}
+            {view.name === "locked" ? <Unlock record={view.record} count={view.count} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.forgetAll} /> : null}
             {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={controller.remove} /> : null}
             {view.name === "opening" ? <Opening /> : null}
             {view.name === "open" && saveProblem ? <SaveProblemNotice problem={saveProblem} /> : null}
@@ -172,6 +173,7 @@ export function WalletApp() {
 
 function OpenDashboard({ view, controller, onCashierChange, lockOnLeave }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void; lockOnLeave: LockOnLeave }) {
   const stores = controller.openStores();
+  const walletMenu: WalletMenu = { wallets: view.wallets, onSwitch: controller.switchTo, onAdd: () => void controller.startAdd(), onRename: controller.rename };
   return (
     <Dashboard
       pub={view.pub}
@@ -185,6 +187,7 @@ function OpenDashboard({ view, controller, onCashierChange, lockOnLeave }: { vie
       contacts={stores.contacts}
       onCashierChange={onCashierChange}
       lockOnLeave={lockOnLeave}
+      walletMenu={walletMenu}
       demo={isDemo ? { mode: view.mode, fellBack: view.fellBack, assignedLabel: view.pub.name, onSwitchMode: controller.switchMode } : undefined}
     />
   );
@@ -234,7 +237,7 @@ function DemoIntro({ walletCount }: { walletCount: number }) {
   );
 }
 
-export function Unlock({ record, unlock, submitCode, onForget, warm = warmEngine }: { record: Pick<StoredWallet, "pub">; unlock: (pw: string) => Promise<"open" | "code">; submitCode: (code: string) => Promise<void>; onForget: () => void; warm?: () => void | Promise<void> }) {
+export function Unlock({ record, count = 1, unlock, submitCode, onForget, warm = warmEngine }: { record: Pick<StoredWallet, "pub">; count?: number; unlock: (pw: string) => Promise<"open" | "code">; submitCode: (code: string) => Promise<void>; onForget: () => void; warm?: () => void | Promise<void> }) {
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -284,7 +287,8 @@ export function Unlock({ record, unlock, submitCode, onForget, warm = warmEngine
       current={needsCode ? 1 : 0}
     >
       <form onSubmit={submit}>
-        <h1 className={styles.title}>{needsCode ? "Enter your code" : "Unlock wallet"}</h1>
+        <h1 className={styles.title}>{needsCode ? "Enter your code" : count > 1 ? `Unlock your ${count} wallets` : "Unlock wallet"}</h1>
+        {count > 1 ? <p className="small muted">Opens with <strong>{record.pub.name}</strong>. Switch wallets from the menu at the top.</p> : null}
         <p className="mono small muted" style={{ wordBreak: "break-all" }}>{record.pub.primaryAddress}</p>
         {!needsCode ? (
           <div className="field">
@@ -315,7 +319,7 @@ export function Unlock({ record, unlock, submitCode, onForget, warm = warmEngine
       ) : null}
       <details className={styles.danger} style={{ marginTop: "var(--s-5)" }}>
         <summary>Forgot password?</summary>
-        <ForgotPassword kind={record.pub.kind} onForget={onForget} />
+        <ForgotPassword kind={record.pub.kind} count={count} onForget={onForget} />
       </details>
     </Stage>
   );
@@ -362,16 +366,17 @@ export function OtherNetwork({ record, onRemove }: { record: Pick<StoredWallet, 
   );
 }
 
-function ForgotPassword({ kind, onForget }: { kind: WalletPublic["kind"]; onForget: () => void }) {
+function ForgotPassword({ kind, count = 1, onForget }: { kind: WalletPublic["kind"]; count?: number; onForget: () => void }) {
   const [text, setText] = useState("");
   return (
     <form style={{ paddingBottom: "var(--s-4)" }} onSubmit={(e) => { e.preventDefault(); if (text === "REMOVE") onForget(); }}>
       <p className="small muted">
-        Your password cannot be reset. You can remove this wallet from the browser and bring it back with{" "}
-        {kind === "view-only" ? "its address and private view key" : "your 25 recovery words"}.
+        Your password cannot be reset. You can remove {count > 1 ? `all ${count} wallets` : "this wallet"} from the browser and bring{" "}
+        {count > 1 ? "each one back with its recovery words (or address and view key)" : <>it back with {kind === "view-only" ? "its address and private view key" : "your 25 recovery words"}</>}.
+        {count > 1 ? " They share one password, so they are removed together." : ""}
       </p>
       <p className="small muted">
-        <strong>Without {kind === "view-only" ? "the address and view key" : "your recovery words"}, removing it loses this wallet for good.</strong>{" "}
+        <strong>{count > 1 ? "Without each wallet's recovery words (or address and view key), removing loses it for good." : <>Without {kind === "view-only" ? "the address and view key" : "your recovery words"}, removing it loses this wallet for good.</>}</strong>{" "}
         If you might still remember the password, keep the wallet: this encrypted copy is the only way to open it with that password later.
       </p>
       <p className="small muted" id="forget-list" style={{ marginBottom: "var(--s-2)" }}>Removing deletes everything this wallet stored in this browser:</p>
@@ -390,7 +395,7 @@ function ForgotPassword({ kind, onForget }: { kind: WalletPublic["kind"]; onForg
         <label htmlFor="forget-confirm">Type REMOVE to confirm</label>
         <input id="forget-confirm" className="input" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
       </div>
-      <button type="submit" className="btn btn-danger btn-sm" disabled={text !== "REMOVE"}>Remove wallet from this browser</button>
+      <button type="submit" className="btn btn-danger btn-sm" disabled={text !== "REMOVE"}>{count > 1 ? `Remove all ${count} wallets from this browser` : "Remove wallet from this browser"}</button>
     </form>
   );
 }

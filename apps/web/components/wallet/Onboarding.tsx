@@ -52,7 +52,7 @@ function storageWorks(): boolean {
  * The setup choices. `moveFirst` lists "I already use MonkStash" first, for the browser extension:
  * most people installing it already use the web wallet.
  */
-export function Welcome({ onPick, moveFirst = false }: { onPick: (m: Mode) => void; moveFirst?: boolean }) {
+export function Welcome({ onPick, moveFirst = false, adding = false, onCancel }: { onPick: (m: Mode) => void; moveFirst?: boolean; adding?: boolean; onCancel?: () => void }) {
   // Checked before anything is typed, so nobody writes down words for a wallet that cannot be saved.
   const [blocked, setBlocked] = useState(false);
   useEffect(() => { setBlocked(!storageWorks()); }, []);
@@ -65,8 +65,12 @@ export function Welcome({ onPick, moveFirst = false }: { onPick: (m: Mode) => vo
       steps={FLOW_STEPS.create}
       current={0}
     >
-      <h1 className={styles.title}>Set up your wallet</h1>
-      <p className="muted">Everything happens in this browser. Nothing you enter here is sent to MonkStash.</p>
+      <h1 className={styles.title}>{adding ? "Add a wallet" : "Set up your wallet"}</h1>
+      <p className="muted">
+        {adding
+          ? "It joins the wallets in this browser and opens with the same password. Everything happens in this browser."
+          : "Everything happens in this browser. Nothing you enter here is sent to MonkStash."}
+      </p>
       {blocked ? (
         <div className="notice notice-warn" role="alert" style={{ marginBottom: "var(--s-4)" }}>
           <span>
@@ -103,6 +107,9 @@ export function Welcome({ onPick, moveFirst = false }: { onPick: (m: Mode) => vo
         </button>
         {moveFirst ? null : <MoveChoice disabled={blocked} onPick={onPick} />}
       </div>
+      {adding && onCancel ? (
+        <button type="button" className="btn btn-ghost" style={{ marginTop: "var(--s-4)" }} onClick={onCancel}>Back to my wallet</button>
+      ) : null}
       <div className="notice notice-warn" style={{ marginTop: "var(--s-5)" }}>
         <span>
           <strong>Early preview.</strong> The wallet works with real XMR. Use small amounts until our public security review
@@ -126,8 +133,10 @@ function MoveChoice({ disabled, onPick }: { disabled: boolean; onPick: (m: Mode)
   );
 }
 
-export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchMode }: {
+export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchMode, adding = false }: {
   mode: Mode; testWallets?: TestWallet[]; onCancel: () => void; onDone: (r: OnboardingResult) => Promise<void>;
+  /** Adding a wallet next to others: the password and authenticator of those are used, so there is no step for them. */
+  adding?: boolean;
   /** Leaves this path for another one (from "move" to a plain restore when there is no move file). */
   onSwitchMode?: (m: Mode) => void;
 }) {
@@ -146,18 +155,23 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
   const finishing = useRef(false);
 
   async function finish(totp: TotpConfig | undefined) {
-    if (!base || !password || finishing.current) return;
+    if (!base || (!password && !adding) || finishing.current) return;
     finishing.current = true;
     setBusy(true);
     setError(null);
     try {
-      await onDone({ ...base, password, totp });
+      await onDone({ ...base, password: password ?? "", totp });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
       finishing.current = false;
     }
   }
+
+  // Adding: the wallet is saved as soon as its words or keys are in (no password step).
+  useEffect(() => {
+    if (adding && base) void finish(undefined);
+  }, [adding, base]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Back goes one step back, not to the start. In create mode, going back from the password step
   // returns to the same recovery words (kept above), so the paper copy stays valid.
@@ -190,8 +204,8 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
     }
   }
 
-  const stepCount = mode === "create" || mode === "move" ? 4 : 3;
-  const step = mode === "move" && !move ? 1 : !base ? stepCount - 2 : !password ? stepCount - 1 : stepCount;
+  const stepCount = adding ? (mode === "move" ? 2 : 1) : mode === "create" || mode === "move" ? 4 : 3;
+  const step = mode === "move" && !move ? 1 : adding ? stepCount : !base ? stepCount - 2 : !password ? stepCount - 1 : stepCount;
   const keysPhase: Phase = mode === "restore" || (mode === "move" && move?.header.kind === "full") ? "restore" : "watch";
 
   if (!base && mode === "create") return <CreateSteps keys={createKeys} onKeys={setCreateKeys} onReady={setBase} onCancel={onCancel} />;
@@ -201,7 +215,7 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
       mode={mode}
       step={step}
       stepCount={stepCount}
-      phase={mode === "move" && !move ? "move" : !base ? keysPhase : !password ? "password" : "totp"}
+      phase={mode === "move" && !move ? "move" : !base || adding ? keysPhase : !password ? "password" : "totp"}
       onCancel={back}
     >
       {mode === "move" && !move ? (
@@ -210,6 +224,11 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
         keysPhase === "restore"
           ? <RestoreSeed onReady={acceptBase} testWallets={testWallets} draft={restoreDraft} setDraft={setRestoreDraft} fromMove={move?.name} />
           : <ViewOnly onReady={acceptBase} draft={watchDraft} setDraft={setWatchDraft} fromMove={move?.name} />
+      ) : adding ? (
+        <div role="status">
+          <p className="muted">{busy ? "Adding the wallet and opening it…" : error ? null : "Adding the wallet…"}</p>
+          {error ? <p className="error small" role="alert">{error} Use Back to change the words or keys.</p> : null}
+        </div>
       ) : !password ? (
         <PasswordStep onDone={setPassword} />
       ) : (

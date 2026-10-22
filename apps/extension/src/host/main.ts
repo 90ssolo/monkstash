@@ -53,8 +53,9 @@ function broadcast(msg: ToView) {
 
 /** The controller's view without the live wallet object or the encrypted vault. */
 function publicView(v: View): HostState["view"] {
-  if (v.name === "open") return { name: "open", pub: v.pub, mode: v.mode, fellBack: v.fellBack };
-  if (v.name === "locked" || v.name === "otherNetwork") return { name: v.name, record: { pub: v.record.pub } };
+  if (v.name === "open") return { name: "open", pub: v.pub, mode: v.mode, fellBack: v.fellBack, wallets: v.wallets };
+  if (v.name === "locked") return { name: v.name, record: { pub: v.record.pub }, count: v.count };
+  if (v.name === "otherNetwork") return { name: v.name, record: { pub: v.record.pub } };
   return { ...v };
 }
 
@@ -163,6 +164,11 @@ async function handle(target: string, method: string, args: unknown[], seq?: num
       case "submitCode": return controller.submitCode(args[0] as string);
       case "lock": return controller.lock();
       case "remove": return controller.remove();
+      case "forgetAll": return controller.forgetAll();
+      case "startAdd": return controller.startAdd();
+      case "cancelAdd": return controller.cancelAdd();
+      case "switchTo": return controller.switchTo(String(args[0]));
+      case "rename": return controller.rename(String(args[0]));
       case "pick": return controller.pick(args[0] as Parameters<WalletController["pick"]>[0]);
       case "onboarded": return controller.onboarded(args[0] as Parameters<WalletController["onboarded"]>[0]);
       case "onSynced": return controller.onSynced();

@@ -85,9 +85,18 @@ export async function deleteSyncState(walletId: string): Promise<void> {
   await run("readwrite", (s) => s.delete(walletId));
 }
 
-/** Removes every saved state (used when the wallet is removed from this browser). */
+/** Removes every saved state (used when every wallet is removed from this browser). */
 export async function clearSyncStates(): Promise<void> {
   await run("readwrite", (s) => s.clear());
+}
+
+/** The sealed lists kept per wallet (keys are `${name}|${walletId}`, see lib/wallet/session.ts). */
+const WALLET_LISTS = ["addresses", "requests", "contacts", "cashier"] as const;
+
+/** Removes one wallet's scan progress and sealed lists; other wallets' data stays. */
+export async function deleteWalletData(walletId: string): Promise<void> {
+  await run("readwrite", (s) => s.delete(walletId));
+  for (const name of WALLET_LISTS) await run("readwrite", (s) => s.delete(`${name}|${walletId}`));
 }
 
 /** Any other sealed per-wallet blob (for example the payment requests list), by key. */
