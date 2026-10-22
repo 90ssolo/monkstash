@@ -21,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="License: BSD-3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-1b2a22"></a>
   <a href="https://github.com/90ssolo/monkstash/actions/workflows/reproducible-builds.yml"><img alt="Reproducible builds" src="https://github.com/90ssolo/monkstash/actions/workflows/reproducible-builds.yml/badge.svg"></a>
-  <a href="https://github.com/90ssolo/monkstash/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/90ssolo/monkstash?include_prereleases&label=extension&color=f26822"></a>
+  <a href="https://github.com/90ssolo/monkstash/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/90ssolo/monkstash?include_prereleases&label=release&color=f26822"></a>
   <img alt="No accounts, no tracking" src="https://img.shields.io/badge/accounts-none-215a3a">
 </p>
 
@@ -42,7 +42,7 @@
 
 ## 🧰 What you can do
 
-| | |
+| Feature | What it does |
 |---|---|
 | 🆕 **Create or restore** | New wallet, or restore from 25 words, a 13-word MyMonero phrase or a 12-word Exodus phrase, all converted in your browser |
 | 👀 **Watch-only wallets** | Follow a wallet with its view key: sees payments, can never spend |
