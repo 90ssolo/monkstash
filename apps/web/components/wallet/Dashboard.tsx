@@ -1439,7 +1439,7 @@ function RenameWallet({ name, onRename }: { name: string; onRename: (name: strin
     }}>
       <div className="field" style={{ margin: 0, flex: 1, minWidth: 0 }}>
         <label htmlFor="wallet-name">Wallet name</label>
-        <input id="wallet-name" className="input" value={value} maxLength={40} autoComplete="off" onChange={(e) => { setValue(e.target.value); setState("idle"); }} />
+        <input id="wallet-name" className="input" value={value} maxLength={24} autoComplete="off" onChange={(e) => { setValue(e.target.value); setState("idle"); }} />
       </div>
       <button type="submit" className="btn btn-secondary btn-sm" disabled={state === "saving" || !value.trim() || value.trim() === name}>{state === "saved" ? "Saved" : "Rename"}</button>
       {error ? <p className="error small" role="alert" style={{ flexBasis: "100%", margin: 0 }}>{error}</p> : null}

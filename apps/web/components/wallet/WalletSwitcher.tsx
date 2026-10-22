@@ -45,8 +45,9 @@ export function WalletSwitcher({ current, wallets, onSwitch, onAdd }: {
 
   return (
     <div className={styles.switcher} ref={box}>
-      <button ref={button} type="button" className={styles.switcherBtn} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((o) => !o)}>
-        <span className={styles.switcherName}>{current}</span>
+      <button ref={button} type="button" className={styles.switcherBtn} aria-expanded={open} aria-controls={menuId} title="Switch wallet or add one" onClick={() => setOpen((o) => !o)}>
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"><rect x="1.75" y="3.75" width="12.5" height="9.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M10 8.5h4.25M1.75 6.25h9.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+        <MiddleTrim className={styles.switcherName} text={current} />
         <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         <span className="visually-hidden">, switch wallet</span>
       </button>
@@ -58,7 +59,7 @@ export function WalletSwitcher({ current, wallets, onSwitch, onAdd }: {
               <li key={w.id}>
                 <button type="button" className={styles.switcherItem} aria-current={w.active ? "true" : undefined} disabled={w.active || busy !== null} onClick={() => void pick(w.id)}>
                   <span className={styles.switcherDot} aria-hidden="true">{w.active ? "✓" : ""}</span>
-                  <span className={styles.switcherItemName}>{w.name}</span>
+                  <MiddleTrim className={styles.switcherItemName} text={w.name} />
                   {w.kind === "view-only" ? <span className={styles.switcherTag}>Watch-only</span> : null}
                   {busy === w.id ? <span className="small muted">Opening…</span> : null}
                 </button>
@@ -72,5 +73,16 @@ export function WalletSwitcher({ current, wallets, onSwitch, onAdd }: {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** A name trimmed in the middle when space runs out: the start shrinks to "…", the last few characters always show. */
+function MiddleTrim({ text, className }: { text: string; className?: string }) {
+  const keep = text.length > 12 ? 5 : 0;
+  return (
+    <span className={`${className ?? ""} ${styles.trim}`} title={text}>
+      <span className={styles.trimHead}>{keep ? text.slice(0, -keep) : text}</span>
+      {keep ? <span className={styles.trimTail}>{text.slice(-keep).trimStart()}</span> : null}
+    </span>
   );
 }

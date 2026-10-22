@@ -430,8 +430,11 @@
 .switcherBtn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 36px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: var(--r-1); background: transparent; color: #fff; font: inherit; font-weight: 650; font-size: var(--step--1); cursor: pointer; }
 .switcherBtn:hover { background: rgba(255, 255, 255, 0.1); }
 .switcherBtn:focus-visible { outline: 2px solid var(--clay-dim); outline-offset: 2px; }
-.switcherName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16ch; }
-.switcherMenu { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(300px, calc(100vw - 32px)); padding: var(--s-2) 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r-2); box-shadow: 0 12px 32px rgba(27, 42, 34, 0.18); }
+.switcherName { max-width: 18ch; }
+.trim { display: inline-flex; min-width: 0; white-space: nowrap; }
+.trimHead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.trimTail { flex: none; white-space: pre; }
+.switcherMenu { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(300px, calc(100vw - 64px)); padding: var(--s-2) 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r-2); box-shadow: 0 12px 32px rgba(27, 42, 34, 0.18); }
 .switcherMenu ul { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
 .switcherHead { margin: 0; padding: var(--s-1) var(--s-3) var(--s-2); font-size: var(--step--1); font-weight: 650; color: var(--ink-3); }
 .switcherItem, .switcherAdd { display: flex; align-items: center; gap: var(--s-2); width: 100%; min-height: 44px; padding: var(--s-2) var(--s-3); border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
@@ -440,7 +443,7 @@
 .switcherItem[aria-current] { cursor: default; font-weight: 650; }
 .switcherItem[disabled]:not([aria-current]) { opacity: 0.6; }
 .switcherDot { width: 1.1em; color: var(--forest); font-weight: 700; flex: none; }
-.switcherItemName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switcherItemName { flex: 1; }
 .switcherTag { flex: none; font-size: 0.75rem; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 6px; }
 .renameRow { display: flex; align-items: flex-end; gap: var(--s-2); flex-wrap: wrap; margin: 0 0 var(--s-4); }
 .switcherAdd { border-top: 1px solid var(--line); margin-top: var(--s-1); color: var(--forest); font-weight: 650; }

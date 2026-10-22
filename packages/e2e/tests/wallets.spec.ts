@@ -26,7 +26,7 @@ test("several wallets: add, switch, rename, one password, remove one", async ({ 
   await openWallet(page);
   await restore(page, wallet("Test A"));
   await dashboard(page);
-  await expect(menuButton(page)).toContainText("Wallet");
+  await expect(menuButton(page)).toContainText("Wallet 1");
 
   // Add a second wallet: no password or authenticator step, it opens straight away.
   await addByWords(page, wallet("Test B").seed);
@@ -49,9 +49,9 @@ test("several wallets: add, switch, rename, one password, remove one", async ({ 
 
   // Switch without a password.
   await menuButton(page).click();
-  await expect(page.getByRole("button", { name: /^✓?\s*Wallet$/ })).toBeVisible();
-  await page.getByRole("button", { name: /^\s*Wallet\s*$/ }).click();
-  await opened(page, "Wallet");
+  await expect(page.getByRole("button", { name: /^✓?\s*Wallet 1$/ })).toBeVisible();
+  await page.getByRole("button", { name: /^\s*Wallet 1\s*$/ }).click();
+  await opened(page, "Wallet 1");
   await settings(page);
   await expect(shownAddress(page)).toHaveAttribute("title", wallet("Test A").primaryAddress);
 

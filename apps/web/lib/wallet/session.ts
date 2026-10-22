@@ -170,11 +170,10 @@ function activeRecord(): StoredWallet | null {
   return here.find((w) => w.pub.id === list!.active) ?? here[0] ?? null;
 }
 
-/** Default name for a new wallet: "Wallet", then "Wallet 2", "Wallet 3"... */
+/** Default name for a new wallet: "Wallet 1", "Wallet 2"... (earlier versions named the first one "Wallet", which counts as 1). */
 function nextWalletName(list: WalletList | null): string {
-  const names = new Set((list?.wallets ?? []).map((w) => w.pub.name));
-  if (!names.has("Wallet")) return "Wallet";
-  for (let n = 2; ; n++) if (!names.has(`Wallet ${n}`)) return `Wallet ${n}`;
+  const names = new Set((list?.wallets ?? []).map((w) => (w.pub.name === "Wallet" ? "Wallet 1" : w.pub.name)));
+  for (let n = 1; ; n++) if (!names.has(`Wallet ${n}`)) return `Wallet ${n}`;
 }
 
 export type SaveProblem = "full" | "unavailable" | null;
@@ -608,7 +607,7 @@ export class WalletController {
 
   /** Renames the open wallet (shown in the wallet menu). */
   rename = async (name: string) => {
-    const clean = name.replace(/\s+/g, " ").trim().slice(0, 40);
+    const clean = name.replace(/\s+/g, " ").trim().slice(0, 24);
     if (!clean) throw new Error("Give the wallet a name.");
     if (this.view.name !== "open") return;
     const openId = this.view.pub.id;
