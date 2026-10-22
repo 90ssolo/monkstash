@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   checkAddressFormat, checkMoneroWords, estimateHeightAt, exodusPhraseProblem, isHexKey, MoveFileError, MyMoneroPhraseError, openMoveFile, readMoveHeader,
   type MoveHeader, type NetworkType, type SeedCheck, type TotpConfig, type WalletKind,
@@ -208,9 +208,10 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
   const step = mode === "move" && !move ? 1 : adding ? stepCount : !base ? stepCount - 2 : !password ? stepCount - 1 : stepCount;
   const keysPhase: Phase = mode === "restore" || (mode === "move" && move?.header.kind === "full") ? "restore" : "watch";
 
-  if (!base && mode === "create") return <CreateSteps keys={createKeys} onKeys={setCreateKeys} onReady={setBase} onCancel={onCancel} />;
+  if (!base && mode === "create") return <AddingContext.Provider value={adding}><CreateSteps keys={createKeys} onKeys={setCreateKeys} onReady={setBase} onCancel={onCancel} /></AddingContext.Provider>;
 
   return (
+    <AddingContext.Provider value={adding}>
     <OnboardFrame
       mode={mode}
       step={step}
@@ -226,7 +227,7 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
           : <ViewOnly onReady={acceptBase} draft={watchDraft} setDraft={setWatchDraft} fromMove={move?.name} />
       ) : adding ? (
         <div role="status">
-          <p className="muted">{busy ? "Adding the wallet and opening it…" : error ? null : "Adding the wallet…"}</p>
+          <p className="muted">{error ? null : "Adding the wallet and opening it. If the other wallet was still scanning, this can take a few seconds while it saves."}</p>
           {error ? <p className="error small" role="alert">{error} Use Back to change the words or keys.</p> : null}
         </div>
       ) : !password ? (
@@ -239,6 +240,7 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
         </>
       )}
     </OnboardFrame>
+    </AddingContext.Provider>
   );
 }
 
@@ -250,6 +252,10 @@ const FLOW_STEPS: Record<Mode, string[]> = {
   "view-only": ["Choose", "Address and key", "Password", "Authenticator"],
   move: ["Choose", "Move file", "Words or keys", "Password", "Authenticator"],
 };
+
+/** True while a wallet is added next to others: its password and authenticator steps do not apply. */
+const AddingContext = createContext(false);
+const SHARED_STEPS = new Set(["Password", "Authenticator"]);
 
 const FLOW_TITLE: Record<Mode, string> = { create: "Create a new wallet", restore: "Restore a wallet", "view-only": "Add a watch-only wallet", move: "Move a MonkStash wallet here" };
 
@@ -266,7 +272,9 @@ function OnboardFrame({ mode, step, stepCount, phase, focusKey = "", onCancel, c
   useEffect(() => {
     bodyRef.current?.querySelector<HTMLElement>("h2[tabindex]")?.focus();
   }, [phase, step, focusKey]);
-  const stepName = FLOW_STEPS[mode][step] ?? "";
+  const adding = useContext(AddingContext);
+  const steps = adding ? FLOW_STEPS[mode].filter((n) => !SHARED_STEPS.has(n)) : FLOW_STEPS[mode];
+  const stepName = steps[step] ?? "";
   const copy: Record<Phase, { kicker: string; sizzle: React.ReactNode; art: React.ReactNode; tone: "paper" | "ink" }> = {
     words: { kicker: "Recovery words", sizzle: <>These words are the <mark>only key</mark> to your money. Pen, paper, somewhere safe.</>, art: <ArtWords />, tone: "paper" },
     confirm: { kicker: "Check your backup", sizzle: <>A quick check that the <mark>paper copy</mark> is right, before anything gets locked.</>, art: <ArtConfirm />, tone: "paper" },
@@ -278,7 +286,7 @@ function OnboardFrame({ mode, step, stepCount, phase, focusKey = "", onCancel, c
   };
   const c = copy[phase];
   return (
-    <Stage tone={c.tone} kicker={c.kicker} sizzle={c.sizzle} art={c.art} steps={FLOW_STEPS[mode]} current={step}>
+    <Stage tone={c.tone} kicker={c.kicker} sizzle={c.sizzle} art={c.art} steps={steps} current={step}>
       <h1 className="visually-hidden">{FLOW_TITLE[mode]}, step {step + 1} of {stepCount + 1}: {stepName}</h1>
       <div className={styles.progressRow}>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}><span aria-hidden="true">←</span> Back</button>

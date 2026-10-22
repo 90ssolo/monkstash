@@ -179,6 +179,8 @@ function nextWalletName(list: WalletList | null): string {
 
 export type SaveProblem = "full" | "unavailable" | null;
 
+/** Longest wait for an engine to close when switching or adding wallets. */
+const ENGINE_CLOSE_TIMEOUT_MS = 10_000;
 /** How long a password approval for a send stays valid. */
 const SEND_APPROVAL_MS = 2 * 60 * 1000;
 export const SEND_NEEDS_APPROVAL = "Confirm this payment with your wallet password first.";
@@ -502,6 +504,8 @@ export class WalletController {
     const adding = !!this.view.adding;
     if (adding && (!this.password || !this.session)) throw new Error("The wallet locked while you were adding one. Unlock it and try again.");
     const password = adding ? this.password! : r.password;
+    // The previous wallet finishes saving and closing first (started by startAdd).
+    if (adding && this.closing) await this.closing;
     const totp = adding ? this.session!.secrets.totp : r.totp;
     if (onThisNetwork(list).some((w) => w.pub.primaryAddress === r.primaryAddress && w.pub.kind === r.kind)) {
       throw new Error("This wallet is already in MonkStash in this browser. Choose it from the wallet menu.");
@@ -561,16 +565,25 @@ export class WalletController {
     await this.open(pub, { ...secrets, totp });
   };
 
-  /** Starts adding another wallet: the open one is saved and closed, and setup opens without a password step. */
+  /** The open wallet being saved and closed in the background (while "add a wallet" shows). */
+  private closing: Promise<void> | null = null;
+
+  /**
+   * Starts adding another wallet. Setup shows at once, without a password step; meanwhile the open
+   * wallet saves its scan progress and closes (that can take a few seconds during a first scan).
+   */
   startAdd = async () => {
     if (this.view.name !== "open" || !this.password) return;
-    await this.closeEngine();
     this.set({ name: "welcome", adding: true });
+    const closing = this.closeEngine().catch(() => {});
+    this.closing = closing;
+    void closing.finally(() => { if (this.closing === closing) this.closing = null; });
   };
 
   /** Leaves "add a wallet" and opens the wallet that was open before. */
   cancelAdd = async () => {
     if ((this.view.name !== "welcome" && this.view.name !== "onboard") || !this.view.adding) return;
+    if (this.closing) await this.closing;
     if (this.session) await this.open(this.session.pub, this.session.secrets);
     else this.set(viewFor(loadWallets()));
   };
@@ -586,6 +599,8 @@ export class WalletController {
     } catch {
       throw new Error("That wallet could not be opened with the current password.");
     }
+    // The other wallet's opening screen shows at once, while this one saves and closes.
+    this.set({ name: "opening", pub: rec.pub });
     await this.closeEngine();
     setActiveWallet(id);
     await this.open({ ...rec.pub, totpEnabled: !!s.totp }, s);
@@ -615,7 +630,9 @@ export class WalletController {
     const running = this.live;
     if (running?.syncing?.()) {
       await withTimeout(running.haltSync?.() ?? Promise.resolve(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      await withTimeout(this.persistState(true), SAVE_IN_FLIGHT_TIMEOUT_MS);
+      // An engine still inside a large batch would only answer the save after it: skip it then. A
+      // first scan saves itself about once a minute, so little is lost, and the switch stays quick.
+      if (!running.syncing?.()) await withTimeout(this.persistState(true), SAVE_IN_FLIGHT_TIMEOUT_MS);
     } else {
       await withTimeout(this.persistState(!this.synced), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
     }
@@ -625,7 +642,8 @@ export class WalletController {
     this.sendApprovals.clear();
     this.synced = false;
     this.cashierOn = false;
-    await w?.close().catch(() => {});
+    // Bounded: an engine busy with a large answer must not hold the next wallet back.
+    await withTimeout(w?.close().catch(() => {}) ?? Promise.resolve(), ENGINE_CLOSE_TIMEOUT_MS);
   }
 
   /** The engine as screens see it: identical, except that relay() needs an approval (see sendApprovals). */
@@ -895,7 +913,9 @@ export class WalletController {
     const running = this.live;
     if (running?.syncing?.()) {
       await withTimeout(running.haltSync?.() ?? Promise.resolve(), STATE_SAVE_ON_LOCK_TIMEOUT_MS);
-      await withTimeout(this.persistState(true), patience);
+      // Still inside a large batch: the save would wait for it, so lock now (the scan saved itself
+      // within the last minute or so, see the checkpoints in engine.ts).
+      if (!running.syncing?.()) await withTimeout(this.persistState(true), patience);
     } else if (this.syncBusy || !this.synced) {
       // The first scan is finishing (the engine has stopped but its sync call has not returned yet)
       // or never finished: save what it got, which a normal save would skip until it is confirmed.
@@ -914,7 +934,7 @@ export class WalletController {
     this.synced = false;
     this.cashierOn = false;
     this.password = null;
-    await w?.close().catch(() => {});
+    await withTimeout(w?.close().catch(() => {}) ?? Promise.resolve(), ENGINE_CLOSE_TIMEOUT_MS);
     this.set(viewFor(loadWallets()));
   }
 
