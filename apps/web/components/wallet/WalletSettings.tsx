@@ -400,7 +400,11 @@ function LoadMoveFileForm({ actions }: { actions: SettingsActions }) {
       setPw("");
       setCode("");
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message;
+      // The usual case: a file saved from another wallet. Say what that means and what to do.
+      setError(/different wallet/.test(message)
+        ? "This move file was made from a different wallet than the one open here, so nothing was changed. A move file loads only into the wallet it was saved from (the one with the same recovery words). To use that other wallet in this browser instead, write down this wallet's recovery words, remove it in Settings, then choose \"I already use MonkStash\" and pick the file."
+        : message);
     } finally {
       setBusy(false);
     }
@@ -409,8 +413,9 @@ function LoadMoveFileForm({ actions }: { actions: SettingsActions }) {
   return (
     <form onSubmit={submit} className={styles.settingsForm}>
       <p className="small muted">
-        Made a move file on another device? Load it here to skip the scan. Contacts, requests and sales already on this device are
-        kept, and address counters are combined, so no address is ever handed out twice.
+        Saved a move file from this same wallet on another device? Load it here to skip the scan. It works only for this wallet
+        (the same recovery words). Contacts, requests and sales already on this device are kept, and address counters are
+        combined, so no address is ever handed out twice.
       </p>
       <div className="field">
         <label htmlFor="move-in-file">Move file</label>
