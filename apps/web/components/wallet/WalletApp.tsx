@@ -219,6 +219,7 @@ function OpenDashboard({ view, controller, onCashierChange, lockOnLeave, refresh
       requests={stores.requests}
       cashier={stores.cashier}
       contacts={stores.contacts}
+      labels={stores.labels}
       onCashierChange={onCashierChange}
       lockOnLeave={lockOnLeave}
       refreshUnlock={refreshUnlock}
@@ -418,6 +419,7 @@ function ForgotPassword({ kind, count = 1, onForget }: { kind: WalletPublic["kin
       <ul className="small muted" aria-labelledby="forget-list" style={{ marginTop: 0 }}>
         <li>the encrypted wallet copy</li>
         <li>its contacts</li>
+        <li>its notes and address names</li>
         <li>its payment requests</li>
         <li>its till sales</li>
         <li>its sync progress</li>

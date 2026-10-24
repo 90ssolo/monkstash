@@ -4,10 +4,11 @@
  * browser from data already on this device and saved straight to the user's downloads; nothing
  * is uploaded. Amounts are plain decimal XMR (not atomic units) so spreadsheets can sum them.
  */
-import { formatXmr, invoiceFromJson, toCsv, type CsvCell, type InvoiceStatus } from "@quietmint/wallet-core";
+import { atomicToFiat, formatXmr, invoiceFromJson, toCsv, utcDay, type CsvCell, type InvoiceStatus } from "@quietmint/wallet-core";
 import { MAIN_ACCOUNT, type IncomingEntry, type TxSummary } from "./engine";
 import { saleStatus, type Sale } from "./cashier";
 import { statusOf, type PaymentRequest } from "./requests";
+import type { TxTags } from "./history";
 
 const xmr = (a: bigint | undefined) => (a === undefined ? "" : formatXmr(a));
 const iso = (ms: number | undefined) => (ms === undefined || !Number.isFinite(ms) ? "" : new Date(ms).toISOString());
@@ -56,14 +57,40 @@ export function requestsCsv(list: PaymentRequest[], incoming: IncomingEntry[]): 
   return toCsv(header, rows);
 }
 
-export function historyCsv(txs: TxSummary[]): string {
-  const header = ["date", "direction", "xmr_amount", "xmr_fee", "confirmations", "status", "block_height", "tx_hash"];
-  const rows: CsvCell[][] = txs.map((t) => [
-    t.timestamp ? new Date(t.timestamp * 1000).toISOString() : "", t.direction,
+export interface HistoryExtras {
+  /** Note and address labels of each payment. */
+  tags?: (t: TxSummary) => TxTags;
+  /** Daily XMR prices in one currency: adds the value of each payment on its day. */
+  prices?: { currency: string; days: Record<string, string> };
+}
+
+export function historyCsv(txs: TxSummary[], extras: HistoryExtras = {}): string {
+  const p = extras.prices;
+  const cur = p?.currency.toLowerCase();
+  const header = ["date", "direction", "xmr_amount", "xmr_fee", "confirmations", "status", "block_height", "tx_hash", "note", "received_at",
+    ...(p ? [`xmr_price_${cur}`, `value_${cur}`, `fee_value_${cur}`, "price_date"] : [])];
+  const latest = p ? Object.keys(p.days).sort().pop() : undefined;
+  const rows: CsvCell[][] = txs.map((t) => {
+    const tags = extras.tags?.(t) ?? { at: [] };
     // Outgoing amounts are negative so a column sum gives the net change.
-    t.direction === "out" ? `-${formatXmr(t.amount)}` : formatXmr(t.amount), xmr(t.fee), t.confirmations,
-    t.pending ? "pending" : t.confirmations >= 10 ? "confirmed" : "confirming", t.height, t.hash,
-  ]);
+    const sign = t.direction === "out" ? "-" : "";
+    const row: CsvCell[] = [
+      t.timestamp ? new Date(t.timestamp * 1000).toISOString() : "", t.direction,
+      `${sign}${formatXmr(t.amount)}`, xmr(t.fee), t.confirmations,
+      t.pending ? "pending" : t.confirmations >= 10 ? "confirmed" : "confirming", t.height, t.hash,
+      tags.note, tags.at.join("; "),
+    ];
+    if (p) {
+      // A payment still waiting for a block has no date yet: it uses the latest price.
+      const day = t.timestamp ? utcDay(t.timestamp * 1000) : latest;
+      const rate = day ? p.days[day] : undefined;
+      if (rate) {
+        const fee = t.fee !== undefined && t.direction !== "in" ? `-${atomicToFiat(t.fee, rate)}` : "";
+        row.push(rate, `${sign}${atomicToFiat(t.amount, rate)}`, fee, day);
+      } else row.push("", "", "", "");
+    }
+    return row;
+  });
   return toCsv(header, rows);
 }
 

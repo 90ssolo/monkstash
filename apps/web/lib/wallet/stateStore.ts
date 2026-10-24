@@ -91,7 +91,7 @@ export async function clearSyncStates(): Promise<void> {
 }
 
 /** The sealed lists kept per wallet (keys are `${name}|${walletId}`, see lib/wallet/session.ts). */
-const WALLET_LISTS = ["addresses", "requests", "contacts", "cashier"] as const;
+const WALLET_LISTS = ["addresses", "requests", "contacts", "cashier", "labels"] as const;
 
 /** Removes one wallet's scan progress and sealed lists; other wallets' data stays. */
 export async function deleteWalletData(walletId: string): Promise<void> {

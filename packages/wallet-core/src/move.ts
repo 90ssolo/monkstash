@@ -32,6 +32,7 @@ export interface MoveRecords {
   requests?: unknown;
   contacts?: unknown;
   cashier?: unknown;
+  labels?: unknown;
 }
 
 export interface MovePayload {

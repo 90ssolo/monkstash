@@ -7,6 +7,7 @@ import { createTotpSecret, totpUri, type WalletPublic } from "@quietmint/wallet-
 import type { Balances, LiveWallet, SyncHealth, SyncState } from "@/lib/wallet/engine";
 import type { SettingsActions } from "@/components/wallet/WalletSettings";
 import type { RequestStore } from "@/lib/wallet/requests";
+import type { LabelStore } from "@/lib/wallet/session";
 import type { ContactStore } from "@/lib/wallet/contacts";
 import type { CashierStore } from "@/lib/wallet/cashier";
 import { StorageError } from "@/lib/wallet/stateStore";
@@ -285,3 +286,4 @@ function remoteList<T>(host: HostConnection, target: string): { load(): Promise<
 export const remoteRequests = (host: HostConnection) => remoteList(host, "requests") as RequestStore;
 export const remoteContacts = (host: HostConnection) => remoteList(host, "contacts") as ContactStore;
 export const remoteCashier = (host: HostConnection) => remoteList(host, "cashier") as CashierStore;
+export const remoteLabels = (host: HostConnection) => remoteList(host, "labels") as LabelStore;

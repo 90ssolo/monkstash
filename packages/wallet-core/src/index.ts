@@ -18,3 +18,5 @@ export * from "./contacts";
 export * from "./proofs";
 export * from "./move";
 export * from "./seedcheck";
+export * from "./priceHistory";
+export * from "./labels";

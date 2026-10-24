@@ -6,23 +6,25 @@ import { FiatValue } from "./FiatValue";
 import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
-import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, type WalletPublic } from "@quietmint/wallet-core";
+import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, EMPTY_LABELS, addressKey, LABEL_MAX, withAddressLabel, type WalletLabels, type WalletPublic } from "@quietmint/wallet-core";
 import { fetchPriceFeed, fetchQuote, MAIN_CURRENCIES, PriceUnavailableError } from "@/lib/prices";
 import { fiatText, localCurrency } from "@/lib/localCurrency";
 import { recordRequestSeen, statusOf, type PaymentRequest, type RequestStatus, type RequestStore } from "@/lib/wallet/requests";
 import type { Balances, Destination, IncomingEntry, LiveWallet, SendSpeed, SyncHealth, SyncState, TxSummary, TxWhere } from "@/lib/wallet/engine";
-import { ACCOUNT_NAME, CHECKPOINT_BLOCKS } from "@/lib/wallet/engine";
+import { ACCOUNT_NAME, CHECKPOINT_BLOCKS, MAIN_ACCOUNT } from "@/lib/wallet/engine";
 import { checkClock, clockWarning, serverNow, useClockOffset } from "@/lib/wallet/clock";
 import { apiUrl } from "@/lib/wallet/config";
 import { validateAddress } from "@/lib/wallet/engine";
-import { downloadCsv, historyCsv, requestsCsv } from "@/lib/wallet/exports";
+import { downloadCsv, requestsCsv } from "@/lib/wallet/exports";
+import { arrivedAt } from "@/lib/wallet/history";
+import type { LabelStore } from "@/lib/wallet/session";
+import { Activity, minutesLeft } from "./History";
 import Link from "next/link";
 import type { TestMode } from "@/lib/wallet/demo";
 import { MoneroSymbol } from "@/components/art/MoneroSymbol";
 import { CopyButton } from "./CopyButton";
 import { Cashier } from "./Cashier";
 import { ContactChips, ContactManager, TamperAlarm } from "./Contacts";
-import { CheckProof, ProveSent } from "./Proofs";
 import type { ContactStore } from "@/lib/wallet/contacts";
 import { freshAddress } from "@/lib/wallet/addresses";
 import { payLinkOrigin, siteHref } from "@/lib/site";
@@ -104,7 +106,7 @@ export interface WalletMenu {
   onRename: (name: string) => Promise<void>;
 }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave, refreshUnlock, walletMenu }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave; refreshUnlock?: LockOnLeave; walletMenu?: WalletMenu }) {
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, labels, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave, refreshUnlock, walletMenu }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; labels?: LabelStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave; refreshUnlock?: LockOnLeave; walletMenu?: WalletMenu }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
@@ -137,6 +139,17 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     await contacts?.save(list);
     setContactList(list);
   }, [contacts]);
+  // Notes on payments and labels on receive addresses (sealed on this device).
+  const [labelData, setLabelData] = useState<WalletLabels>(EMPTY_LABELS);
+  useEffect(() => {
+    let alive = true;
+    void labels?.load().then((l) => { if (alive) setLabelData(l); });
+    return () => { alive = false; };
+  }, [labels]);
+  const saveLabels = useCallback(async (l: WalletLabels) => {
+    await labels?.save(l);
+    setLabelData(l);
+  }, [labels]);
   const local = useLocalChecks(pub);
   const clockMsg = clockWarning(useClockOffset());
   // Node health after the first sync: a node that stops answering must not leave "Up to date" on screen.
@@ -221,14 +234,17 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     return () => { document.body.style.overflow = prev; onCashierChange?.(false); };
   }, [tillOpen, onCashierChange]);
 
-  // Payment requests, for the Home summary card (reloaded whenever Home is shown).
+  // Payment requests, for the Home summary card and the names in Activity (reloaded when shown).
   const [reqList, setReqList] = useState<PaymentRequest[]>([]);
   useEffect(() => {
-    if (section !== "home" || !requests) return;
+    if ((section !== "home" && section !== "activity") || !requests) return;
     let alive = true;
     void requests.load().then((l) => { if (alive) setReqList(l); });
     return () => { alive = false; };
   }, [section, requests]);
+
+  const arrived = useMemo(() => arrivedAt(incoming, labelData, reqList), [incoming, labelData, reqList]);
+  const historyProps = { labels: labelData, arrived, ...(labels ? { onSaveLabels: saveLabels } : {}) };
 
   const pct = sync ? Math.min(100, Math.round(sync.percent * 1000) / 10) : 0;
   const synced = !!sync?.done;
@@ -423,7 +439,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
             </div>
 
             <div className={styles.panel}>
-              <Activity txs={txs.slice(0, 5)} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} compact onSeeAll={txs.length > 5 ? () => go("activity") : undefined} />
+              <Activity txs={txs.slice(0, 5)} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} {...historyProps} compact onSeeAll={txs.length > 5 ? () => go("activity") : undefined} />
             </div>
           </section>
 
@@ -439,7 +455,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
           <section hidden={section !== "receive"} aria-labelledby="receive-h" className={styles.section}>
             <h2 id="receive-h" className={styles.panelH} tabIndex={-1}>Receive Monero</h2>
-            <AddressView pub={pub} wallet={wallet} requests={requests} />
+            <AddressView pub={pub} wallet={wallet} requests={requests} labels={labelData} onSaveLabels={labels ? saveLabels : undefined} hidden={hidden} />
             <p className="small muted" style={{ marginTop: "var(--s-5)" }}>
               Want a set amount, a price in your currency, or to see when someone has paid?{" "}
               <button type="button" className={styles.inlineLink} onClick={() => go("paid")}>Make a payment request</button>.
@@ -458,11 +474,11 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
               </div>
             ) : null}
             <h3 className={styles.recentH}>Payment requests</h3>
-            <RequestsView pub={pub} wallet={wallet} requests={requests} incoming={incoming} onChanged={refresh} />
+            <RequestsView pub={pub} wallet={wallet} requests={requests} incoming={incoming} onChanged={refresh} hidden={hidden} />
           </section>
 
           <section hidden={section !== "activity"} aria-label="Activity" className={styles.section}>
-            <Activity txs={txs} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} />
+            <Activity txs={txs} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} onToggleHidden={toggleHidden} {...historyProps} />
           </section>
 
           <section hidden={section !== "contacts"} aria-labelledby="contacts-h" className={styles.section}>
@@ -615,52 +631,116 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
   );
 }
 
-function AddressView({ pub, wallet, requests }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore }) {
+function AddressView({ pub, wallet, requests, labels, onSaveLabels, hidden }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore; labels: WalletLabels; onSaveLabels?: (l: WalletLabels) => Promise<void>; hidden: boolean }) {
   const [address, setAddress] = useState(pub.primaryAddress);
+  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSub = address !== pub.primaryAddress;
+  const name = isSub ? labels.addr[addressKey(MAIN_ACCOUNT, index)]?.label : undefined;
+  const named = Object.entries(labels.addr)
+    .filter(([k]) => k.startsWith(`${MAIN_ACCOUNT}/`))
+    .sort(([a], [b]) => Number(b.split("/")[1]) - Number(a.split("/")[1]));
   return (
-    <div className={styles.receive}>
-      <Qr value={`monero:${address}`} label="QR code of your receiving address" />
-      <div style={{ minWidth: 0 }}>
-        <h3>{isSub ? "A new address" : "Your main address"}</h3>
-        <p className={`mono ${styles.addr}`}>{address}</p>
-        <div style={{ display: "flex", gap: "var(--s-2)", flexWrap: "wrap" }}>
-          <CopyButton value={address} label="Copy address" />
-          {pub.kind === "full" ? (
-            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={async () => {
-              setBusy(true);
-              setError(null);
-              // Same guards as payment requests: never an index a request already uses, and the new
-              // index is recorded (sealed) before it is shown, so a later request cannot reuse it.
-              try {
-                const used = requests ? (await requests.load()).map((r) => r.index) : [];
-                setAddress((await freshAddress(wallet, "Receive", used)).address);
-              } catch (err) {
-                setError((err as Error).message || "A new address could not be made.");
-              } finally { setBusy(false); }
-            }}>
-              {busy ? "Creating…" : "New address"}
-            </button>
+    <>
+      <div className={styles.receive}>
+        <Qr value={`monero:${address}`} label="QR code of your receiving address" />
+        <div style={{ minWidth: 0 }}>
+          <h3>{!isSub ? "Your main address" : name && !hidden ? `Address for ${name}` : "A new address"}</h3>
+          <p className={`mono ${styles.addr}`}>{address}</p>
+          <div style={{ display: "flex", gap: "var(--s-2)", flexWrap: "wrap" }}>
+            <CopyButton value={address} label="Copy address" />
+            {pub.kind === "full" ? (
+              <button className="btn btn-ghost btn-sm" disabled={busy} onClick={async () => {
+                setBusy(true);
+                setError(null);
+                // Same guards as payment requests: never an index a request already uses, and the new
+                // index is recorded (sealed) before it is shown, so a later request cannot reuse it.
+                try {
+                  const used = requests ? (await requests.load()).map((r) => r.index) : [];
+                  const sub = await freshAddress(wallet, "Receive", used);
+                  setAddress(sub.address);
+                  setIndex(sub.index);
+                } catch (err) {
+                  setError((err as Error).message || "A new address could not be made.");
+                } finally { setBusy(false); }
+              }}>
+                {busy ? "Creating…" : "New address"}
+              </button>
+            ) : null}
+          </div>
+          {error ? <p className="error small" role="alert">{error}</p> : null}
+          {isSub && onSaveLabels && !hidden ? (
+            <AddressLabelForm key={index} label={name ?? ""}
+              onSave={(l) => onSaveLabels(withAddressLabel(labels, MAIN_ACCOUNT, index, address, l))} />
           ) : null}
+          <p className="small muted" style={{ marginTop: "var(--s-4)" }}>
+            Every address here belongs to your wallet. Giving each person a different one makes your payments harder to link together.
+          </p>
         </div>
-        {error ? <p className="error small" role="alert">{error}</p> : null}
-        <p className="small muted" style={{ marginTop: "var(--s-4)" }}>
-          Every address here belongs to your wallet. Giving each person a different one makes your payments harder to link together.
-        </p>
       </div>
-    </div>
+      {named.length && !hidden ? (
+        <section className={styles.addrNamed} aria-labelledby="named-h">
+          <h3 id="named-h" className={styles.recentH}>Addresses you named</h3>
+          <p className="small muted" style={{ margin: "var(--s-1) 0 0" }}>Payments to these show the name in Activity.</p>
+          <ul className={styles.addrNames}>
+            {named.map(([k, a]) => (
+              <li key={k}>
+                <strong>{a.label}</strong>
+                <span className={styles.addrNameActions}>
+                  <button type="button" className="btn btn-ghost btn-sm" aria-label={`Show the address for ${a.label}`} onClick={() => { setAddress(a.address); setIndex(Number(k.split("/")[1])); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Show</button>
+                  <CopyButton value={a.address} label="Copy" />
+                </span>
+                <span className="mono">{shortAddress(a.address)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
   );
 }
 
-const STATUS_TEXT = (s: RequestStatus, amount?: string): string => {
+/** "Who has this address?" A private name for one receive address. */
+function AddressLabelForm({ label, onSave }: { label: string; onSave: (label: string) => Promise<void> }) {
+  const [text, setText] = useState(label);
+  const [saved, setSaved] = useState(label);
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const changed = text.trim() !== saved;
+  return (
+    <form className={styles.addrLabelForm} onSubmit={async (e) => {
+      e.preventDefault();
+      setState("saving");
+      setError(null);
+      try {
+        await onSave(text);
+        setSaved(text.trim());
+        setState("saved");
+      } catch (err) {
+        setError((err as Error).message || "The name could not be saved.");
+        setState("idle");
+      }
+    }}>
+      <label htmlFor="addr-label">Who is this address for? <span className="muted">(optional, only on this device)</span></label>
+      <div className={styles.noteRow}>
+        <input id="addr-label" className="input" maxLength={LABEL_MAX} placeholder="For example: Ana, or Shop sales" value={text}
+          onChange={(e) => { setText(e.target.value); setState("idle"); }} />
+        <button className="btn btn-secondary btn-sm" disabled={!changed || state === "saving"}>{state === "saving" ? "Saving…" : saved ? "Rename" : "Save name"}</button>
+      </div>
+      {state === "saved" && !changed ? <p className="small muted" role="status" style={{ margin: 0 }}>{saved ? "Saved. Payments to this address will show this name in Activity." : "Name removed."}</p> : null}
+      {error ? <p className="error small" role="alert" style={{ margin: 0 }}>{error}</p> : null}
+    </form>
+  );
+}
+
+const STATUS_TEXT = (s: RequestStatus, amount?: string, hidden = false): string => {
   switch (s.kind) {
     case "unpaid": return "Waiting for payment";
     case "expired": return "Expired, not paid";
-    case "late": return `Paid after it expired: ${formatXmr(s.received, 6)} XMR`;
+    case "late": return hidden ? "Paid after it expired" : `Paid after it expired: ${formatXmr(s.received, 6)} XMR`;
     case "arriving": return "Payment arriving";
-    case "partial": return `Partly paid: ${formatXmr(s.received, 6)} of ${amount ? formatXmr(BigInt(amount), 6) : "?"} XMR`;
+    case "partial": return hidden ? "Partly paid" : `Partly paid: ${formatXmr(s.received, 6)} of ${amount ? formatXmr(BigInt(amount), 6) : "?"} XMR`;
     case "confirming": return `Paid, confirming ${s.confirmations} of 10`;
     case "paid": return "Paid";
   }
@@ -688,7 +768,7 @@ function buttonHtml(link: string): string {
   return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 22px;border-radius:8px;background:#1f4733;color:#ffffff;font:600 16px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;text-decoration:none">Pay with Monero</a>`;
 }
 
-function RequestsView({ pub, wallet, requests, incoming, onChanged }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore; incoming: IncomingEntry[]; onChanged: () => void }) {
+function RequestsView({ pub, wallet, requests, incoming, onChanged, hidden }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore; incoming: IncomingEntry[]; onChanged: () => void; hidden: boolean }) {
   const [list, setListState] = useState<PaymentRequest[] | null>(null);
   // The latest list, for async create/remove: building on the list captured at submit would
   // overwrite first-seen times recorded while the request was being made.
@@ -872,13 +952,13 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged }: { pub: Wal
         <ul className={styles.reqList} aria-label="Your payment requests">
           {list.map((r) => {
             const status = statusOf(r, incoming);
-            const xmrText = r.amount ? `${formatXmr(BigInt(r.amount), 6)} XMR` : "Any amount";
+            const xmrText = !r.amount ? "Any amount" : hidden ? "•••• XMR" : `${formatXmr(BigInt(r.amount), 6)} XMR`;
             const expired = r.expiresAt !== undefined && serverNow() >= r.expiresAt;
             return (
               <li key={r.id} className={`${styles.reqItem} ${fresh === r.id ? styles.reqFresh : ""}`}>
                 <div className={styles.reqTop}>
                   <div style={{ minWidth: 0 }}>
-                    <strong className={styles.reqAmt}>{r.fiat ? moneyText(r.fiat.amount, r.fiat.currency) : xmrText}</strong>
+                    <strong className={styles.reqAmt}>{r.fiat ? (hidden ? "••••" : moneyText(r.fiat.amount, r.fiat.currency)) : xmrText}</strong>
                     {r.fiat ? <span className="small muted">{xmrText}</span> : null}
                     {r.note ? <span className={styles.reqNote}>{r.note}</span> : null}
                     <span className="small muted">
@@ -886,7 +966,7 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged }: { pub: Wal
                       {r.expiresAt ? `, ${expired ? "expired" : "expires"} ${new Date(r.expiresAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
                     </span>
                   </div>
-                  <span className={`${styles.chip} ${status.kind === "paid" ? styles.chipPaid : status.kind === "unpaid" || status.kind === "expired" ? styles.chipIdle : styles.chipWait}`} aria-live="polite">{STATUS_TEXT(status, r.amount)}</span>
+                  <span className={`${styles.chip} ${status.kind === "paid" ? styles.chipPaid : status.kind === "unpaid" || status.kind === "expired" ? styles.chipIdle : styles.chipWait}`} aria-live="polite">{STATUS_TEXT(status, r.amount, hidden)}</span>
                 </div>
                 <div className={styles.reqActions}>
                   <CopyButton value={linkOf(r)} label="Copy link" />
@@ -1388,88 +1468,6 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
   );
 }
 
-function Activity({ txs, synced, onReceive, wallet, hidden, compact = false, onSeeAll }: { txs: TxSummary[]; synced: boolean; onReceive: () => void; wallet: LiveWallet; hidden: boolean; compact?: boolean; onSeeAll?: () => void }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-  if (checking) return <CheckProof wallet={wallet} onClose={() => setChecking(false)} />;
-  if (!txs.length) {
-    return (
-      <div className={styles.empty}>
-        <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-          <rect x="7" y="12" width="34" height="26" rx="4" /><path d="M7 19h34" /><path d="M24 25v8" /><path d="m20 29 4 4 4-4" />
-        </svg>
-        <h2 tabIndex={-1}>{synced ? "No payments yet" : "Looking for your payments"}</h2>
-        <p>{synced ? "Share your address and your first XMR will show up here." : "They appear here as the wallet catches up with the network."}</p>
-        {synced ? <button className="btn btn-primary" onClick={onReceive}>Receive your first XMR</button> : null}
-      </div>
-    );
-  }
-  return (
-    <>
-      <div className={styles.listHead}>
-        {compact ? <h3 className={styles.recentH}>Recent activity</h3> : <h2 className={styles.panelH} tabIndex={-1}>Activity</h2>}
-        <span className={styles.contactActions}>
-          {compact ? (
-            onSeeAll ? <button type="button" className="btn btn-ghost btn-sm" onClick={onSeeAll}>See all</button> : null
-          ) : (
-            <>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChecking(true)}>Check a payment proof</button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => downloadCsv("history", historyCsv(txs))}>Export CSV</button>
-            </>
-          )}
-        </span>
-      </div>
-      <ul className={styles.txs}>
-        {txs.map((t) => {
-          const confirming = !t.pending && t.confirmations < 10;
-          return (
-            <li key={t.hash} className={open === t.hash ? styles.txOpen : undefined}>
-              <button type="button" className={styles.txToggle} aria-expanded={open === t.hash} aria-label={`Details of this ${t.direction === "in" ? "incoming" : "outgoing"} payment`} onClick={() => setOpen(open === t.hash ? null : t.hash)} />
-              <span className={`${styles.txDir} ${t.direction === "in" ? styles.txIn : ""}`} aria-hidden="true">{t.direction === "in" ? "↓" : "↑"}</span>
-              <div className={styles.txMain}>
-                <strong>{t.direction === "in" ? "Received" : t.direction === "self" ? "Sent to yourself" : "Sent"}</strong>
-                <span className={`small muted mono ${styles.txHash}`} title={t.hash}>{t.hash.slice(0, 10)}…{t.hash.slice(-6)}</span>
-              </div>
-              <div className={styles.txSide}>
-                <strong className={t.direction === "in" ? styles.amtIn : undefined}>{hidden ? "••••" : `${t.direction === "in" ? "+" : "−"}${formatXmr(t.amount, 6)}`} <span className={styles.txUnit}>XMR</span></strong>
-                {t.pending ? (
-                  <span className={`${styles.chip} ${styles.chipWait}`}>{t.direction === "in" ? "Spendable in about 20 min" : "Waiting to confirm"}</span>
-                ) : confirming ? (
-                  <span className={styles.confirming} title={`${t.confirmations} of 10 confirmations`}>
-                    <span className={styles.miniBar} aria-hidden="true"><span style={{ width: `${(t.confirmations / 10) * 100}%` }} /></span>
-                    {t.direction === "in" ? `Spendable in about ${minutesLeft(t.confirmations)} min` : `${t.confirmations} of 10`}
-                  </span>
-                ) : (
-                  <span className="small muted">{t.timestamp ? new Date(t.timestamp * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Confirmed"}</span>
-                )}
-              </div>
-              {open === t.hash ? (
-                <div className={styles.txDetails}>
-                  <dl className={styles.facts}>
-                    <dt>Transaction ID</dt><dd className="mono" style={{ wordBreak: "break-all" }}>{t.hash}</dd>
-                    {t.timestamp ? <><dt>Date</dt><dd>{new Date(t.timestamp * 1000).toLocaleString()}</dd></> : null}
-                    <dt>Confirmations</dt><dd>{t.pending ? "Waiting in the pool" : t.confirmations}</dd>
-                    {t.fee !== undefined && t.direction !== "in" ? <><dt>Network fee</dt><dd>{formatXmr(t.fee)} XMR</dd></> : null}
-                  </dl>
-                  <CopyButton value={t.hash} label="Copy transaction ID" />
-                  {t.direction !== "in" ? <ProveSent wallet={wallet} tx={t} /> : (
-                    <p className="small muted" style={{ margin: 0 }}>Received payments are proven by the sender. If someone sent you a proof, use <em>Check a payment proof</em> above.</p>
-                  )}
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </>
-  );
-}
-
-/** About two minutes per block until the 10-block spendable age. */
-function minutesLeft(confirmations: number): number {
-  return Math.max(2, (10 - Math.min(confirmations, 10)) * 2);
-}
-
 /** When the locked part of the balance becomes spendable, from the newest incoming payment. */
 /** The build this wallet was loaded from (public/build.json), linking to how to check it. */
 function BuildFingerprint() {
@@ -1561,7 +1559,7 @@ function RemoveWallet({ onRemove, settings, kind }: { onRemove: () => void; sett
         back any time with {kind === "view-only" ? "its address and private view key" : "your recovery words. Without those words, the money is gone for good"}.
       </p>
       <p className="small muted">
-        It also deletes this wallet&apos;s contacts, payment requests and till sales stored in this browser. Export them first with <em>Export CSV</em> in Activity and Get paid.
+        It also deletes this wallet&apos;s contacts, notes, address names, payment requests and till sales stored in this browser. Export them first with <em>Export CSV</em> in Activity and Get paid.
       </p>
       {settings ? <Credentials totp={settings.totpEnabled} pw={pw} setPw={setPw} code={code} setCode={setCode} idPrefix="rm" /> : null}
       <div className="field">

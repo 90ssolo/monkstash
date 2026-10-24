@@ -16,7 +16,7 @@ import { ArtLock } from "@/components/wallet/WalletArt";
 import { BrandMark } from "@/components/BrandMark";
 import styles from "@/components/wallet/wallet.module.css";
 import { siteHref } from "@/lib/site";
-import { forgetNode, HostConnection, remoteCashier, remoteContacts, remoteRequests, remoteSettings, remoteWallet } from "./remote";
+import { forgetNode, HostConnection, remoteCashier, remoteContacts, remoteLabels, remoteRequests, remoteSettings, remoteWallet } from "./remote";
 import ext from "./extension.module.css";
 
 export type Surface = "popup" | "side" | "tab";
@@ -161,7 +161,7 @@ function OpenWallet({ surface }: { surface: Surface }) {
   const wallet = useMemo(() => remoteWallet(host, pub, state.walletSeq), [state.walletSeq]); // eslint-disable-line react-hooks/exhaustive-deps
   // Its timers and listeners stop with its screens.
   useEffect(() => () => wallet.dispose(), [wallet]);
-  const stores = useMemo(() => ({ requests: remoteRequests(host), contacts: remoteContacts(host), cashier: remoteCashier(host) }), [state.walletSeq]);
+  const stores = useMemo(() => ({ requests: remoteRequests(host), contacts: remoteContacts(host), cashier: remoteCashier(host), labels: remoteLabels(host) }), [state.walletSeq]);
   const settingsJson = JSON.stringify(state.settings);
   const settings = useMemo(() => remoteSettings(host, pub, surface === "tab" ? undefined : () => (surface === "popup" ? openFull("settings") : openTab("settings"))), [settingsJson, pub, surface]); // eslint-disable-line react-hooks/exhaustive-deps
   const compact = useMemo(() => (surface === "popup" ? { openFull } : undefined), [surface]);
@@ -191,6 +191,7 @@ function OpenWallet({ surface }: { surface: Surface }) {
         requests={stores.requests}
         cashier={stores.cashier}
         contacts={stores.contacts}
+        labels={stores.labels}
         onCashierChange={setCashierOn}
         compact={compact}
         leaveText="you close every MonkStash window"

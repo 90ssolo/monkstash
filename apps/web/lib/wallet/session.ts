@@ -11,7 +11,7 @@
  * (opened from its own real seed). Simulation mode replaces the node with canned data, and is also
  * the automatic fallback when the node is unreachable.
  */
-import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, type Contact, type NodeConfig, type StoredWallet, type WalletKind, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
+import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, EMPTY_LABELS, mergeLabels, readLabels, type Contact, type WalletLabels, type NodeConfig, type StoredWallet, type WalletKind, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
 import type { OnboardingResult } from "@/components/wallet/Onboarding";
 import type { SettingsActions } from "@/components/wallet/WalletSettings";
 import { normalizeSeed, NodeTestError, openWallet, testNode, type EngineState, type LiveWallet } from "./engine";
@@ -20,6 +20,12 @@ import { clearSyncStates, deleteSyncState, deleteWalletData, loadSealedBlob, loa
 import type { PaymentRequest, RequestStore } from "./requests";
 import { EMPTY_CASHIER, type CashierData, type CashierStore } from "./cashier";
 import type { ContactStore } from "./contacts";
+
+/** Notes on payments and labels on receive addresses, sealed like contacts. */
+export interface LabelStore {
+  load(): Promise<WalletLabels>;
+  save(l: WalletLabels): Promise<void>;
+}
 import { createSimWallet } from "./sim";
 import { loadWallets, putWallets, removeWallet, removeWalletRecord, saveWallet, sealWallet, setActiveWallet, StorageUnavailableError, unlockWallet, updatePublic, type WalletList } from "./storage";
 import { NETWORK } from "./config";
@@ -102,6 +108,12 @@ function sealedList<T>(pub: WalletPublic, secrets: Secrets, name: string, what: 
       await saveSealedBlob(key, await sealBytes(utf8.encode(JSON.stringify(v)), sealSecretOf(secrets), context));
     },
   };
+}
+
+/** The labels list, read through readLabels so a damaged or old save cannot break the screens. */
+function labelList(pub: WalletPublic, secrets: Secrets): LabelStore {
+  const list = sealedList<WalletLabels>(pub, secrets, "labels", "notes and labels", EMPTY_LABELS);
+  return { load: async () => readLabels(await list.load()), save: (l) => list.save(l) };
 }
 
 /**
@@ -222,7 +234,7 @@ export class WalletController {
     this.onPassword?.(password);
   }
   private listeners = new Set<() => void>();
-  private stores: { pub: WalletPublic; requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore } | null = null;
+  private stores: { pub: WalletPublic; requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore; labels?: LabelStore } | null = null;
   /**
    * Signed transactions the owner approved with the password (and code) in the last two minutes.
    * The wallet handed to screens only broadcasts one of these, once: an unlocked wallet left on a
@@ -527,6 +539,12 @@ export class WalletController {
       await till.save(moved.records.cashier as CashierData);
       added.push("till settings and sales");
     }
+    const movedLabels = readLabels(moved.records.labels);
+    if (Object.keys(movedLabels.tx).length || Object.keys(movedLabels.addr).length) {
+      const labels = labelList(pub, s);
+      await labels.save(mergeLabels(await labels.load(), movedLabels));
+      added.push("notes and labels");
+    }
     return added;
   }
 
@@ -768,6 +786,12 @@ export class WalletController {
     return secrets ? sealedList<Contact[]>(pub, secrets, "contacts", "contacts", []) : undefined;
   }
 
+  /** Notes and address labels, sealed like payment requests. */
+  labelStore(pub: WalletPublic): LabelStore | undefined {
+    const secrets = this.session?.secrets;
+    return secrets ? labelList(pub, secrets) : undefined;
+  }
+
   /** Cashier mode settings and sales, sealed like payment requests. */
   cashierStore(pub: WalletPublic): CashierStore | undefined {
     const secrets = this.session?.secrets;
@@ -775,11 +799,11 @@ export class WalletController {
   }
 
   /** One set of stores per opened wallet, so lists are not reloaded on every render. */
-  openStores(): { requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore } {
+  openStores(): { requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore; labels?: LabelStore } {
     const pub = this.view.name === "open" ? this.view.pub : null;
     if (!pub) return {};
     if (this.stores?.pub !== pub) {
-      this.stores = { pub, requests: this.requestStore(pub), contacts: this.contactStore(pub), cashier: this.cashierStore(pub) };
+      this.stores = { pub, requests: this.requestStore(pub), contacts: this.contactStore(pub), cashier: this.cashierStore(pub), labels: this.labelStore(pub) };
     }
     return this.stores;
   }
@@ -853,16 +877,17 @@ export class WalletController {
         if (!w?.exportState) throw new Error("Open the wallet first.");
         if (w.syncing?.()) throw new Error("The wallet is still scanning. Try again when it says Up to date.");
         const { state, height } = await w.exportState();
-        const [addresses, requests, contacts, cashier] = await Promise.all([
+        const [addresses, requests, contacts, cashier, labels] = await Promise.all([
           handedOutStore(rec.pub, s).load(),
           this.requestStore(rec.pub)?.load(),
           this.contactStore(rec.pub)?.load(),
           this.cashierStore(rec.pub)?.load(),
+          this.labelStore(rec.pub)?.load(),
         ]);
         const bytes = await sealMoveFile({
           primaryAddress: rec.pub.primaryAddress, network: rec.pub.network, kind: rec.pub.kind,
           restoreHeight: rec.pub.restoreHeight, height, engine: state,
-          records: { ...(addresses ? { addresses } : {}), ...(requests?.length ? { requests } : {}), ...(contacts?.length ? { contacts } : {}), ...(cashier && (cashier.config || cashier.sales.length) ? { cashier } : {}) },
+          records: { ...(addresses ? { addresses } : {}), ...(requests?.length ? { requests } : {}), ...(contacts?.length ? { contacts } : {}), ...(cashier && (cashier.config || cashier.sales.length) ? { cashier } : {}), ...(labels && (Object.keys(labels.tx).length || Object.keys(labels.addr).length) ? { labels } : {}) },
         }, moveSecretOf(rec.pub.kind, s));
         const day = new Date().toISOString().slice(0, 10);
         return { bytes, filename: `monkstash-move-${rec.pub.network}-${day}.monkstash`, height };

@@ -12,7 +12,7 @@ import { MoneroSymbol } from "@/components/art/MoneroSymbol";
 import styles from "./wallet.module.css";
 
 const PREF_KEY = "monkstash.fiat.v1";
-const OFF = "off";
+export const OFF = "off";
 const REFRESH_MS = 60_000;
 
 const EURO_REGIONS = new Set(["AT", "BE", "BG", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK"]);
@@ -38,7 +38,7 @@ export function fiatText(amount: string, currency: string): string {
   }
 }
 
-function useCurrencyPref(): [string, (c: string) => void] {
+export function useCurrencyPref(): [string, (c: string) => void] {
   const [currency, setCurrency] = useState<string>("USD");
   useEffect(() => {
     let saved: string | null = null;
@@ -134,11 +134,15 @@ function nameOf(names: Intl.DisplayNames | null, code: string): string {
  * The currency menu: a button showing the chosen currency, opening a searchable list. The search
  * field is a combobox (arrow keys move, Enter picks, Escape closes), so it works without a mouse.
  */
-function CurrencyPicker({ value, main, more, onPick }: {
+export function CurrencyPicker({ value, main, more, onPick, offHint = "Hide the value", label = "Show the value in" }: {
   value: string;
   main: string[];
   more: string[];
   onPick: (code: string) => void;
+  /** What the "XMR only" choice means here. */
+  offHint?: string;
+  /** Accessible name of the list. */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -238,7 +242,7 @@ function CurrencyPicker({ value, main, more, onPick }: {
           : <span className={styles.curSym} aria-hidden="true">{symbolOf(code)}</span>}
         <span className={styles.curText}>
           <span className={styles.curCode}>{off ? "XMR only" : code}</span>
-          <span className={styles.curName}>{off ? "Hide the value" : nameOf(names, code)}</span>
+          <span className={styles.curName}>{off ? offHint : nameOf(names, code)}</span>
         </span>
         <svg className={styles.curCheck} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </li>
@@ -262,7 +266,7 @@ function CurrencyPicker({ value, main, more, onPick }: {
               placeholder="Search currencies" value={query} autoComplete="off" spellCheck={false}
               onChange={(e) => { setQuery(e.target.value); setActive(0); }} onKeyDown={onKey} />
           </div>
-          <ul id={`${id}-list`} role="listbox" aria-label="Show the value in" className={styles.curList}>
+          <ul id={`${id}-list`} role="listbox" aria-label={label} className={styles.curList}>
             {groups.map((g) => (
               <li key={g.label} role="presentation">
                 <p className={styles.curGroup} aria-hidden="true">{g.label}</p>

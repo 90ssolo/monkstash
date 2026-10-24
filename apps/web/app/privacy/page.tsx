@@ -167,6 +167,9 @@ export default function PrivacyPage() {
                 To show values in your currency, the wallet asks our server for the current Monero price. That request carries no wallet data. Our server collects prices from public exchange feeds and the European Central Bank, so your browser never contacts them.
               </p>
               <p>
+                When you export your history with a value in your currency, the wallet downloads the whole table of daily Monero prices for that currency, going back to 2016, and looks up your dates on your device. <mark>The request names only the currency</mark>, never your dates, amounts or payments.
+              </p>
+              <p>
                 When you send to a name such as an OpenAlias address, our server looks the name up through a DNS service (Cloudflare&apos;s, by default). The DNS service sees our server, not you, and we see only the name, not who is paying or how much. The fee calculator, mining calculator and donation page get network numbers from our server in the same way.
               </p>
               <h3>Floods and errors</h3>

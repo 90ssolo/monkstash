@@ -142,7 +142,7 @@
 .review dd { margin: 0; overflow-wrap: anywhere; }
 
 .txs { list-style: none; padding: 0; margin: 0; display: grid; }
-.txs li { display: grid; grid-template-columns: 32px 1fr auto; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; border-bottom: 1px solid var(--line); }
+.txs li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; border-bottom: 1px solid var(--line); }
 .txs li:last-child { border-bottom: 0; }
 .txDir { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-2); }
 .txIn { background: var(--forest-soft); color: var(--forest); }
@@ -638,8 +638,48 @@
 .reviewList li > span:first-child { min-width: 0; }
 .reviewList :global(.mono) { display: block; font-size: 0.8rem; word-break: break-all; }
 .reviewAmt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Activity: search, filters, notes and export. */
+.histTools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, auto) auto; gap: var(--s-2); align-items: center; margin: 0 0 var(--s-3); }
+.histTools > select { min-height: 46px; width: auto; }
+.histSearch { position: relative; display: block; min-width: 0; }
+.histSearch svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.histSearch :global(.input) { padding-left: 34px; min-height: 46px; }
+.histKinds label { min-height: 38px; }
+.histCount { margin: 0 0 var(--s-2); }
+.txNote { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.noteForm { display: grid; gap: var(--s-2); font-size: var(--step--1); }
+.noteForm > label { font-weight: 600; }
+.noteRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-2); align-items: center; }
+.noteRow :global(.btn) { min-height: 44px; }
+.exportPanel { display: grid; gap: var(--s-3); margin: 0 0 var(--s-4); padding: var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface-2); }
+.exportPanel h3 { margin: 0; font-size: var(--step-0); }
+.exportScope { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+.exportScope :global(.check) { margin: 0; }
+.exportCur { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; font-size: var(--step--1); font-weight: 600; }
+.exportActions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.exportActions :global(.btn) { min-height: 44px; }
+.addrNames { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: var(--s-2); }
+.addrNames li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-1) var(--s-3); align-items: center; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); }
+.addrNames strong { overflow-wrap: anywhere; }
+.addrNames :global(.mono) { grid-column: 1 / -1; font-size: 0.78rem; color: var(--ink-3); overflow-wrap: anywhere; }
+.addrNameActions { display: flex; gap: var(--s-1); }
+.addrLabelForm { display: grid; gap: var(--s-2); margin-top: var(--s-4); font-size: var(--step--1); }
+.addrLabelForm > label { font-weight: 600; }
+
 @media (max-width: 520px) {
+  /* Long "Spendable in about N min" lines wrap instead of running over the transaction ID. */
+  .txSide { max-width: 44vw; }
+  .confirming { display: grid; justify-items: end; gap: 3px; white-space: normal; text-align: right; text-wrap: balance; }
+  .miniBar { flex: none; }
+  .histTools { grid-template-columns: minmax(0, 1fr) auto; }
+  .histSearch { grid-column: 1 / -1; }
   .batchFields { grid-template-columns: minmax(0, 1fr) auto; }
   .batchFields > :global(.input.mono) { grid-column: 1 / -1; }
   .batchAmt { text-align: left; }
 }
+.addrNamed { margin-top: var(--s-6); }
+/* The currency chip on light panels (it is drawn for the dark balance card by default). */
+.exportCur .curBtn { border-color: var(--line-2); background: var(--surface); color: var(--ink); min-height: 38px; }
+.exportCur .curBtn:hover, .exportCur .curBtn[aria-expanded="true"] { background: var(--surface); border-color: var(--ink-3); }
+.exportCur .curBtn:focus-visible { outline-color: var(--focus); }
+.exportCur .curBtnSym { background: var(--forest); color: #f6f5ec; }

@@ -49,7 +49,9 @@
 | 🗂️ **Several wallets** | Keep savings, a shop and more in one browser. Switch from the menu at the top; one password unlocks them all |
 | 📤 **Send** | Every payment asks for your password. Choose the speed, take the fee from the amount, scan a QR code with your camera, or pay up to 15 people in one transaction. Send to OpenAlias names like `donate.getmonero.org`, with the DNSSEC status shown |
 | 🚨 **Lookalike alarm** | Warns when an address starts and ends like one you paid or saved but differs in the middle (clipboard malware), and marks exactly where |
-| 📥 **Receive** | A fresh subaddress for every request, with a QR code |
+| 📥 **Receive** | A fresh subaddress for every request, with a QR code. Name each address after the person you gave it to |
+| 📒 **Activity and records** | Search your history by note, amount or ID, filter by direction and year, add private notes to payments, and export a CSV with each payment's value in your currency on its day. Notes stay encrypted on your device |
+| 🙈 **Hide** | One tap hides balances, amounts, notes and address names when someone can see your screen |
 | 🧾 **Get paid** | Payment links priced in EUR, USD and more, with expiry, a return link and a ready-made "Pay with Monero" button. Marked paid automatically |
 | 🏪 **Cashier mode** | A point of sale for your counter: keypad, QR per sale, sales list encrypted on the device, CSV export |
 | 🛡️ **Security checkup** | Five quick checks: test your paper backup, add a second lock, bookmark the wallet and more |

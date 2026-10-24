@@ -204,7 +204,7 @@ async function handle(target: string, method: string, args: unknown[], seq?: num
     if (typeof fn !== "function") throw new Error(`Unknown settings call: ${method}`);
     return (fn as (...a: unknown[]) => unknown)(...args);
   }
-  if (target === "requests" || target === "contacts" || target === "cashier") {
+  if (target === "requests" || target === "contacts" || target === "cashier" || target === "labels") {
     const store = controller.openStores()[target];
     if (!store) throw new Error("The wallet is locked.");
     if (method === "load") return store.load();
