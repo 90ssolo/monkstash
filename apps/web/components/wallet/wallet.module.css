@@ -215,6 +215,14 @@
 .wallet .heroLabel { margin: var(--s-5) 0 0; font-family: var(--font-sans); }
 .wallet .balance { margin: var(--s-2) 0 var(--s-2); }
 .balancePending { opacity: 0.5; }
+.fiat { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-3); margin: 0 0 var(--s-3); }
+.fiatValue { font-size: var(--step-1); font-weight: 500; color: #dfe6dc; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fiatPick { display: inline-flex; }
+.fiatPick select { appearance: none; -webkit-appearance: none; min-height: 32px; padding: 3px 28px 3px 10px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: var(--r-1); color: #f6f5ec; font: inherit; font-size: var(--step--1); font-weight: 650; letter-spacing: 0.02em; cursor: pointer;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23f6f5ec' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 11px; }
+.fiatPick select:hover { background-color: rgba(255, 255, 255, 0.08); }
+.fiatPick select:focus-visible { outline: 2px solid var(--clay-dim); outline-offset: 2px; }
+.fiatPick option, .fiatPick optgroup { color: var(--ink); background: var(--surface); }
 .heroNote { margin: 0; font-size: var(--step--1); line-height: 1.55; color: #b5c2b6; max-width: 62ch; }
 .heroNote strong { color: #f6f5ec; }
 .wallet .syncRow { margin-top: var(--s-4); }

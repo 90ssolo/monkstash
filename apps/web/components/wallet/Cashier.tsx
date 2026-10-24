@@ -82,6 +82,8 @@ export function Cashier({ pub, wallet, store, settings, synced, offlineSince = n
   const [data, setData] = useState<CashierData | null>(null);
   const [screen, setScreen] = useState<Screen>("keypad");
   const [activeId, setActiveId] = useState<string | null>(null);
+  // What the keypad types in: the shop's currency, or XMR. Kept while the till is open.
+  const [typeInXmr, setTypeInXmr] = useState(false);
   const [incoming, setIncoming] = useState<IncomingEntry[]>([]);
   // Every time on the till is corrected by the server clock, so a device clock that is off cannot
   // expire a sale early or ignore its payment (see clock.ts).
@@ -202,7 +204,7 @@ export function Cashier({ pub, wallet, store, settings, synced, offlineSince = n
           <Setup pub={pub} initial={config} settings={settings} onSave={async (c) => { await persist({ ...latest(), config: c }); setScreen("keypad"); }} />
         ) : null}
         {screen === "keypad" && config ? (
-          <Keypad config={config} pub={pub} wallet={wallet}
+          <Keypad config={config} pub={pub} wallet={wallet} typeInXmr={typeInXmr} onTypeInXmr={setTypeInXmr}
             usedIndexes={data.sales.filter((s) => (s.account ?? MAIN_ACCOUNT) === tillAccount(config.tillNumber ?? 1)).map((s) => s.invoice.subaddressIndex)}
             onCreated={async (sale) => {
             // Always build on the latest data (dataRef), never on a copy from an earlier render.
@@ -310,24 +312,30 @@ function Setup({ pub, initial, settings, onSave }: { pub: WalletPublic; initial:
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "back"] as const;
 
-function Keypad({ config, pub, wallet, onCreated, usedIndexes }: { config: CashierConfig; pub: WalletPublic; wallet: LiveWallet; onCreated: (s: Sale) => Promise<void>; usedIndexes: number[] }) {
+function Keypad({ config, pub, wallet, onCreated, usedIndexes, typeInXmr, onTypeInXmr }: {
+  config: CashierConfig; pub: WalletPublic; wallet: LiveWallet; onCreated: (s: Sale) => Promise<void>; usedIndexes: number[];
+  typeInXmr: boolean; onTypeInXmr: (on: boolean) => void;
+}) {
   const [entry, setEntry] = useState("");
   const [note, setNote] = useState("");
   const [rate, setRate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fiat = isFiat(config.currency);
+  // A till priced in a currency can still take an amount typed in XMR; a till priced in XMR has no switch.
+  const shopFiat = isFiat(config.currency);
+  const unit = shopFiat && typeInXmr ? "XMR" : config.currency;
+  const fiat = isFiat(unit);
   const maxDecimals = fiat ? 2 : 6;
 
   // A live estimate while typing (the real rate is fetched again when charging).
   useEffect(() => {
-    if (!fiat) return;
+    if (!shopFiat) return;
     let alive = true;
     const load = () => void fetchPriceFeed().then((f) => { if (alive) setRate(f.rates[config.currency] ?? null); }).catch(() => { if (alive) setRate(null); });
     load();
     const t = setInterval(load, 60_000);
     return () => { alive = false; clearInterval(t); };
-  }, [fiat, config.currency]);
+  }, [shopFiat, config.currency]);
 
   const press = useCallback((k: string) => {
     setError(null);
@@ -360,10 +368,23 @@ function Keypad({ config, pub, wallet, onCreated, usedIndexes }: { config: Cashi
 
   const value = entry.replace(/\.$/, "");
   const positive = !!value && Number(value) > 0;
+  // Always show the other side too: XMR for a currency amount, the shop's currency for XMR.
   let estimate: string | null = null;
-  if (positive && fiat && rate) {
-    try { estimate = `about ${formatXmr(fiatToAtomic(value, rate), 6)} XMR`; } catch { estimate = null; }
+  if (positive && rate) {
+    try {
+      if (fiat) estimate = `about ${formatXmr(fiatToAtomic(value, rate), 6)} XMR`;
+      else {
+        const a = parseXmr(value);
+        if (a !== null) estimate = `about ${money(atomicToFiat(a, rate), config.currency)}`;
+      }
+    } catch { estimate = null; }
   }
+  const switchUnit = (toXmr: boolean) => {
+    if (toXmr === typeInXmr) return;
+    setEntry("");
+    setError(null);
+    onTypeInXmr(toXmr);
+  };
 
   async function charge() {
     if (!positive || busy) return;
@@ -377,7 +398,7 @@ function Keypad({ config, pub, wallet, onCreated, usedIndexes }: { config: Cashi
       // The quote's age on the price server's own clock, when the offset is known.
       let quoteAgeMs: number | undefined;
       if (fiat) {
-        const quote = await fetchQuote(config.currency);
+        const quote = await fetchQuote(unit);
         price = { fiat: value, quote };
         expected = fiatToAtomic(value, quote.rate);
         if (clockOffset() !== null) quoteAgeMs = serverNow() - quote.quotedAt;
@@ -410,10 +431,21 @@ function Keypad({ config, pub, wallet, onCreated, usedIndexes }: { config: Cashi
 
   return (
     <div className={styles.keypadWrap}>
-      <div className={styles.display} aria-live="polite">
-        <span className={styles.displayLabel}>Amount to charge</span>
-        <output className={styles.amount} aria-label="Amount">{entry ? money(entry.endsWith(".") ? entry + "0" : entry, config.currency) : money("0", config.currency)}</output>
-        <span className={styles.estimate}>{fiat ? (estimate ?? (rate ? " " : "Live rate loading…")) : " "}</span>
+      <div className={styles.display}>
+        <div className={styles.displayTop}>
+          <span className={styles.displayLabel}>Amount to charge</span>
+          {shopFiat ? (
+            <div className={styles.unitSwitch} role="radiogroup" aria-label="Type the amount in">
+              {[config.currency, "XMR"].map((u) => (
+                <button key={u} type="button" role="radio" aria-checked={unit === u} className={unit === u ? styles.unitOn : undefined} onClick={() => switchUnit(u === "XMR")}>{u}</button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className={styles.displayRead} aria-live="polite">
+          <output className={styles.amount} aria-label="Amount">{entry ? money(entry.endsWith(".") ? entry + "0" : entry, unit) : money("0", unit)}</output>
+          <span className={styles.estimate}>{shopFiat ? (estimate ?? (rate ? " " : "Live rate loading…")) : " "}</span>
+        </div>
       </div>
       <div className={styles.keys} role="group" aria-label="Number pad">
         {KEYS.map((k) => (
@@ -430,7 +462,7 @@ function Keypad({ config, pub, wallet, onCreated, usedIndexes }: { config: Cashi
       <div className={`${styles.keyActions} ${styles.padActions}`}>
         <button type="button" className="btn btn-secondary btn-lg" onClick={() => press("clear")} disabled={!entry}>Clear</button>
         <button type="button" className={`btn btn-primary btn-lg ${styles.chargeBtn}`} onClick={() => void charge()} disabled={!positive || busy}>
-          {busy ? "Preparing…" : positive ? `Charge ${money(value, config.currency)}` : "Charge"}
+          {busy ? "Preparing…" : positive ? `Charge ${money(value, unit)}` : "Charge"}
         </button>
       </div>
       {pub.network !== "mainnet" ? <p className="small muted" style={{ margin: 0 }}>Test network ({pub.network}): practice coins only.</p> : null}
@@ -460,6 +492,15 @@ function Charge({ sale, config, incoming, now, onNew, onResolve }: {
 }) {
   const inv = useMemo(() => invoiceFromJson(sale.invoice), [sale.invoice]);
   const status = saleStatus(sale, incoming, now);
+  // A sale typed in XMR on a till priced in a currency: show what it is worth today, for reference.
+  const [refRate, setRefRate] = useState<string | null>(null);
+  const wantRef = !inv.fiat && isFiat(config.currency);
+  useEffect(() => {
+    if (!wantRef) return;
+    let alive = true;
+    void fetchPriceFeed().then((f) => { if (alive) setRefRate(f.rates[config.currency] ?? null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [wantRef, config.currency]);
   const due = inv.amount ?? 0n;
   const priceText = inv.fiat ? money(inv.fiat.amount, inv.fiat.currency) : `${formatXmr(due, 6)} XMR`;
   const left = inv.expiresAt ? Math.max(0, inv.expiresAt - now) : null;
@@ -570,7 +611,11 @@ function Charge({ sale, config, incoming, now, onNew, onResolve }: {
       <div className={styles.info}>
         <span className={styles.displayLabel}>{inv.reference ?? "Sale"}</span>
         <p className={styles.chargeAmt}>{priceText}</p>
-        <p className={styles.chargeXmr}>{formatXmr(due, 6)} XMR{inv.fiat ? <span> at {money(inv.fiat.rate, inv.fiat.currency)} per XMR</span> : null}</p>
+        {inv.fiat ? (
+          <p className={styles.chargeXmr}>{formatXmr(due, 6)} XMR<span> at {money(inv.fiat.rate, inv.fiat.currency)} per XMR</span></p>
+        ) : wantRef && refRate ? (
+          <p className={styles.chargeXmr}>about {money(atomicToFiat(due, refRate), config.currency)}<span> at today&apos;s rate</span></p>
+        ) : null}
 
         <div className={`${styles.state} ${confirming ? styles.stateGood : ""}`} role="status" aria-live="polite">
           <span className={styles.pulse} aria-hidden="true" />

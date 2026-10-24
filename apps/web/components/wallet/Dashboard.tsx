@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Credentials, LoadMoveFile, NodeSettings, RescanFrom, RevealWords, SaveMoveFile, type SettingsActions } from "./WalletSettings";
 import { WalletSwitcher } from "./WalletSwitcher";
+import { FiatValue } from "./FiatValue";
 import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
@@ -379,6 +380,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                     : <><span className={styles.balancePending} aria-hidden="true">…</span><span className="visually-hidden">Balance loading</span></>}
                   <span className={styles.unit}><MoneroSymbol size={26} /> XMR</span>
                 </p>
+                <FiatValue atomic={bal && synced ? bal.total : null} hidden={hidden} />
                 {bal && synced && !hidden && bal.total - otherTotal(bal) > bal.unlocked ? (
                   <p className={styles.heroNote}><strong>{formatXmr(bal.unlocked, 6)} XMR</strong> spendable now. {unlockNote(txs)}</p>
                 ) : null}
