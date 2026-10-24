@@ -5,7 +5,7 @@
  * the one-tab rule and auto-lock on idle or a hidden tab.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { StoredWallet, WalletPublic } from "@quietmint/wallet-core";
 import { warmEngine } from "@/lib/wallet/engine";
 import { CODE_EXPIRED, CODE_TOO_MANY, CODE_WAIT_MS, STATE_SAVE_EVERY_MS, WalletController, type SaveProblem, type View } from "@/lib/wallet/session";
@@ -21,6 +21,7 @@ import { ArtEngine, ArtLock } from "./WalletArt";
 import styles from "./wallet.module.css";
 import { siteHref } from "@/lib/site";
 import { useSingleTab } from "@/lib/wallet/tabLock";
+import { forget, mayResume, readRefreshUnlock, recall, remember, touch, writeRefreshUnlock } from "@/lib/wallet/refreshUnlock";
 
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
 
@@ -39,8 +40,22 @@ export function WalletApp() {
   const [tillShown, setTillShown] = useState(false);
   const [lockOnLeave, setLockOnLeave] = useState(readLockOnLeave);
   const changeLockOnLeave = (on: boolean) => { writeLockOnLeave(on); setLockOnLeave(on); };
+  // Stay unlocked across a reload of this tab (lib/wallet/refreshUnlock.ts), unless turned off.
+  const [refreshUnlock, setRefreshUnlock] = useState(readRefreshUnlock);
+  const refreshRef = useRef(refreshUnlock);
+  const changeRefreshUnlock = (on: boolean) => {
+    writeRefreshUnlock(on);
+    refreshRef.current = on;
+    setRefreshUnlock(on);
+    if (on) controller.rememberPassword();
+    else void forget();
+  };
+  /** True while a reload tries the password this tab sealed, so the unlock screen does not flash. */
+  const [resuming, setResuming] = useState(true);
 
   useEffect(() => {
+    controller.onPassword = (pw) => void (pw && refreshRef.current ? remember(pw) : forget());
+    if (!mayResume()) setResuming(false);
     controller.start();
     if (DEV_TOOLS_ENABLED) void fetchTestWallets().then((f) => { if (f) { controller.testWallets = f.wallets; setTestWalletCount(f.wallets.length); } });
     return () => controller.dispose();
@@ -61,6 +76,12 @@ export function WalletApp() {
     let lastTouched = lastActive;
     let hiddenSince: number | null = document.hidden ? clock() : null;
     let locking = false;
+    // Activity also goes into the sealed reload pass, so a reload keeps the same limits.
+    let lastTouch = -Infinity;
+    const touchSoon = () => {
+      const t = clock();
+      if (t - lastTouch > 5_000) { lastTouch = t; touch(document.hidden); }
+    };
     const lockNow = () => {
       if (locking) return;
       locking = true;
@@ -69,7 +90,7 @@ export function WalletApp() {
     const check = () => {
       // A watch-only wallet in cashier mode stays open all shift: it cannot spend, and a till that
       // locks between customers is unusable. Full wallets keep the normal auto-lock.
-      if (controller.cashierOn && controller.view.name === "open" && controller.view.pub.kind === "view-only") return;
+      if (controller.cashierOn && controller.view.name === "open" && controller.view.pub.kind === "view-only") { touchSoon(); return; }
       const now = clock();
       // While the first scan runs, waiting is not idleness: locking would stop the scan. By default
       // leaving the tab still locks (progress is saved on the way out); with lock-on-leave turned
@@ -77,12 +98,13 @@ export function WalletApp() {
       // With lock on leave on, an untouched screen still locks after AUTO_LOCK_SCAN_MAX_MS: a
       // spending wallet must not stay open for hours on an unattended screen.
       const scanKeepsOpen = lockOnLeave ? !document.hidden && now - lastTouched < AUTO_LOCK_SCAN_MAX_MS : true;
-      if (controller.syncBusy && scanKeepsOpen) lastActive = now;
+      if (controller.syncBusy && scanKeepsOpen) { lastActive = now; touchSoon(); }
       if (now - lastActive >= AUTO_LOCK_IDLE_MS) lockNow();
       else if (lockOnLeave && hiddenSince !== null && now - hiddenSince >= AUTO_LOCK_HIDDEN_MS) lockNow();
     };
-    const onActivity = () => { lastActive = clock(); lastTouched = lastActive; };
+    const onActivity = () => { lastActive = clock(); lastTouched = lastActive; touchSoon(); };
     const onVisibility = () => {
+      touch(document.hidden);
       if (document.hidden) {
         hiddenSince = clock();
       } else {
@@ -106,6 +128,18 @@ export function WalletApp() {
   useEffect(() => {
     if (tab.state === "moved") void controller.lock();
   }, [tab.state, controller]);
+
+  // A reload of an unlocked tab: reopen with the sealed password once this tab owns the wallet.
+  useEffect(() => {
+    if (!resuming || tab.state !== "owner" || view.name === "boot") return;
+    if (view.name !== "locked") { setResuming(false); return; }
+    let live = true;
+    void recall(lockOnLeave)
+      .then((pw) => (pw ? controller.resume(pw) : false))
+      .then((ok) => { if (!ok) void forget(); })
+      .finally(() => { if (live) setResuming(false); });
+    return () => { live = false; };
+  }, [resuming, tab.state, view.name, controller, lockOnLeave]);
 
   // While open, save sync progress periodically (persistState skips if nothing new was synced).
   useEffect(() => {
@@ -146,7 +180,7 @@ export function WalletApp() {
         ) : null}
         {tab.state !== "owner" ? null : (
           <>
-            {view.name === "boot" ? <Loading text="Loading…" /> : null}
+            {view.name === "boot" || (view.name === "locked" && resuming) ? <Loading text={resuming ? "Opening your wallet…" : "Loading…"} /> : null}
             {view.name === "welcome" ? (
               <>
                 {isDemo ? <DemoIntro walletCount={testWalletCount} /> : null}
@@ -156,12 +190,12 @@ export function WalletApp() {
             {view.name === "onboard" ? (
               <Onboarding mode={view.mode} adding={view.adding} testWallets={controller.testWallets} onCancel={() => controller.pick(null)} onDone={controller.onboarded} onSwitchMode={(m) => controller.pick(m)} />
             ) : null}
-            {view.name === "locked" ? <Unlock record={view.record} count={view.count} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.forgetAll} /> : null}
+            {view.name === "locked" && !resuming ? <Unlock record={view.record} count={view.count} unlock={controller.unlock} submitCode={controller.submitCode} onForget={controller.forgetAll} /> : null}
             {view.name === "otherNetwork" ? <OtherNetwork record={view.record} onRemove={controller.remove} /> : null}
             {view.name === "opening" ? <Opening /> : null}
             {view.name === "open" && saveProblem ? <SaveProblemNotice problem={saveProblem} /> : null}
             {view.name === "open" ? (
-              <OpenDashboard view={view} controller={controller} onCashierChange={setCashierOn} lockOnLeave={{ on: lockOnLeave, onChange: changeLockOnLeave }} />
+              <OpenDashboard view={view} controller={controller} onCashierChange={setCashierOn} lockOnLeave={{ on: lockOnLeave, onChange: changeLockOnLeave }} refreshUnlock={{ on: refreshUnlock, onChange: changeRefreshUnlock }} />
             ) : null}
             {view.name === "fatal" ? <Fatal message={view.message} /> : null}
           </>
@@ -171,7 +205,7 @@ export function WalletApp() {
   );
 }
 
-function OpenDashboard({ view, controller, onCashierChange, lockOnLeave }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void; lockOnLeave: LockOnLeave }) {
+function OpenDashboard({ view, controller, onCashierChange, lockOnLeave, refreshUnlock }: { view: Extract<View, { name: "open" }>; controller: WalletController; onCashierChange: (on: boolean) => void; lockOnLeave: LockOnLeave; refreshUnlock: LockOnLeave }) {
   const stores = controller.openStores();
   const walletMenu: WalletMenu = { wallets: view.wallets, onSwitch: controller.switchTo, onAdd: () => void controller.startAdd(), onRename: controller.rename };
   return (
@@ -187,6 +221,7 @@ function OpenDashboard({ view, controller, onCashierChange, lockOnLeave }: { vie
       contacts={stores.contacts}
       onCashierChange={onCashierChange}
       lockOnLeave={lockOnLeave}
+      refreshUnlock={refreshUnlock}
       walletMenu={walletMenu}
       demo={isDemo ? { mode: view.mode, fellBack: view.fellBack, assignedLabel: view.pub.name, onSwitchMode: controller.switchMode } : undefined}
     />

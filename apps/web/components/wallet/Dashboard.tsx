@@ -102,7 +102,7 @@ export interface WalletMenu {
   onRename: (name: string) => Promise<void>;
 }
 
-export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave, walletMenu }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave; walletMenu?: WalletMenu }) {
+export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, requests, cashier, contacts, onCashierChange, demo, compact, leaveText = "you leave this tab", leaveDelay, lockOnLeave, refreshUnlock, walletMenu }: { pub: WalletPublic; wallet: LiveWallet; onLock: () => void; onRemove: () => void; onSynced?: () => void; settings?: SettingsActions; requests?: RequestStore; cashier?: CashierStore; contacts?: ContactStore; onCashierChange?: (on: boolean) => void; demo?: DemoInfo; compact?: CompactView; leaveText?: string; leaveDelay?: string; lockOnLeave?: LockOnLeave; refreshUnlock?: LockOnLeave; walletMenu?: WalletMenu }) {
   const [sync, setSync] = useState<SyncState | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [bal, setBal] = useState<Balances | null>(null);
@@ -533,6 +533,15 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                     <span>
                       Lock {Math.round(AUTO_LOCK_HIDDEN_MS / 60000)} minutes after I leave this tab.{" "}
                       <span className="muted">Turn off to let a long scan finish while you use other tabs. Your browser may still slow a background tab down. Leave it on if other people use this computer.</span>
+                    </span>
+                  </label>
+                ) : null}
+                {refreshUnlock ? (
+                  <label className="check" style={{ margin: "0 0 var(--s-4)" }}>
+                    <input type="checkbox" checked={!refreshUnlock.on} onChange={(e) => refreshUnlock.onChange(!e.target.checked)} />
+                    <span>
+                      Ask for my password after a refresh.{" "}
+                      <span className="muted">When off, reloading this tab keeps the wallet open, within the same auto-lock limits. A new tab, a closed browser or Lock always asks for the password.</span>
                     </span>
                   </label>
                 ) : null}

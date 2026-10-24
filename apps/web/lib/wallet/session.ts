@@ -211,6 +211,16 @@ export class WalletController {
    * to another wallet in this browser needs no new password. Dropped on lock and removal.
    */
   private password: string | null = null;
+  /**
+   * Told whenever the password is held or dropped (unlock, lock, password change). The web wallet
+   * uses it to stay unlocked across a reload of the same tab; the extension leaves it unset.
+   */
+  onPassword: ((password: string | null) => void) | null = null;
+
+  private setPassword(password: string | null) {
+    this.password = password;
+    this.onPassword?.(password);
+  }
   private listeners = new Set<() => void>();
   private stores: { pub: WalletPublic; requests?: RequestStore; contacts?: ContactStore; cashier?: CashierStore } | null = null;
   /**
@@ -436,10 +446,35 @@ export class WalletController {
       this.pending = { secrets: s, password, timer: setTimeout(() => this.dropPending(), CODE_WAIT_MS), tries: 0 };
       return "code";
     }
-    this.password = password;
+    this.setPassword(password);
     void this.open({ ...record.pub, totpEnabled: false }, s);
     return "open";
   };
+
+  /**
+   * Reopens the active wallet after a reload of the same tab, with the password that tab sealed
+   * when it was unlocked (see refreshUnlock.ts). The authenticator code was checked for that unlock,
+   * so it is not asked again. Returns false when the password no longer opens it.
+   */
+  resume = async (password: string): Promise<boolean> => {
+    const record = activeRecord();
+    if (!record || this.view.name !== "locked") return false;
+    let s: Secrets;
+    try {
+      s = await unlockWallet(record, password);
+    } catch {
+      return false;
+    }
+    if (this.view.name !== "locked") return false;
+    this.setPassword(password);
+    void this.open({ ...record.pub, totpEnabled: !!s.totp }, s);
+    return true;
+  };
+
+  /** Hands the held password to onPassword again (the stay-unlocked setting was just turned on). */
+  rememberPassword() {
+    if (this.password && this.unlocked) this.onPassword?.(this.password);
+  }
 
   /** Second unlock step. Throws when the code is wrong, or when the keys stopped waiting. */
   submitCode = async (code: string): Promise<void> => {
@@ -455,7 +490,7 @@ export class WalletController {
       throw new Error(WRONG_CODE);
     }
     this.dropPending();
-    this.password = p.password;
+    this.setPassword(p.password);
     void this.open({ ...record.pub, totpEnabled: true }, p.secrets);
   };
 
@@ -528,7 +563,7 @@ export class WalletController {
         if (e instanceof StorageUnavailableError) throw e;
         throw new Error("Could not save the wallet on this device.");
       }
-      this.password = password;
+      this.setPassword(password);
       await this.open(pub, { seed: w.seed, privateViewKey: w.privateViewKey, totp });
       return;
     }
@@ -560,7 +595,7 @@ export class WalletController {
       const blob = await sealBytes(packParts([utf8.encode(moved.engine.password), moved.engine.keysData, moved.engine.cacheData]), sealSecretOf(secrets), sealContextOf(pub));
       await saveSyncState(pub.id, blob).catch(() => {});
     }
-    this.password = password;
+    this.setPassword(password);
     await this.open(pub, { ...secrets, totp });
   };
 
@@ -711,7 +746,7 @@ export class WalletController {
       resealed.push(await sealWallet(pub, next, newPassword));
     }
     putWallets(resealed);
-    this.password = newPassword;
+    this.setPassword(newPassword);
     const openId = this.session?.pub.id;
     const mine = resealed.find((r) => r.pub.id === openId);
     if (mine && this.session) {
@@ -902,6 +937,8 @@ export class WalletController {
     // Any open() still in progress must not reopen the wallet after this.
     const gen = ++this.openGen;
     this.dropPending();
+    // A reload from here on asks for the password, even while the save below is still running.
+    this.onPassword?.(null);
     // Save progress first (bounded, so locking never hangs), then drop secrets and close. A first
     // sync in progress is stopped so its state can be exported: the scan resumes from there.
     // Locking should be quick. It waits longer only when nothing of this scan is saved anywhere yet
@@ -932,7 +969,7 @@ export class WalletController {
     this.sendApprovals.clear();
     this.synced = false;
     this.cashierOn = false;
-    this.password = null;
+    this.setPassword(null);
     await withTimeout(w?.close().catch(() => {}) ?? Promise.resolve(), ENGINE_CLOSE_TIMEOUT_MS);
     this.set(viewFor(loadWallets()));
   }
@@ -969,7 +1006,7 @@ export class WalletController {
         /* falls through to the unlock screen */
       }
     }
-    this.password = null;
+    this.setPassword(null);
     this.set(viewFor(left));
   };
 
@@ -984,7 +1021,7 @@ export class WalletController {
     this.session = null;
     this.stores = null;
     this.sendApprovals.clear();
-    this.password = null;
+    this.setPassword(null);
     await w?.close().catch(() => {});
     removeWallet();
     await clearSyncStates();

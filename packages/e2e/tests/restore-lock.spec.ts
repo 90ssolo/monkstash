@@ -46,11 +46,10 @@ test("restore, lock, wrong password, unlock, reload", async ({ page }) => {
   await unlock(page, PASSWORD);
   await dashboard(page);
 
-  // A reload never leaves the wallet open: it asks for the password again.
+  // A reload of this tab keeps it open (refresh.spec.ts covers when it asks again).
   await page.reload();
-  await expect(page.locator("#upw")).toBeVisible();
-  await unlock(page);
   await dashboard(page);
+  await expect(page.locator("#upw")).toHaveCount(0);
 });
 
 test("lock on leave: on by default, can be turned off, and the choice is kept", async ({ page }) => {
@@ -81,7 +80,6 @@ test("lock on leave: on by default, can be turned off, and the choice is kept", 
 
   // The choice survives a reload; turning it back on restores the lock after leaving.
   await page.reload();
-  await unlock(page);
   await dashboard(page);
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(toggle).not.toBeChecked();

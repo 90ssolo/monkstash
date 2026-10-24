@@ -98,6 +98,7 @@ test("a wallet saved by an earlier version still unlocks, and joins the list", a
   await openWallet(page);
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await lock(page);
   // Rewrite the stored list as the single record that earlier versions saved.
   await page.evaluate(() => {
     const key = "quietmint.wallet.v1";

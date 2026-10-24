@@ -9,8 +9,8 @@ import { KeysOnDeviceArt } from "../_trust/TrustArt";
 import trust from "../_trust/trust.module.css";
 import styles from "./privacy.module.css";
 
-const UPDATED = "2026-10-22";
-const UPDATED_TEXT = "22 October 2026";
+const UPDATED = "2026-10-24";
+const UPDATED_TEXT = "24 October 2026";
 const DESCRIPTION =
   "What MonkStash can and cannot see: no accounts, no cookies, no tracking. Your keys never leave your device. Here is exactly what passes through our server.";
 
@@ -123,7 +123,10 @@ export default function PrivacyPage() {
                 A few details are saved without encryption: the wallet&apos;s name, its main address, its restore height, when it was created, and whether 2FA is turned on. The lock screen needs them to show you which wallet it is before you type your password. They cannot be used to spend, but anyone who can open your browser profile could read them.
               </p>
               <p>
-                Using <em>Remove wallet</em> deletes all of this from the device. Two display preferences (whether amounts are hidden, and whether you bookmarked the wallet) stay until you clear your browser&apos;s site data. Your money is not affected: it lives on the Monero network, and your recovery words bring it back. See <Link className={trust.inlineLink} href="/back-up-monero-wallet">how to back up a Monero wallet</Link>.
+                So that reloading the page does not lock you out, an unlocked wallet also keeps a reload pass for that one tab: the password, encrypted with a key that your browser creates and will not let any page read out. The pass is deleted when the wallet locks (the Lock button, idle time, or leaving the tab) and when the tab or browser closes, so a new tab always asks for the password. You can turn it off in Settings with <em>Ask for my password after a refresh</em>.
+              </p>
+              <p>
+                Using <em>Remove wallet</em> deletes all of this from the device. A few display preferences (whether amounts are hidden, the currency for the balance&apos;s value, and whether you bookmarked the wallet) stay until you clear your browser&apos;s site data. Your money is not affected: it lives on the Monero network, and your recovery words bring it back. See <Link className={trust.inlineLink} href="/back-up-monero-wallet">how to back up a Monero wallet</Link>.
               </p>
             </section>
 
