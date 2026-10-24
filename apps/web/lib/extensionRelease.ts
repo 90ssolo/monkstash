@@ -6,19 +6,19 @@
 import { repoUrl } from "./site";
 
 export const extensionRelease = {
-  tag: "extension-v0.1.8",
-  url: `${repoUrl}/releases/tag/extension-v0.1.8`,
+  tag: "extension-v0.1.9",
+  url: `${repoUrl}/releases/tag/extension-v0.1.9`,
   published: "2026-10-24",
   chrome: {
-    version: "0.1.8",
-    file: "monkstash-chrome-0.1.8.zip",
-    sha256: "98fd6663a6a0a7dba2a952f0a020ec6e27f3810cc1569e5663a48fdc15273f49",
-    fingerprint: "fbef9a5ce17e44be7fec2a4f1c8813a32e333a9fd5705adba466b72a38779759",
+    version: "0.1.9",
+    file: "monkstash-chrome-0.1.9.zip",
+    sha256: "7f8e345f9fbc00302cea162789f9994dadc6fd43a3966d99dab12a4208fedfee",
+    fingerprint: "da34b779880a3ca7b54f895c5e4e20eb9a48b3e83f2094581451ededfe9588f0",
   },
   firefox: {
-    version: "0.1.8",
-    file: "monkstash-firefox-0.1.8.zip",
-    sha256: "36666e197247e3efd247bf6ba20d5466800d55cd32aae15ede07eded513f44eb",
-    fingerprint: "581ccd0b26cc94cdf5644878ff91b37b211bb8df453a2661498a092b0bd01b89",
+    version: "0.1.9",
+    file: "monkstash-firefox-0.1.9.zip",
+    sha256: "1fdd1445eddd440fce9db23a7557d8e685ae9a0f057b8e42ed045183a6ce9765",
+    fingerprint: "74becf056c91f79d4368d4a38f8199d4cb3ce59317a4f899c6ed1698c4696406",
   },
 } as const;
