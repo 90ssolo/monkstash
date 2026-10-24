@@ -1,16 +1,16 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Credentials, LoadMoveFile, NodeSettings, RescanFrom, RevealWords, SaveMoveFile, type SettingsActions } from "./WalletSettings";
 import { WalletSwitcher } from "./WalletSwitcher";
 import { FiatValue } from "./FiatValue";
 import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
-import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, type WalletPublic } from "@quietmint/wallet-core";
+import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, type WalletPublic } from "@quietmint/wallet-core";
 import { fetchPriceFeed, fetchQuote, MAIN_CURRENCIES, PriceUnavailableError } from "@/lib/prices";
 import { fiatText, localCurrency } from "@/lib/localCurrency";
 import { recordRequestSeen, statusOf, type PaymentRequest, type RequestStatus, type RequestStore } from "@/lib/wallet/requests";
-import type { Balances, IncomingEntry, LiveWallet, SyncHealth, SyncState, TxSummary, TxWhere } from "@/lib/wallet/engine";
+import type { Balances, Destination, IncomingEntry, LiveWallet, SendSpeed, SyncHealth, SyncState, TxSummary, TxWhere } from "@/lib/wallet/engine";
 import { ACCOUNT_NAME, CHECKPOINT_BLOCKS } from "@/lib/wallet/engine";
 import { checkClock, clockWarning, serverNow, useClockOffset } from "@/lib/wallet/clock";
 import { apiUrl } from "@/lib/wallet/config";
@@ -28,6 +28,8 @@ import { freshAddress } from "@/lib/wallet/addresses";
 import { payLinkOrigin, siteHref } from "@/lib/site";
 import type { CashierStore } from "@/lib/wallet/cashier";
 import { Qr } from "./Qr";
+import { QrScanButton } from "./QrScan";
+import { AddressDiff, BatchForm, SpeedPicker, speedLabel } from "./SendParts";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
 import styles from "./wallet.module.css";
 
@@ -123,6 +125,8 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     });
   };
   const [contactList, setContactList] = useState<Contact[]>([]);
+  // Everyone this wallet has paid, from its own history (for the lookalike and first-time checks).
+  const pastRecipients = useMemo(() => [...new Set(txs.flatMap((t) => (t.direction === "in" ? [] : (t.destinations ?? []).map((d) => d.address))))], [txs]);
   useEffect(() => {
     let alive = true;
     void contacts?.load().then((l) => { if (alive) setContactList(l); });
@@ -427,7 +431,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
             <h2 id="send-h" className={styles.panelH} tabIndex={-1}>Send Monero</h2>
             {pub.kind === "full" ? (
               <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} settings={settings} synced={synced} unlocked={bal?.unlocked ?? 0n} onSent={refresh} prefill={prefill}
-                contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} />
+                contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} past={pastRecipients} />
             ) : (
               <p className="muted">This is a watch-only wallet: it can see payments but has no key to send. Send from the full wallet that holds your recovery words.</p>
             )}
@@ -928,8 +932,13 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged }: { pub: Wal
   );
 }
 
-function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contacts, onSaveContacts, hidden }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean }) {
+function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contacts, onSaveContacts, hidden, past }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean; past: string[] }) {
   const [to, setTo] = useState(prefill?.address ?? "");
+  const [speed, setSpeed] = useState<SendSpeed>("standard");
+  // The fee comes out of the typed amount: the recipient gets a little less, you pay exactly that amount.
+  const [subtractFee, setSubtractFee] = useState(false);
+  // Pay several people in one transaction.
+  const [batch, setBatch] = useState(false);
   const [amount, setAmount] = useState(prefill?.amount ? formatXmr(prefill.amount) : "");
   // "Send all": everything spendable, the network fee taken out of it (no amount to type).
   const [sendAll, setSendAll] = useState(false);
@@ -937,7 +946,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
   const [sendPw, setSendPw] = useState("");
   const [sendCode, setSendCode] = useState("");
   // The review is a frozen snapshot: what was built is what is shown and sent, whatever the form says now.
-  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; hash?: string; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean } | null>(null);
+  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean; speed: SendSpeed; feeFromAmount: boolean } | null>(null);
   const toRef = useRef("");
   const [state, setState] = useState<"idle" | "preparing" | "sending" | "checking" | "sent">("idle");
   // After a broadcast error the payment may or may not be on the network. Until a check shows the
@@ -1002,6 +1011,22 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fqdn]);
 
+  /** Typed, pasted or scanned recipient. A payment link (monero:address?tx_amount=...) fills in the address and amount. */
+  function takeRecipient(v: string, scanned = false) {
+    setError(null);
+    if (/^\s*monero:/i.test(v)) {
+      try {
+        const req = parsePaymentUri(v);
+        setTo(req.address);
+        if (req.amount) { setAmount(formatXmr(req.amount)); setSendAll(false); }
+        return;
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    }
+    setTo(scanned ? v.trim() : v);
+  }
+
   if (pub.kind === "view-only") {
     return <p className="muted" style={{ margin: 0 }}>This is a view-only wallet. To send, restore the wallet from its recovery words.</p>;
   }
@@ -1020,12 +1045,12 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
     }
     return (
       <div>
-        <h3>Sent{paidTo ? ` to ${paidTo.name}` : ""}</h3>
+        <h3>Sent{review && review.destinations.length > 1 ? ` to ${review.destinations.length} people` : paidTo ? ` to ${paidTo.name}` : ""}</h3>
         <p className="muted">Your payment was sent to the network. It usually confirms in about 2 minutes.</p>
         <p className="small">Transaction ID</p>
         <p className={`mono ${styles.addr}`}>{txHash}</p>
         <CopyButton value={txHash} label="Copy transaction ID" />
-        {contacts && !paidTo ? (
+        {contacts && !paidTo && (review?.destinations.length ?? 1) === 1 ? (
           <form onSubmit={saveRecipient} className={styles.saveContact}>
             <label htmlFor="save-name">Save this recipient as a contact?</label>
             <div className={styles.saveRow}>
@@ -1035,7 +1060,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
             {saveMsg ? <p className="small" role="status" style={{ margin: 0 }}>{saveMsg}</p> : null}
           </form>
         ) : null}
-        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setReview(null); setTxHash(null); }}>Send another</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setSubtractFee(false); setBatch(false); setReview(null); setTxHash(null); }}>Send another</button>
       </div>
     );
   }
@@ -1051,7 +1076,11 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
   const lookalike = contacts && dest && fmt?.ok && !known ? lookalikeContact(dest, contacts) : null;
   const aliasContact = contacts && fqdn ? contactForAlias(fqdn, contacts) : null;
   const aliasMoved = aliasContact && resolved && aliasChanged(aliasContact, resolved.address) ? aliasContact : null;
-  const alarm = !!(lookalike || aliasMoved);
+  // Also compare with everyone this wallet has paid: a lookalike of a past recipient is the same red flag.
+  const pastLook = dest && fmt?.ok && !known && !lookalike && !past.includes(dest) ? lookalikeAddress(dest, past) : null;
+  const alarm = !!(lookalike || aliasMoved || pastLook);
+  // A calm note, not an alarm: most new recipients are fine, but this is when to double-check.
+  const firstTime = !!(synced && dest && fmt?.ok && !known && !alarm && !past.includes(dest));
 
   async function prepare(e: React.FormEvent) {
     e.preventDefault();
@@ -1070,7 +1099,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
       if (atomic === null) return setError(xmrAmountProblem(amount) ?? "Enter an amount in XMR, like 0.5.");
       if (atomic <= 0n) return setError("Enter an amount greater than 0");
       if (unlocked <= 0n) return setError(nothingSpendable);
-      if (atomic >= unlocked) return setError(`That leaves nothing for the network fee. You can send a little under ${formatXmr(unlocked)} XMR, or use Send all.`);
+      if (subtractFee ? atomic > unlocked : atomic >= unlocked) return setError(subtractFee ? `That is more than you can spend now (${formatXmr(unlocked)} XMR).` : `That leaves nothing for the network fee. You can send a little under ${formatXmr(unlocked)} XMR, take the fee from the amount, or use Send all.`);
     } else if (unlocked <= 0n) {
       return setError(nothingSpendable);
     }
@@ -1083,13 +1112,29 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
       return setError("This address failed the checksum test. Copy it again.");
     }
     try {
-      const built = sendAll ? await wallet.prepareSweep(target) : await wallet.prepareSend(target, atomic!);
+      const built = sendAll ? await wallet.prepareSweep(target, { speed }) : await wallet.prepareSend([{ address: target, amount: atomic! }], { speed, subtractFee });
       // If the recipient changed while the fee was being calculated, start over rather than guess.
       if (toRef.current !== typed || built.address !== target) {
         setError("The recipient changed while the payment was being prepared. Check it and press Review again.");
       } else {
-        setReview({ ...built, alias: targetAlias, all: sendAll });
+        setReview({ ...built, alias: targetAlias, all: sendAll, speed, feeFromAmount: subtractFee && !sendAll });
       }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+    setState("idle");
+  }
+
+  /** Builds a payment to several recipients (the batch form). */
+  async function prepareBatch(dests: Destination[]) {
+    setError(null);
+    setState("preparing");
+    try {
+      for (const d of dests) {
+        if (!(await validateAddress(d.address, pub.network))) throw new Error(`${shortAddress(d.address, 6)} failed the checksum test. Copy it again.`);
+      }
+      const built = await wallet.prepareSend(dests, { speed });
+      setReview({ ...built, alias: null, all: false, speed, feeFromAmount: false });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -1104,8 +1149,8 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
     sentAlias.current = review.alias ? review.alias.fqdn : null;
     setState("sent");
     onSent();
-    const paid = contacts ? contactForAddress(review.address, contacts) : null;
-    if (contacts && paid) void onSaveContacts(contacts.map((c) => (c.id === paid.id ? { ...c, lastPaidAt: new Date().toISOString() } : c)));
+    const paidIds = new Set(contacts ? review.destinations.map((d) => contactForAddress(d.address, contacts)?.id).filter(Boolean) : []);
+    if (contacts && paidIds.size) void onSaveContacts(contacts.map((c) => (paidIds.has(c.id) ? { ...c, lastPaidAt: new Date().toISOString() } : c)));
   }
 
   /** Where the prepared payment is: in this wallet's history, or the node's pool or chain. "unknown" when it cannot be checked. */
@@ -1163,15 +1208,29 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
     return (
       <div>
         <h3>Review payment</h3>
+        {review.destinations.length > 1 ? (
+          <ol className={styles.reviewList} aria-label="Recipients">
+            {review.destinations.map((d, i) => {
+              const c = contacts ? contactForAddress(d.address, contacts) : null;
+              return (
+                <li key={i}>
+                  <span>{c ? <strong>{c.name}</strong> : null}<span className="mono">{d.address}</span></span>
+                  <span className={styles.reviewAmt}>{formatXmr(d.amount)} XMR</span>
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
         <dl className={styles.review}>
           {review.alias ? <><dt>Name</dt><dd>{review.alias.fqdn}{review.alias.name ? ` (${review.alias.name})` : ""}{review.alias.dnssec ? ", DNSSEC verified" : ", not DNSSEC verified"}</dd></> : null}
           {reviewContact ? <><dt>Contact</dt><dd><strong>{reviewContact.name}</strong> <span className="muted">(saved contact)</span></dd></> : null}
-          <dt>To</dt><dd><AddressCheck address={review.address} /></dd>
-          <dt>Amount</dt><dd>{formatXmr(review.amount)} XMR{inFiat(review.amount) ? <span className="muted"> (about {inFiat(review.amount)})</span> : null}</dd>
-          <dt>Network fee</dt><dd>{formatXmr(review.fee)} XMR</dd>
+          {review.destinations.length === 1 ? <><dt>To</dt><dd><AddressCheck address={review.address} /></dd></> : <><dt>Recipients</dt><dd>{review.destinations.length}</dd></>}
+          <dt>{review.destinations.length > 1 ? "They receive" : review.feeFromAmount ? "They receive" : "Amount"}</dt><dd>{formatXmr(review.amount)} XMR{inFiat(review.amount) ? <span className="muted"> (about {inFiat(review.amount)})</span> : null}</dd>
+          <dt>Network fee</dt><dd>{formatXmr(review.fee)} XMR{inFiat(review.fee) ? <span className="muted"> (about {inFiat(review.fee)})</span> : null}<span className="muted">, {speedLabel(review.speed).toLowerCase()} speed</span></dd>
           <dt>Total</dt><dd><strong>{formatXmr(review.amount + review.fee)} XMR</strong></dd>
         </dl>
         {review.all ? <p className="small muted" style={{ margin: "var(--s-3) 0 0" }}>This sends everything spendable. The network fee comes out of it, so the recipient gets the amount above.</p> : null}
+        {review.feeFromAmount ? <p className="small muted" style={{ margin: "var(--s-3) 0 0" }}>The fee was taken from the amount you typed, so the recipient gets a little less and you pay exactly {formatXmr(review.amount + review.fee)} XMR.</p> : null}
         {unlocked > 0n && review.amount * 2n >= unlocked ? (
           <div className="notice notice-warn" role="alert" style={{ margin: "var(--s-4) 0 0" }}>
             <span>
@@ -1213,6 +1272,13 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
     );
   }
 
+  if (batch) {
+    return (
+      <BatchForm network={pub.network} contacts={contacts} past={past} unlocked={unlocked} synced={synced} busy={state === "preparing"} error={error}
+        speed={speed} onSpeed={setSpeed} onBuild={(d) => void prepareBatch(d)} onCancel={() => { setBatch(false); setError(null); }} inFiat={inFiat} />
+    );
+  }
+
   if (managing && contacts) {
     return <ContactManager contacts={contacts} network={pub.network} onSave={onSaveContacts} onClose={() => setManaging(false)} />;
   }
@@ -1238,24 +1304,12 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
         </div>
       ) : null}
       <div className="field">
-        <label htmlFor="to">Recipient (address or name)</label>
+        <span className={styles.toHead}>
+          <label htmlFor="to">Recipient (address or name)</label>
+          <QrScanButton disabled={state === "preparing"} onScan={(text) => takeRecipient(text, true)} />
+        </span>
         <textarea id="to" className="textarea mono" style={{ minHeight: 80 }} spellCheck={false} autoComplete="off" autoCapitalize="none" value={to} readOnly={state === "preparing"}
-          onChange={(e) => {
-            const v = e.target.value;
-            setError(null);
-            // A pasted payment link (monero:address?tx_amount=...) fills in the address and amount.
-            if (/^\s*monero:/i.test(v)) {
-              try {
-                const req = parsePaymentUri(v);
-                setTo(req.address);
-                if (req.amount) setAmount(formatXmr(req.amount));
-                return;
-              } catch (err) {
-                setError((err as Error).message);
-              }
-            }
-            setTo(v);
-          }} aria-describedby="to-hint" />
+          onChange={(e) => takeRecipient(e.target.value)} aria-describedby="to-hint" />
         <span id="to-hint" className={fmt && !fmt.ok ? "error" : "hint"}>
           {fqdn ? (resolved ? (fmt?.ok ? `Name found: valid ${fmt.kind} address` : wrongNet ? `${resolved.fqdn} points to a ${wrongNet} address, but this wallet is on ${pub.network}.` : fmt?.reason) : aliasState === "looking" ? `Looking up ${fqdn}…` : aliasError)
             : fmt ? (fmt.ok ? `Valid ${fmt.kind} address format` : fmt.reason) : "Paste the full address, a payment link, or a name like donate.getmonero.org"}
@@ -1263,9 +1317,23 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
         {known && !alarm ? <span className={styles.knownContact}>Saved contact: <strong>{known.name}</strong></span> : null}
         {lookalike ? (
           <TamperAlarm title={`This looks like ${lookalike.name}'s address, but it is different`} checked={alarmOk} onCheck={setAlarmOk}>
-            <p>It starts and ends like the address you saved for {lookalike.name}, but the middle is not the same. Malware that swaps copied addresses makes lookalikes exactly like this.</p>
+            <p>It starts and ends like the address you saved for {lookalike.name}, but the middle is not the same. Malware that swaps copied addresses makes lookalikes exactly like this. The differences are marked:</p>
+            <p><AddressDiff address={dest} other={lookalike.address} /></p>
             <p>Saved: <span className="mono">{shortAddress(lookalike.address, 8)}</span>. Do not send unless {lookalike.name} confirms this new address another way.</p>
           </TamperAlarm>
+        ) : null}
+        {pastLook ? (
+          <TamperAlarm title="This looks like an address you paid before, but it is different" checked={alarmOk} onCheck={setAlarmOk}>
+            <p>It starts and ends like an address this wallet has paid, but the middle is not the same. Malware that swaps copied addresses makes lookalikes exactly like this. The differences are marked:</p>
+            <p><AddressDiff address={dest} other={pastLook} /></p>
+            <p>You paid before: <span className="mono">{shortAddress(pastLook, 8)}</span>. Do not send unless the person confirms this new address another way.</p>
+          </TamperAlarm>
+        ) : null}
+        {firstTime ? (
+          <p className={styles.firstTime} role="status">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M8 7.25v4M8 4.75v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            <span>You have not paid this address before. Check the first and last few characters with the person you are paying.</span>
+          </p>
         ) : null}
         {aliasMoved ? (
           <TamperAlarm title={`${aliasMoved.alias} now points to a different address`} checked={alarmOk} onCheck={setAlarmOk}>
@@ -1297,7 +1365,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
         <span className={styles.amtHead}>
           <label htmlFor="amt">Amount (XMR)</label>
           <button type="button" className={`btn btn-ghost btn-sm ${sendAll ? styles.allOn : ""}`} aria-pressed={sendAll} disabled={state === "preparing" || !synced}
-            onClick={() => { setSendAll((v) => !v); setAmount(""); setError(null); }}>Send all</button>
+            onClick={() => { setSendAll((v) => !v); setSubtractFee(false); setAmount(""); setError(null); }}>Send all</button>
         </span>
         <input id="amt" className="input" inputMode="decimal" autoComplete="off" value={sendAll ? "" : amount} placeholder={sendAll ? "Everything spendable, minus the fee" : undefined}
           readOnly={state === "preparing"} onChange={(e) => { setSendAll(false); setAmount(e.target.value); setError(null); }} aria-describedby="amt-hint" />
@@ -1306,8 +1374,16 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
           Spendable now: {!synced ? "syncing…" : hidden ? "hidden" : `${formatXmr(unlocked)} XMR`}
         </span>
       </div>
+      {!sendAll ? (
+        <label className={`${styles.trust} ${styles.feeFrom}`}>
+          <input type="checkbox" checked={subtractFee} disabled={state === "preparing"} onChange={(e) => { setSubtractFee(e.target.checked); setError(null); }} />
+          <span>Take the network fee from this amount <span className="muted">(they receive a little less, you pay exactly this)</span></span>
+        </label>
+      ) : null}
+      <SpeedPicker value={speed} onChange={setSpeed} disabled={state === "preparing"} />
       {error ? <p className="error small" role="alert">{error}</p> : null}
       <button className="btn btn-primary btn-block" disabled={state === "preparing"}>{state === "preparing" ? "Calculating fee…" : "Review"}</button>
+      <button type="button" className={`btn btn-ghost btn-sm ${styles.multiLink}`} disabled={state === "preparing"} onClick={() => { setBatch(true); setError(null); }}>Pay several people at once</button>
     </form>
   );
 }

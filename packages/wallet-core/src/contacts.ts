@@ -86,6 +86,34 @@ export function lookalikeContact(address: string, contacts: Contact[]): Contact 
   return contacts.find((c) => c.address !== a && head(c.address) === head(a) && tail(c.address) === tail(a)) ?? null;
 }
 
+/**
+ * An address from `known` (for example everyone this wallet has paid) that looks like this one
+ * but is not it. Same test as lookalikeContact.
+ */
+export function lookalikeAddress(address: string, known: Iterable<string>): string | null {
+  const a = address.trim();
+  if (a.length < 2 * LOOKALIKE_EDGE + 2) return null;
+  const head = (s: string) => s.slice(1, 1 + LOOKALIKE_EDGE);
+  const tail = (s: string) => s.slice(-LOOKALIKE_EDGE);
+  for (const k of known) if (k !== a && head(k) === head(a) && tail(k) === tail(a)) return k;
+  return null;
+}
+
+/**
+ * Splits `address` into runs that match `other` at the same position or differ from it, for
+ * showing exactly where two lookalike addresses part ways.
+ */
+export function addressDiff(address: string, other: string): { text: string; same: boolean }[] {
+  const out: { text: string; same: boolean }[] = [];
+  for (let i = 0; i < address.length; i++) {
+    const same = address[i] === other[i];
+    const last = out[out.length - 1];
+    if (last && last.same === same) last.text += address[i];
+    else out.push({ text: address[i]!, same });
+  }
+  return out;
+}
+
 /** For a contact saved by name: true when the name now resolves to a different address. */
 export function aliasChanged(contact: Contact, resolvedAddress: string): boolean {
   return !!contact.alias && contact.address !== resolvedAddress.trim();

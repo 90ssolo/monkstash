@@ -1,6 +1,6 @@
 {
   "name": "@quietmint/extension",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "BSD-3-Clause",
   "private": true,
   "type": "module",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@quietmint/node-client": "workspace:*",
     "@quietmint/wallet-core": "workspace:*",
+    "jsqr": "1.4.0",
     "monero-ts": "0.11.20",
     "qrcode": "1.5.4",
     "react": "19.3.0",

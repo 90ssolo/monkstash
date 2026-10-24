@@ -336,7 +336,44 @@ export const CHECKPOINT_MS = 60_000;
  */
 const CHECKPOINTS_ENABLED = true;
 
-export interface PreparedTx { fee: bigint; amount: bigint; metadata: string; address: string; hash?: string }
+/** One recipient of a payment. */
+export interface Destination { address: string; amount: bigint }
+
+/**
+ * How fast the payment should confirm. "standard" lets the wallet pick (the cheapest fee that gets
+ * into the next blocks while they are not full); the others pay more to get ahead when blocks fill.
+ */
+export type SendSpeed = "standard" | "faster" | "fastest";
+export const SEND_SPEEDS: readonly SendSpeed[] = ["standard", "faster", "fastest"];
+/** monero-ts MoneroTxPriority: DEFAULT 0, NORMAL 2, ELEVATED 3. */
+export const SPEED_PRIORITY: Record<SendSpeed, number> = { standard: 0, faster: 2, fastest: 3 };
+
+export interface SendOptions {
+  speed?: SendSpeed;
+  /** The fee comes out of the (single) recipient's amount, so the total you pay is the amount typed. */
+  subtractFee?: boolean;
+}
+
+/** Most recipients one Monero transaction can pay (16 outputs, one of them change). */
+export const MAX_DESTINATIONS = 15;
+
+/**
+ * A built payment. `destinations` are read back from the built transaction; `address` and `amount`
+ * are the first recipient and the total they all receive (most payments have one recipient).
+ */
+export interface PreparedTx { fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string }
+
+/**
+ * Checks what the engine built against what was asked for. When the engine reports destinations,
+ * they must match exactly, in order; with the fee subtracted, the one recipient gets amount minus fee.
+ */
+export function checkBuilt(wanted: Destination[], built: Destination[], fee: bigint, subtractFee: boolean): Destination[] {
+  const expect = (w: Destination) => (subtractFee && wanted.length === 1 ? w.amount - fee : w.amount);
+  if (!built.length) return wanted.map((w) => ({ address: w.address, amount: expect(w) }));
+  const ok = built.length === wanted.length && built.every((d, i) => d.address === wanted[i]!.address && d.amount === expect(wanted[i]!));
+  if (!ok) throw new Error("The payment could not be prepared safely. Please try again.");
+  return built;
+}
 
 export interface LiveWallet {
   primaryAddress: string;
@@ -379,9 +416,9 @@ export interface LiveWallet {
    * Builds (does not send) a payment. `address` is the destination read back from the built
    * transaction; `hash` is its transaction ID, known before it is sent.
    */
-  prepareSend(address: string, amount: bigint): Promise<PreparedTx>;
+  prepareSend(destinations: Destination[], options?: SendOptions): Promise<PreparedTx>;
   /** Builds (does not send) one payment of everything spendable; the fee comes out of the amount. */
-  prepareSweep(address: string): Promise<PreparedTx>;
+  prepareSweep(address: string, options?: SendOptions): Promise<PreparedTx>;
   relay(metadata: string): Promise<string>;
   /** Exports the engine state plus the height it is synced to, for sealed local saving. */
   exportState?(): Promise<{ state: EngineState; height: number }>;
@@ -683,22 +720,29 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     async newSubaddress(label) {
       return (await w.createSubaddress(0, label ?? "")).getAddress();
     },
-    async prepareSend(address, amount) {
+    async prepareSend(destinations, options = {}) {
       if (p.kind !== "full") throw new Error("This is a view-only wallet. It can watch funds but cannot send.");
-      const target = address.trim();
-      const tx = await w.createTx({ accountIndex: 0, address: target, amount, relay: false }).catch((e: unknown) => { throw friendlySendError(e); });
-      // Read the destination back from the built transaction: the review must show what will be paid.
-      // If the engine reports destinations, they must match exactly; otherwise refuse to continue.
-      const dests = tx.getOutgoingTransfer()?.getDestinations() ?? [];
-      if (dests.length && (dests.length !== 1 || dests[0]!.getAddress() !== target || BigInt(dests[0]!.getAmount()) !== amount)) {
-        throw new Error("The payment could not be prepared safely. Please try again.");
-      }
-      return { fee: tx.getFee(), amount, metadata: tx.getMetadata(), address: target, ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
+      const wanted = destinations.map((d) => ({ address: d.address.trim(), amount: d.amount }));
+      if (!wanted.length || wanted.length > MAX_DESTINATIONS) throw new Error(`A payment can have 1 to ${MAX_DESTINATIONS} recipients.`);
+      const subtractFee = !!options.subtractFee && wanted.length === 1;
+      const tx = await w.createTx({
+        accountIndex: 0,
+        destinations: wanted,
+        priority: SPEED_PRIORITY[options.speed ?? "standard"],
+        ...(subtractFee ? { subtractFeeFrom: [0] } : {}),
+        relay: false,
+      } as never).catch((e: unknown) => { throw friendlySendError(e); });
+      const fee = BigInt(tx.getFee());
+      // Read the destinations back from the built transaction: the review must show what will be paid.
+      const built = checkBuilt(wanted, (tx.getOutgoingTransfer()?.getDestinations() ?? []).map((d) => ({ address: d.getAddress(), amount: BigInt(d.getAmount()) })), fee, subtractFee);
+      const final = built;
+      const amount = final.reduce((s, d) => s + d.amount, 0n);
+      return { fee, amount, metadata: tx.getMetadata(), address: final[0]!.address, destinations: final, ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
     },
-    async prepareSweep(address) {
+    async prepareSweep(address, options = {}) {
       if (p.kind !== "full") throw new Error("This is a view-only wallet. It can watch funds but cannot send.");
       const target = address.trim();
-      const txs = await w.sweepUnlocked({ accountIndex: 0, address: target, relay: false }).catch((e: unknown) => { throw friendlySendError(e); });
+      const txs = await w.sweepUnlocked({ accountIndex: 0, address: target, priority: SPEED_PRIORITY[options.speed ?? "standard"], relay: false } as never).catch((e: unknown) => { throw friendlySendError(e); });
       if (!txs.length) throw new Error("Nothing is spendable yet. New payments unlock after 10 confirmations (about 20 minutes).");
       if (txs.length > 1) throw new Error("Your balance is spread over many small payments and needs more than one transaction. Send most of it first, then use Send all for the rest.");
       const tx = txs[0]!;
@@ -706,7 +750,8 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       if (dests.length !== 1 || dests[0]!.getAddress() !== target) {
         throw new Error("The payment could not be prepared safely. Please try again.");
       }
-      return { fee: tx.getFee(), amount: BigInt(dests[0]!.getAmount()), metadata: tx.getMetadata(), address: target, ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
+      const amount = BigInt(dests[0]!.getAmount());
+      return { fee: tx.getFee(), amount, metadata: tx.getMetadata(), address: target, destinations: [{ address: target, amount }], ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
     },
     async relay(metadata) {
       return w.relayTx(metadata);

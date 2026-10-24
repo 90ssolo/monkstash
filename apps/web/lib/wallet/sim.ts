@@ -5,7 +5,7 @@
  * unreachable. Clearly labelled in the UI. Nothing here touches the real network.
  */
 import { ATOMIC_UNITS } from "@quietmint/wallet-core";
-import type { Balances, IncomingEntry, LiveWallet, SyncState, TxSummary } from "./engine";
+import { SPEED_PRIORITY, type Balances, type Destination, type IncomingEntry, type LiveWallet, type SendOptions, type SyncState, type TxSummary } from "./engine";
 
 const xmr = (n: number) => BigInt(Math.round(n * 1e6)) * (ATOMIC_UNITS / 1_000_000n);
 
@@ -24,6 +24,11 @@ function simAddress(index: number): string {
   return `8sim${String(index).replace(/0/g, "o")}${"S".repeat(90)}`.slice(0, 95);
 }
 
+function simFee(options: SendOptions, recipients: number): bigint {
+  const multiplier = [1n, 1n, 4n, 16n][SPEED_PRIORITY[options.speed ?? "standard"]]!;
+  return (xmr(0.00006) + xmr(0.00002) * BigInt(recipients)) * multiplier;
+}
+
 export function createSimWallet(address: string): LiveWallet {
   let txs = seedTxs(address);
   let balanceListener: ((b: Balances) => void) | null = null;
@@ -32,7 +37,7 @@ export function createSimWallet(address: string): LiveWallet {
   // Simulation only: incoming payments per subaddress. A new payment request is "paid" a few
   // seconds after it is created, in two steps, so the request statuses can be seen working.
   const incoming: IncomingEntry[] = [];
-  let lastSend: { address: string; amount: bigint } | null = null;
+  let lastSend: { address: string; amount: bigint; destinations?: Destination[] } | null = null;
   const sent = new Map<string, { address: string; amount: bigint; txKey: string; signature: string }>();
 
   return {
@@ -81,23 +86,31 @@ export function createSimWallet(address: string): LiveWallet {
     async incoming() {
       return incoming.map((e) => ({ ...e }));
     },
-    async prepareSend(address: string, amount: bigint) {
-      lastSend = { address: address.trim(), amount };
-      return { fee: xmr(0.0001), amount, metadata: "sim-metadata", address: address.trim() };
+    // Fees in the simulation scale like Monero's: x1 standard, x4 faster, x16 fastest (as measured on stagenet), and a little per recipient.
+    async prepareSend(destinations: Destination[], options: SendOptions = {}) {
+      const wanted = destinations.map((d) => ({ address: d.address.trim(), amount: d.amount }));
+      const fee = simFee(options, wanted.length);
+      const final = options.subtractFee && wanted.length === 1 ? [{ ...wanted[0]!, amount: wanted[0]!.amount - fee }] : wanted;
+      if (final.some((d) => d.amount <= 0n)) throw new Error("The amount is smaller than the network fee.");
+      const amount = final.reduce((s, d) => s + d.amount, 0n);
+      if (amount + fee > total()) throw new Error("Not enough spendable balance for this amount plus the network fee. Lower the amount, or use Send all.");
+      lastSend = { address: final[0]!.address, amount, destinations: final };
+      return { fee, amount, metadata: "sim-metadata", address: final[0]!.address, destinations: final };
     },
-    async prepareSweep(address: string) {
-      const fee = xmr(0.0001);
+    async prepareSweep(address: string, options: SendOptions = {}) {
+      const fee = simFee(options, 1);
       const amount = total() - fee;
       if (amount <= 0n) throw new Error("Nothing is spendable yet.");
-      lastSend = { address: address.trim(), amount };
-      return { fee, amount, metadata: "sim-metadata", address: address.trim() };
+      const destinations = [{ address: address.trim(), amount }];
+      lastSend = { address: address.trim(), amount, destinations };
+      return { fee, amount, metadata: "sim-metadata", address: address.trim(), destinations };
     },
     async relay() {
       const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
       const hash = hex(32);
       const send = lastSend ?? { address: "", amount: xmr(0.5) };
       sent.set(hash, { ...send, txKey: hex(32), signature: `OutProofV2Sim${hash.slice(0, 40).replace(/[0lIO]/g, "x")}` });
-      txs = [{ hash, direction: "out", amount: send.amount, fee: xmr(0.0001), confirmations: 0, timestamp: Math.floor(Date.now() / 1000), pending: true, ...(send.address ? { destinations: [{ address: send.address, amount: send.amount }] } : {}) }, ...txs];
+      txs = [{ hash, direction: "out", amount: send.amount, fee: xmr(0.0001), confirmations: 0, timestamp: Math.floor(Date.now() / 1000), pending: true, ...(send.address ? { destinations: send.destinations ?? [{ address: send.address, amount: send.amount }] } : {}) }, ...txs];
       balanceListener?.(await this.balances());
       return hash;
     },

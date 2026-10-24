@@ -192,8 +192,8 @@ export function remoteWallet(host: HostConnection, pub: WalletPublic, seq: numbe
     proveSent: (hash, address, message) => call("proveSent", hash, address, message),
     checkProof: (p) => call("checkProof", p),
     syncNow: () => call("syncNow"),
-    prepareSend: (address, amount) => call("prepareSend", address, amount),
-    prepareSweep: (address) => call("prepareSweep", address),
+    prepareSend: (destinations, options) => call("prepareSend", destinations, options),
+    prepareSweep: (address, options) => call("prepareSweep", address, options),
     relay: (metadata) => call("relay", metadata),
     height: () => call("height"),
     // Views never close the engine; locking does (in the host).

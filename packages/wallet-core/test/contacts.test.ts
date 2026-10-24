@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aliasChanged, checkContact, ContactError, contactForAddress, lookalikeContact, sortContacts, type Contact } from "../src/contacts";
+import { addressDiff, aliasChanged, checkContact, ContactError, contactForAddress, lookalikeAddress, lookalikeContact, sortContacts, type Contact } from "../src/contacts";
 
 const MAIN = "48VWHdLTEpE5dqa5VpAy5xgQWBHZARiGmEmojNLqD4ef1FAzkPxCe9JXUYwCShRR5XNMGnyusrnkmMWr2HMdfDRx2vsrG7c";
 const STAGE = "58hYNUFQtRL5dqa5VpAy5xgQWBHZARiGmEmojNLqD4ef1FAzkPxCe9JXUYwCShRR5XNMGnyusrnkmMWr2HMdfDRx32FhSVJ";
@@ -30,6 +30,18 @@ describe("contacts", () => {
     expect(lookalikeContact(MAIN, [ana])).toBeNull(); // the real one is fine
     expect(lookalikeContact(STAGE, [ana])).toBeNull(); // unrelated address
     expect(lookalikeContact("48VW", [ana])).toBeNull();
+  });
+
+  it("finds a lookalike among past recipients and shows where it differs", () => {
+    const fake = MAIN.slice(0, 10) + "X".repeat(MAIN.length - 16) + MAIN.slice(-6);
+    expect(lookalikeAddress(fake, [STAGE, MAIN])).toBe(MAIN);
+    expect(lookalikeAddress(MAIN, [MAIN])).toBeNull();
+    expect(lookalikeAddress(STAGE, new Set([MAIN]))).toBeNull();
+    const parts = addressDiff(fake, MAIN);
+    expect(parts.map((p) => p.text).join("")).toBe(fake);
+    expect(parts[0]).toEqual({ text: MAIN.slice(0, 10), same: true });
+    expect(parts.at(-1)?.same).toBe(true);
+    expect(parts.some((p) => !p.same && p.text.startsWith("X"))).toBe(true);
   });
 
   it("flags a saved name that now points somewhere else", () => {

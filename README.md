@@ -47,7 +47,8 @@
 | 🆕 **Create or restore** | New wallet, or restore from 25 words, a 13-word MyMonero phrase or a 12-word Exodus phrase, all converted in your browser |
 | 👀 **Watch-only wallets** | Follow a wallet with its view key: sees payments, can never spend |
 | 🗂️ **Several wallets** | Keep savings, a shop and more in one browser. Switch from the menu at the top; one password unlocks them all |
-| 📤 **Send** | Every payment asks for your password. Send to OpenAlias names like `donate.getmonero.org`, with the DNSSEC status shown |
+| 📤 **Send** | Every payment asks for your password. Choose the speed, take the fee from the amount, scan a QR code with your camera, or pay up to 15 people in one transaction. Send to OpenAlias names like `donate.getmonero.org`, with the DNSSEC status shown |
+| 🚨 **Lookalike alarm** | Warns when an address starts and ends like one you paid or saved but differs in the middle (clipboard malware), and marks exactly where |
 | 📥 **Receive** | A fresh subaddress for every request, with a QR code |
 | 🧾 **Get paid** | Payment links priced in EUR, USD and more, with expiry, a return link and a ready-made "Pay with Monero" button. Marked paid automatically |
 | 🏪 **Cashier mode** | A point of sale for your counter: keypad, QR per sale, sales list encrypted on the device, CSV export |
