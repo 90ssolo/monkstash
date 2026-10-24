@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "How to Restore a Monero Wallet From Seed",
   summary: "Restore a Monero wallet from seed: enter your 25 recovery words on any device, set a restore height for a fast sync, and fix a wrong balance.",
   keyword: "restore monero wallet",
-  updated: "2026-10-15",
+  updated: "2026-10-24",
   readingMinutes: 8,
   toc: [
     { id: "when", label: "When you need to restore" },
@@ -32,9 +32,9 @@ export const meta: ArticleMeta = {
     { q: "How do I restore a Monero wallet?", a: "Open a Monero wallet, choose the restore option, type your 25 recovery words in order, enter roughly when you made the wallet if you know it, set a new password, and wait for the wallet to scan the network." },
     { q: "Can I restore my wallet on a new device?", a: "Yes. Your recovery words work in any Monero wallet, on any device. That is the whole point of a backup. Enter the 25 words and your money will appear once the wallet finishes checking the network." },
     { q: "Why is my balance taking so long to appear?", a: "The wallet has to scan the network to find your payments. If you know roughly when you first made the wallet, enter that date so it can skip ahead. Without a date it checks the entire history, which takes much longer." },
-    { q: "I have my recovery words but a different number of them.", a: "Standard Monero wallets use 25 words. MyMonero used 13 words, and Exodus used a 12-word phrase for all its coins. MonkStash restores all three: the 13 and 12 word phrases are converted in your browser using each wallet's own derivation. A 16-word seed is a Polyseed from Feather or Cake Wallet, which MonkStash cannot restore yet." },
+    { q: "I have my recovery words but a different number of them.", a: "Standard Monero wallets use 25 words. MyMonero used 13 words, and Exodus used a 12-word phrase for all its coins. MonkStash restores all three: the 13 and 12 word phrases are converted in your browser using each wallet's own derivation. A 16-word seed is a Polyseed from Feather or Cake Wallet, which MonkStash restores too." },
     { q: "Can I restore a 12-word Monero seed?", a: "Usually yes, if it came from Exodus: MonkStash converts it to the matching 25-word wallet in your browser. Ledger and Coinomi turn 12 or 24 words into Monero keys differently, so always check that the restored address matches the one you used before." },
-    { q: "Can I restore a 16-word Monero seed?", a: "A 16-word seed is a Polyseed, the default in Feather and Cake Wallet. MonkStash cannot restore Polyseed yet, so restore it in Feather or Cake Wallet. If you want it in MonkStash, send the funds from there to a new MonkStash address." },
+    { q: "Can I restore a 16-word Monero seed?", a: "Yes. A 16-word seed is a Polyseed, the default in Feather and Cake Wallet. Enter the 16 words in MonkStash; the date the wallet was made is inside them, so no restore date is needed. If you set a passphrase in Cake Wallet, enter it under My seed has a passphrase." },
     { q: "Do I need my old password to restore?", a: "No. The password only protected the copy on your old device. You set a new password when you restore." },
     { q: "Will restoring on a second device break the first one?", a: "No. The same words can open the wallet on several devices at once. Be careful, though: each extra device is another place that could be lost or stolen." },
     { q: "Can I restore a Monero wallet without the recovery words?", a: "Not in any way we can help with. Without the words, or a saved copy of the wallet file and its password, there is no way to rebuild the wallet, and no one can recover it for you." },
@@ -158,7 +158,7 @@ export function Body() {
           <tr><td>You have 24 or 26 words</td><td>One word is missing or doubled; look for it</td></tr>
           <tr><td>You have 13 words</td><td>This was a MyMonero-style phrase; MonkStash restores it (see <Link href="/restore-mymonero-seed">restoring a MyMonero seed</Link>)</td></tr>
           <tr><td>You have 12 words</td><td>Likely an Exodus phrase; MonkStash and Cake Wallet restore it (see <Link href="/exodus-monero">Exodus and Monero</Link>). Ledger and Coinomi derive 12 words differently, so check the address</td></tr>
-          <tr><td>You have 16 words</td><td>A Polyseed from Feather or Cake Wallet. MonkStash cannot restore it yet; restore it in Feather or Cake Wallet</td></tr>
+          <tr><td>You have 16 words</td><td>A Polyseed from Feather or Cake Wallet. Enter the words as they are: no date needed</td></tr>
           <tr><td>A different language list</td><td>Some wallets let you choose the word list language</td></tr>
         </tbody>
       </table>

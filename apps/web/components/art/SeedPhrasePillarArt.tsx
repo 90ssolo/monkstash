@@ -135,7 +135,7 @@ export function KeyPowerArt() {
 
 export const FORMATS = [
   { n: "25", name: "Standard", lines: ["most Monero wallets", "needs a restore date", "MonkStash: yes"], ok: true },
-  { n: "16", name: "Polyseed", lines: ["Feather, Cake Wallet", "date is built in", "MonkStash: no"], ok: false },
+  { n: "16", name: "Polyseed", lines: ["Feather, Cake Wallet", "date is built in", "MonkStash: yes"], ok: true },
   { n: "13", name: "MyMonero", lines: ["the old web wallet", "own key derivation", "MonkStash: yes"], ok: true },
   { n: "12 / 24", name: "BIP39 style", lines: ["usually not Monero", "Cake: 12-word option", "MonkStash: no"], ok: false },
 ] as const;
@@ -143,7 +143,7 @@ export const FORMATS = [
 /** Which seed do you have? Count the words. */
 export function WordCountArt() {
   return (
-    <svg viewBox="0 0 600 262" role="img" aria-label="Count your words to know your format. 25 words is the standard Monero seed, read by most Monero wallets, including MonkStash, and it needs a restore date. 16 words is a Polyseed, used by Feather and Cake Wallet, with the creation date built in; MonkStash does not read it. 13 words is the old MyMonero format, which derives keys its own way; MonkStash restores it. 12 or 24 words is usually a Bitcoin-style BIP39 phrase, except Cake Wallet's optional 12-word Monero seed; MonkStash does not read it." style={{ width: "100%", height: "auto" }}>
+    <svg viewBox="0 0 600 262" role="img" aria-label="Count your words to know your format. 25 words is the standard Monero seed, read by most Monero wallets, including MonkStash, and it needs a restore date. 16 words is a Polyseed, used by Feather and Cake Wallet, with the creation date built in; MonkStash restores it. 13 words is the old MyMonero format, which derives keys its own way; MonkStash restores it. 12 or 24 words is usually a Bitcoin-style BIP39 phrase, except Cake Wallet's optional 12-word Monero seed; MonkStash does not read it." style={{ width: "100%", height: "auto" }}>
       <text x="8" y="18" fontSize="11" fontWeight="700" letterSpacing="1.4" fill={MUTED}>COUNT YOUR WORDS FIRST</text>
       {FORMATS.map((f, i) => {
         const x = 8 + i * 148;

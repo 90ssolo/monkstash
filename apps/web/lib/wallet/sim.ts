@@ -105,6 +105,10 @@ export function createSimWallet(address: string): LiveWallet {
       lastSend = { address: address.trim(), amount, destinations };
       return { fee, amount, metadata: "sim-metadata", address: address.trim(), destinations };
     },
+    async prepareSweepAll(address: string, options: SendOptions = {}) {
+      const built = await this.prepareSweep(address, options);
+      return { fee: built.fee, amount: built.amount, metadata: [built.metadata] };
+    },
     async relay() {
       const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
       const hash = hex(32);

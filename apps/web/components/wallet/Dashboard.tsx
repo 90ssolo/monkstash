@@ -19,6 +19,7 @@ import { downloadCsv, requestsCsv } from "@/lib/wallet/exports";
 import { arrivedAt } from "@/lib/wallet/history";
 import type { LabelStore } from "@/lib/wallet/session";
 import { Activity, minutesLeft } from "./History";
+import { Sweep } from "./Sweep";
 import Link from "next/link";
 import type { TestMode } from "@/lib/wallet/demo";
 import { MoneroSymbol } from "@/components/art/MoneroSymbol";
@@ -115,6 +116,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
   const [section, setSection] = useState<Section>(() => sectionFromHash() ?? "home");
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [tillOpen, setTillOpen] = useState(false);
+  const [sweepOpen, setSweepOpen] = useState(false);
   // Privacy screen: hide amounts in public or while sharing a screen. A per-device preference.
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -460,6 +462,16 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
               Want a set amount, a price in your currency, or to see when someone has paid?{" "}
               <button type="button" className={styles.inlineLink} onClick={() => go("paid")}>Make a payment request</button>.
             </p>
+            {settings?.sweepStart ? (
+              sweepOpen
+                ? <Sweep actions={settings} network={pub.network} onClose={() => setSweepOpen(false)} onSent={() => void refresh()} />
+                : (
+                  <p className="small muted" style={{ marginTop: "var(--s-2)" }}>
+                    Have money in another wallet, like an old paper wallet?{" "}
+                    <button type="button" className={styles.inlineLink} onClick={() => setSweepOpen(true)}>Move it into this one</button>.
+                  </p>
+                )
+            ) : null}
           </section>
 
           <section hidden={section !== "paid"} aria-labelledby="paid-h" className={styles.section}>

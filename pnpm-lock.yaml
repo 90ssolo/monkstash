@@ -17,6 +17,9 @@ importers:
       '@quietmint/node-client':
         specifier: workspace:*
         version: link:../../packages/node-client
+      '@quietmint/polyseed':
+        specifier: workspace:*
+        version: link:../../packages/polyseed
       '@quietmint/wallet-core':
         specifier: workspace:*
         version: link:../../packages/wallet-core
@@ -91,6 +94,9 @@ importers:
       '@quietmint/node-client':
         specifier: workspace:*
         version: link:../../packages/node-client
+      '@quietmint/polyseed':
+        specifier: workspace:*
+        version: link:../../packages/polyseed
       '@quietmint/wallet-core':
         specifier: workspace:*
         version: link:../../packages/wallet-core
@@ -149,6 +155,25 @@ importers:
       '@types/node':
         specifier: 24.19.0
         version: 24.19.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@24.19.0)(vite@8.3.4(@types/node@24.19.0))
+
+  packages/polyseed:
+    dependencies:
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.0
+        version: 24.19.0
+      monero-ts:
+        specifier: 0.11.20
+        version: 0.11.20
       typescript:
         specifier: 6.0.3
         version: 6.0.3

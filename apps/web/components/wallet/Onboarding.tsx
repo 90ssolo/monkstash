@@ -5,7 +5,7 @@ import {
   type MoveHeader, type NetworkType, type SeedCheck, type TotpConfig, type WalletKind,
 } from "@quietmint/wallet-core";
 import { siteHref, walletAbsoluteUrl } from "@/lib/site";
-import { exodusToMoneroSeed, generateWallet, inspectSeed, normalizeSeed, validateAddress, viewKeyMatches } from "@/lib/wallet/engine";
+import { exodusToMoneroSeed, fullMoveSecret, generateWallet, inspectSeed, normalizeSeed, polyseedWallet, validateAddress, viewKeyMatches } from "@/lib/wallet/engine";
 import { NETWORK } from "@/lib/wallet/config";
 import { isDemo } from "@/lib/wallet/demo";
 import type { TestWallet } from "@/lib/wallet/testWallets";
@@ -24,6 +24,11 @@ export interface OnboardingResult {
   primaryAddress: string;
   restoreHeight: number;
   seed?: string;
+  /** Seed passphrase (seed offset) for a 25-word seed. */
+  seedOffset?: string;
+  /** The 16-word Polyseed this wallet was restored from (`seed` holds the same wallet as 25 words). */
+  polyseed?: string;
+  polyseedEncrypted?: boolean;
   privateViewKey: string;
   password: string;
   totp?: TotpConfig;
@@ -193,7 +198,7 @@ export function Onboarding({ mode, testWallets = [], onCancel, onDone, onSwitchM
       return null;
     }
     try {
-      const secret = b.kind === "full" ? normalizeSeed(b.seed ?? "") : b.privateViewKey.trim().toLowerCase();
+      const secret = b.kind === "full" ? fullMoveSecret(b.seed ?? "", b.seedOffset) : b.privateViewKey.trim().toLowerCase();
       const moved = await openMoveFile(move.file, secret, { primaryAddress: b.primaryAddress, network: b.network, kind: b.kind });
       setBase({ ...b, restoreHeight: moved.restoreHeight, moveFile: move.file });
       return null;
@@ -432,7 +437,7 @@ function ConfirmWords({ words, onOk, onBack }: { words: string[]; onOk: () => vo
 
 /* ---------------- Restore from seed ---------------- */
 
-interface RestoreDraft { seed: string; start: RestoreStart }
+interface RestoreDraft { seed: string; start: RestoreStart; passphrase?: string }
 interface WatchDraft { address: string; viewKey: string; start: RestoreStart }
 
 function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
@@ -443,11 +448,34 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
   const { seed, start } = draft;
   const setSeed = (v: string) => setDraft({ ...draft, seed: v });
   const setStart = (v: RestoreStart) => setDraft({ ...draft, start: v });
+  const passphrase = draft.passphrase ?? "";
+  const setPassphrase = (v: string) => setDraft({ ...draft, passphrase: v });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const count = seed.trim() ? normalizeSeed(seed).split(" ").length : 0;
   // Word-level help for 24 and 25 English words: unknown words, the check word, a missing 25th.
   const check = checkMoneroWords(seed);
+
+  /** A 16-word Polyseed: read with the reference library; its date is in the words. */
+  async function restorePolyseed() {
+    setBusy(true);
+    try {
+      const p = await polyseedWallet(seed, passphrase, NETWORK);
+      const { primaryAddress, privateViewKey } = await inspectSeed(p.seed, NETWORK, p.seedOffset);
+      const height = fromMove ? 0 : estimateHeightAt(new Date(p.birthday * 1000), NETWORK);
+      const problem = await onReady({
+        kind: "full", network: NETWORK, primaryAddress, privateViewKey, seed: p.seed, ...(p.seedOffset ? { seedOffset: p.seedOffset } : {}),
+        polyseed: p.polyseed, ...(p.encrypted ? { polyseedEncrypted: true } : {}), restoreHeight: height, origin: "restore",
+      });
+      if (problem) {
+        setError(problem);
+        setBusy(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error && err.name === "PolyseedError" ? err.message : "These words could not be read. Check the spelling and the order.");
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -455,7 +483,7 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
     if (check.kind === "unknown-words") return setError(wordProblem(check));
     if (check.kind === "bad-checksum") return setError("The 25th word does not match the other 24. Monero's last word is a check word, so one of the words is probably wrong or in the wrong place. Compare each word with your backup.");
     if (check.kind === "missing-checksum") return setError(`You entered 24 words. The 25th is a check word made from the other 24: it should be "${check.word}". Add it at the end (or use the button below), then continue.`);
-    if (count === 16) return setError("16 words are a Polyseed phrase (Feather and Cake Wallet use it). MonkStash cannot restore Polyseed yet. Meanwhile you can follow this wallet here as watch-only, with its address and private view key, and keep spending from your current wallet.");
+    if (count === 16) return restorePolyseed();
     if (count === 14) return setError("14 words come from Feather before version 2.0. MonkStash cannot restore them yet. Feather still restores them; see our seed doctor for the way to move this wallet.");
     if (count === 24) return setError("24 words that are not Monero words are usually a hardware wallet's phrase (restore it with the device in Monero GUI or Feather) or a 24-word BIP39 wallet from Cake Wallet (restore it in Cake). MonkStash cannot restore those.");
     if (count !== 25 && count !== 13 && count !== 12) return setError(`Recovery words come in sets of 25 (13 from MyMonero, 12 from Exodus). You entered ${count}. Not sure what you have? Our seed doctor helps without asking for your words.`);
@@ -469,10 +497,12 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
     try {
       // An Exodus phrase becomes the standard 25-word seed of the same wallet, so it works everywhere from here on.
       const words = count === 12 ? await exodusToMoneroSeed(seed, NETWORK) : normalizeSeed(seed);
-      const { primaryAddress, privateViewKey } = await inspectSeed(words, NETWORK);
+      // A passphrase only exists for 25-word seeds (MyMonero and Exodus phrases have none).
+      const seedOffset = count === 25 && passphrase ? passphrase : undefined;
+      const { primaryAddress, privateViewKey } = await inspectSeed(words, NETWORK, seedOffset);
       // Exodus added Monero on 26 April 2019, so without a date there is no need to scan earlier blocks.
       const height = from.height || (count === 12 && start.by === "date" ? heightFromDate(EXODUS_MONERO_START) : 0);
-      const problem = await onReady({ kind: "full", network: NETWORK, primaryAddress, privateViewKey, seed: words, restoreHeight: height, origin: "restore" });
+      const problem = await onReady({ kind: "full", network: NETWORK, primaryAddress, privateViewKey, seed: words, ...(seedOffset ? { seedOffset } : {}), restoreHeight: height, origin: "restore" });
       if (problem) {
         setError(problem);
         setBusy(false);
@@ -511,11 +541,12 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
         </div>
       ) : null}
       <div className="field">
-        <label htmlFor="seed">Your recovery words (25, 13 from MyMonero, or 12 from Exodus)</label>
+        <label htmlFor="seed">Your recovery words (25, 16 from Cake Wallet or Feather, 13 from MyMonero, or 12 from Exodus)</label>
         <textarea id="seed" className="textarea mono" autoComplete="off" autoCapitalize="none" spellCheck={false} value={seed}
           onChange={(e) => { setSeed(e.target.value); setError(null); }} aria-invalid={!!error} aria-describedby={error ? "seed-hint seed-err" : "seed-hint"} />
         <span id="seed-hint" className="hint">
-          {count === 13 ? "13 words: a MyMonero phrase. After restoring, check the address matches your old MyMonero address."
+          {count === 16 ? "16 words: a Polyseed (Cake Wallet, Feather). The date the wallet was made is in the words, so no date is needed."
+            : count === 13 ? "13 words: a MyMonero phrase. After restoring, check the address matches your old MyMonero address."
             : count === 12 ? "12 words: an Exodus phrase. We turn it into the standard 25-word Monero seed for the same wallet (see it later in Settings). After restoring, check the address matches the Monero address Exodus showed you."
             : `${count} of 25 words`}
         </span>
@@ -528,11 +559,39 @@ function RestoreSeed({ onReady, testWallets = [], draft, setDraft, fromMove }: {
           </p>
         ) : null}
       </div>
-      {fromMove ? null : <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="restore" />}
+      {count === 25 || count === 16 || passphrase ? <SeedPassphrase value={passphrase} onChange={(v) => { setPassphrase(v); setError(null); }} /> : null}
+      {fromMove || count === 16 ? null : <RestoreStartField value={start} onChange={setStart} network={NETWORK} idPrefix="restore" />}
       {error ? <p id="seed-err" className="error small" role="alert">{error}</p> : null}
       <p className="small muted">Not sure what kind of phrase you have? The <a href={siteHref("/tools/monero-seed-doctor")}>seed doctor</a> tells you, without asking for your words.</p>
       <button className="btn btn-primary btn-block" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
     </form>
+  );
+}
+
+/**
+ * The optional seed passphrase ("seed offset"). Folded away: most seeds have none, and a wrong one
+ * quietly opens a different, empty wallet, so it says how to check.
+ */
+export function SeedPassphrase({ value, onChange, id = "seed-pass" }: { value: string; onChange: (v: string) => void; id?: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <details className={styles.passDetails} open={!!value || undefined}>
+      <summary>My seed has a passphrase</summary>
+      <p className="small muted">
+        Only if you set one when the wallet was made, as a seed passphrase in Cake Wallet or a seed offset in Monerujo or the
+        Monero CLI. With a wrong passphrase the words open a different, empty wallet without any error, so after restoring,
+        check that the address matches the one your old wallet showed.
+      </p>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label htmlFor={id}>Seed passphrase</label>
+        <div className={styles.noteRow}>
+          <input id={id} className="input" type={show ? "text" : "password"} autoComplete="off" autoCapitalize="none" spellCheck={false}
+            value={value} onChange={(e) => onChange(e.target.value)} />
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={show} onClick={() => setShow((s) => !s)}>{show ? "Hide" : "Show"}</button>
+        </div>
+        <span className="hint">Typed exactly, including capitals and spaces.</span>
+      </div>
+    </details>
   );
 }
 

@@ -65,7 +65,7 @@ function state(): HostState {
   return {
     view: publicView(v),
     saveProblem: controller.saveProblem,
-    settings: s ? { kind: s.kind, network: s.network, totpEnabled: s.totpEnabled, node: s.node, restoreHeight: s.restoreHeight } : null,
+    settings: s ? { kind: s.kind, network: s.network, totpEnabled: s.totpEnabled, node: s.node, restoreHeight: s.restoreHeight, seedPassphrase: !!s.seedPassphrase } : null,
     syncing: v.name === "open" ? !!v.wallet.syncing?.() : false,
     syncBusy: controller.syncBusy,
     cashierOn: controller.cashierOn,
@@ -143,6 +143,7 @@ const WALLET_CALLS = new Set([
 const SETTINGS_CALLS = new Set([
   "revealSeed", "checkAccess", "approveSend", "changePassword", "enableTotp", "disableTotp", "watchOnlyKeys",
   "rescanFrom", "exportMove", "importMove", "saveNode",
+  "sweepStart", "sweepStatus", "sweepPrepare", "sweepSend", "sweepCancel",
 ]);
 
 function openWallet(): LiveWallet {

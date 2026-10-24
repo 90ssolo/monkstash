@@ -125,7 +125,7 @@ export function KeyPowerNarrow() {
 /** Phone version of the word-count guide: one row per format. */
 export function WordCountNarrow() {
   return (
-    <svg viewBox="0 0 360 452" role="img" aria-label="Count your words to know your format. 25 words is the standard Monero seed, read by most Monero wallets, including MonkStash, and it needs a restore date. 16 words is a Polyseed, used by Feather and Cake Wallet, with the creation date built in; MonkStash does not read it. 13 words is the old MyMonero format, which derives keys its own way; MonkStash restores it. 12 or 24 words is usually a Bitcoin-style BIP39 phrase, apart from Cake Wallet's optional 12-word Monero seed; MonkStash does not read it." style={{ width: "100%", height: "auto" }}>
+    <svg viewBox="0 0 360 452" role="img" aria-label="Count your words to know your format. 25 words is the standard Monero seed, read by most Monero wallets, including MonkStash, and it needs a restore date. 16 words is a Polyseed, used by Feather and Cake Wallet, with the creation date built in; MonkStash restores it. 13 words is the old MyMonero format, which derives keys its own way; MonkStash restores it. 12 or 24 words is usually a Bitcoin-style BIP39 phrase, apart from Cake Wallet's optional 12-word Monero seed; MonkStash does not read it." style={{ width: "100%", height: "auto" }}>
       <text x="4" y="16" fontSize="10.5" fontWeight="700" letterSpacing="1.4" fill={MUTED}>COUNT YOUR WORDS FIRST</text>
       {FORMATS.map((f, i) => {
         const y = 28 + i * 104;

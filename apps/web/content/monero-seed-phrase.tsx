@@ -18,7 +18,7 @@ export const meta: ArticleMeta = {
   h1: { keyword: "Monero seed phrase", sizzle: "Twenty-five words. Your whole wallet." },
   summary: "Your Monero seed phrase is 25 words that hold your whole wallet. Learn what they are, how to store them, restore with them and keep them from thieves.",
   keyword: "Monero seed phrase",
-  updated: "2026-10-15",
+  updated: "2026-10-24",
   readingMinutes: 21,
   toc: [
     { id: "what", label: "What is a Monero seed phrase?" },
@@ -68,7 +68,7 @@ export const meta: ArticleMeta = {
     { q: "What is a Monero seed phrase?", a: "It is a list of 25 ordinary words that encodes the secret behind your wallet. Anyone who has the words can open the wallet and spend the money, and anyone who loses them (and every device that holds the wallet) loses access for good. Treat the words as the wallet itself." },
     { q: "How many words is a Monero seed?", a: "The standard Monero seed has 25 words: 24 that encode your secret and a 25th checksum word that catches typing mistakes. Feather and Cake Wallet use a 16-word format called Polyseed, and the old MyMonero service used 13 words. Count your words before you restore." },
     { q: "My Monero seed has 12 words. Why?", a: "A 12-word phrase for Monero usually comes from Exodus, which used one phrase for all coins, or from Cake Wallet's optional BIP39-style seed. It is not the standard 25-word format. MonkStash converts Exodus 12-word phrases; check that the restored address matches the one you used before." },
-    { q: "My Monero seed has 16 words. Why?", a: "A 16-word seed is a Polyseed, the default in Feather and Cake Wallet. It stores the wallet's creation date inside the words. Restore it in Feather or Cake Wallet; MonkStash cannot restore Polyseed yet." },
+    { q: "My Monero seed has 16 words. Why?", a: "A 16-word seed is a Polyseed, the default in Feather and Cake Wallet. It stores the wallet's creation date inside the words. Feather, Cake Wallet and MonkStash restore it." },
     { q: "Can I use my Monero seed in a Bitcoin wallet?", a: "No. Standard Monero seeds are not BIP39 phrases. They use a different 1,626-word list and a different way of turning words into keys, so a Bitcoin wallet cannot read them. Always restore in a Monero wallet you trust." },
     { q: "Is the seed phrase the same as the private key?", a: "For a standard 25-word seed, yes in effect: the words are your private spend key written in a human-friendly form. Your private view key is derived from the spend key by hashing it, so the 25 words give you both keys and your address." },
     { q: "Can I recover a Monero wallet without the seed phrase?", a: "Sometimes. If the wallet still opens on one of your devices, you can show the words again and write them down. If you saved your private spend key, you can restore from keys. With only the address and view key you can watch incoming payments but never spend. With none of these, the money cannot be recovered." },
@@ -197,7 +197,7 @@ export function Body() {
         <thead><tr><th>Words</th><th>Format</th><th>Created by</th><th>Restored by</th><th>Restore date</th></tr></thead>
         <tbody>
           <tr><th>25</th><td>Standard (also called legacy)</td><td>Monero GUI and CLI, MonkStash, Cake Wallet (Legacy option), and most other Monero wallets</td><td>Almost every Monero wallet, including MonkStash, Feather and Cake Wallet</td><td>Not stored: write the date down</td></tr>
-          <tr><th>16</th><td>Polyseed</td><td>Feather and Cake Wallet, by default</td><td>Feather and Cake Wallet. MonkStash cannot restore it yet</td><td>Built into the words</td></tr>
+          <tr><th>16</th><td>Polyseed</td><td>Feather and Cake Wallet, by default</td><td>Feather, Cake Wallet and MonkStash</td><td>Built into the words</td></tr>
           <tr><th>14</th><td>Old Feather seed</td><td>Feather before version 2.0, no longer created</td><td>Feather</td><td>Handled by Feather</td></tr>
           <tr><th>13</th><td>MyMonero</td><td>The MyMonero web wallet, closed on 6 January 2026</td><td>MonkStash</td><td>Not stored</td></tr>
           <tr><th>12</th><td>Exodus phrase, or a BIP39-style option in Cake Wallet</td><td>Exodus (one phrase for all coins; Monero support ended in 2025), Cake Wallet as an option</td><td>MonkStash for Exodus phrases; Cake&apos;s option only in wallets that support it</td><td>Depends on the wallet</td></tr>
@@ -220,8 +220,8 @@ export function Body() {
         The catch is compatibility. Not every wallet reads Polyseed, and the conversion only goes one way.{" "}
         <a href="https://docs.featherwallet.org/guides/seed-scheme" rel="noopener">Feather explains</a> that a Polyseed wallet can
         show you its 25-word equivalent, but a 25-word wallet can never become a Polyseed one, because Polyseed runs the words
-        through a one-way step to make the key. MonkStash cannot restore a Polyseed directly yet, so a Polyseed owner would
-        restore here with that 25-word version, or keep the wallet in Feather or Cake Wallet.
+        through a one-way step to make the key. MonkStash restores the 16 words directly, using the same Polyseed library as
+        the Monero wallet itself, so you do not need the 25-word version here.
       </p>
       <h3>14 words: an old Feather seed</h3>
       <p>
@@ -365,7 +365,7 @@ export function Body() {
         <a href="https://www.getmonero.org/resources/user-guides/restore_account.html" rel="noopener">restore from a seed</a>.
         Cake Wallet offers a seed passphrase under its advanced settings, and the{" "}
         <a href="https://docs.getmonero.org/mnemonics/polyseed/" rel="noopener">Polyseed documentation</a> recommends seed offsets
-        for Polyseed wallets. MonkStash does not offer a seed passphrase today.
+        for Polyseed wallets. MonkStash asks for it when you restore: open <em>My seed has a passphrase</em> under the words.
       </p>
       <h3>Three things people mix up</h3>
       <table>

@@ -68,7 +68,7 @@ const config: NextConfig = {
   outputFileTracingIncludes: { "/api/donations": ["../../node_modules/.pnpm/monero-ts@*/node_modules/monero-ts/dist/**/*"] },
   // Never ship local secrets or state: test wallet seeds, env files, tracker data.
   outputFileTracingExcludes: { "*": ["./test-wallets.local.json", "./.env*", "./.data/**", "../../private/**"] },
-  transpilePackages: ["@quietmint/wallet-core", "@quietmint/node-client"],
+  transpilePackages: ["@quietmint/wallet-core", "@quietmint/node-client", "@quietmint/polyseed"],
   // The donation tracker runs monero-ts on the server; load it as a normal Node package.
   serverExternalPackages: ["monero-ts"],
   turbopack: {

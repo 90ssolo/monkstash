@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Cake Wallet Review: Monero Features and Safety",
   summary: "Cake Wallet review: an open source, non-custodial wallet for Monero and other coins on Android, iOS and desktop. Features, swaps, MyMonero and who it fits.",
   keyword: "Cake Wallet review",
-  updated: "2026-10-17",
+  updated: "2026-10-24",
   readingMinutes: 9,
   toc: [
     { id: "what", label: "What Cake Wallet is" },
@@ -121,8 +121,8 @@ export function Body() {
       <p>
         The practical lesson: <mark>write down which type you used, not just the words</mark>. Entering words with the wrong seed type selected
         will fail or give you the wrong wallet, and our <Link href="/restore-monero-wallet">restore guide</Link>{" "}
-        shows how to check. MonkStash uses 25-word seeds, which Cake can restore as Legacy. A Cake Polyseed would need a wallet
-        that reads Polyseed, so check before you move it.
+        shows how to check. MonkStash makes 25-word seeds, which Cake can restore as Legacy, and it restores Cake&apos;s 16-word Polyseed
+        too, with its passphrase if you set one.
       </p>
 
       <h2 id="privacy">Tor, nodes and hardware wallets</h2>

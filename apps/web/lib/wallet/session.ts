@@ -14,7 +14,8 @@
 import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, EMPTY_LABELS, mergeLabels, readLabels, type Contact, type WalletLabels, type NodeConfig, type StoredWallet, type WalletKind, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
 import type { OnboardingResult } from "@/components/wallet/Onboarding";
 import type { SettingsActions } from "@/components/wallet/WalletSettings";
-import { normalizeSeed, NodeTestError, openWallet, testNode, type EngineState, type LiveWallet } from "./engine";
+import { fullMoveSecret, inspectSeed, normalizeSeed, NodeTestError, openWallet, testNode, type EngineState, type LiveWallet } from "./engine";
+import { SweepRunner } from "./sweep";
 import { recordHandedOut, type HandedOut, type HandedOutStore } from "./addresses";
 import { clearSyncStates, deleteSyncState, deleteWalletData, loadSealedBlob, loadSyncState, saveSealedBlob, saveSyncState, StorageError } from "./stateStore";
 import type { PaymentRequest, RequestStore } from "./requests";
@@ -123,7 +124,8 @@ function labelList(pub: WalletPublic, secrets: Secrets): LabelStore {
 function moveSecretOf(kind: WalletPublic["kind"], s: Secrets): string {
   if (kind === "full") {
     if (!s.seed) throw new Error("This wallet has no recovery words stored, so it cannot make a move file.");
-    return normalizeSeed(s.seed);
+    // A wallet with a seed passphrase needs both: the words alone open a different wallet.
+    return fullMoveSecret(s.seed, s.seedOffset);
   }
   return s.privateViewKey.trim().toLowerCase();
 }
@@ -241,6 +243,8 @@ export class WalletController {
    * screen, or a view that was tampered with, cannot send without the password.
    */
   private sendApprovals = new Map<string, number>();
+  /** Emptying another wallet into the open one (sweep.ts). Cancelled on lock and wallet switch. */
+  private sweeper = new SweepRunner();
 
   /** Calls `fn` after every change of view or notice. Returns the unsubscribe function. */
   subscribe(fn: () => void): () => void {
@@ -397,7 +401,7 @@ export class WalletController {
       try {
         const params = {
           kind: pub.kind, network: pub.network, restoreHeight: pub.restoreHeight,
-          seed: secrets.seed, primaryAddress: pub.primaryAddress, privateViewKey: secrets.privateViewKey, node: secrets.node,
+          seed: secrets.seed, seedOffset: secrets.seedOffset, primaryAddress: pub.primaryAddress, privateViewKey: secrets.privateViewKey, node: secrets.node,
         };
         const saved = await loadSavedState(pub, secrets);
         if (stale()) return;
@@ -586,7 +590,11 @@ export class WalletController {
       return;
     }
 
-    const secrets: Secrets = { seed: r.seed, privateViewKey: r.privateViewKey };
+    const secrets: Secrets = {
+      seed: r.seed, ...(r.seedOffset ? { seedOffset: r.seedOffset } : {}),
+      ...(r.polyseed ? { polyseed: r.polyseed, ...(r.polyseedEncrypted ? { polyseedEncrypted: true } : {}) } : {}),
+      privateViewKey: r.privateViewKey,
+    };
     // A move file is opened before anything is saved: one for another wallet stops setup here.
     const moved = r.moveFile
       ? await openMoveFile(r.moveFile, moveSecretOf(r.kind, secrets), { primaryAddress: r.primaryAddress, network: r.network, kind: r.kind })
@@ -596,7 +604,7 @@ export class WalletController {
       restoreHeight: moved ? moved.restoreHeight : r.restoreHeight, createdAt: new Date().toISOString(), totpEnabled: !!totp,
     };
     try {
-      await saveWallet(pub, { seed: r.seed, privateViewKey: r.privateViewKey, totp }, password, true);
+      await saveWallet(pub, { ...secrets, totp }, password, true);
     } catch (e) {
       if (e instanceof StorageUnavailableError) throw e;
       throw new Error("Could not save the wallet on this device.");
@@ -604,7 +612,7 @@ export class WalletController {
     // A brand new wallet has handed out no addresses anywhere: an empty record says so. Restored
     // wallets get none, so their first new address starts above a safety margin (addresses.ts).
     if (r.origin === "create") {
-      await handedOutStore(pub, { seed: r.seed, privateViewKey: r.privateViewKey }).save({}).catch(() => {});
+      await handedOutStore(pub, secrets).save({}).catch(() => {});
     }
     if (moved) {
       // Records and scan progress from the other device. If this browser refuses to keep the scan
@@ -677,6 +685,7 @@ export class WalletController {
    */
   private async closeEngine() {
     this.openGen++;
+    void this.sweeper.cancel();
     this.dropPending();
     await this.settleSave();
     const running = this.live;
@@ -814,10 +823,12 @@ export class WalletController {
       network: pub.network,
       totpEnabled: pub.totpEnabled,
       node: this.session?.secrets.node?.uri ?? null,
+      seedPassphrase: !!this.session?.secrets.seedOffset || !!this.session?.secrets.polyseedEncrypted,
       revealSeed: async (password, code) => {
         const { s } = await this.verifyAccess(password, code);
         if (!s.seed) throw new Error("This wallet has no recovery words.");
-        return s.seed;
+        // A wallet restored from a Polyseed shows the 16 words its owner wrote down.
+        return s.polyseed ?? s.seed;
       },
       approveSend: async (password, code, metadata) => {
         await this.verifyAccess(password, code);
@@ -827,6 +838,28 @@ export class WalletController {
       checkAccess: async (password, code) => {
         await this.verifyAccess(password, code);
       },
+      sweepStart: async (input) => {
+        const v = this.view;
+        if (v.name !== "open" || v.pub.id !== pub.id) throw new Error("Open the wallet first.");
+        const node = this.session?.secrets.node;
+        await this.sweeper.start(async () => {
+          if (v.mode === "simulation") {
+            // The simulation has no node: the other wallet gets the canned balance.
+            const { primaryAddress } = await inspectSeed(input.seed, pub.network, input.seedOffset);
+            return createSimWallet(primaryAddress);
+          }
+          return openWallet({ kind: "full", network: pub.network, restoreHeight: input.restoreHeight, seed: input.seed, ...(input.seedOffset ? { seedOffset: input.seedOffset } : {}), ...(node ? { node } : {}) });
+        }, pub.primaryAddress);
+      },
+      sweepStatus: async () => this.sweeper.status(),
+      sweepPrepare: async (speed) => this.sweeper.prepare(pub.primaryAddress, speed),
+      sweepSend: async (password, code) => {
+        await this.verifyAccess(password, code);
+        const hashes = await this.sweeper.send();
+        void this.live?.syncNow?.().catch(() => {});
+        return hashes;
+      },
+      sweepCancel: () => this.sweeper.cancel(),
       changePassword: async (password, code, newPassword) => {
         await this.verifyAccess(password, code);
         await this.rewriteAll(password, newPassword, (p, s) => [p, s]);
@@ -962,6 +995,7 @@ export class WalletController {
     // Any open() still in progress must not reopen the wallet after this.
     const gen = ++this.openGen;
     this.dropPending();
+    void this.sweeper.cancel();
     // A reload from here on asks for the password, even while the save below is still running.
     this.onPassword?.(null);
     // Save progress first (bounded, so locking never hangs), then drop secrets and close. A first

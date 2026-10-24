@@ -159,14 +159,41 @@ export async function exodusToMoneroSeed(phrase: string, network: NetworkType): 
   return keys.getSeed();
 }
 
+/** The secret a full wallet's move file is sealed with: its words, and its passphrase when it has one. */
+export function fullMoveSecret(seed: string, seedOffset?: string): string {
+  return normalizeSeed(seed) + (seedOffset ? `\u0000${seedOffset}` : "");
+}
+
+/**
+ * Reads a 16-word Polyseed (Cake Wallet, Feather) with the reference library and returns the same
+ * wallet as a 25-word seed, as Monero's own wallet code does: the library's key is the spend key,
+ * and a passphrase on a phrase that is not encrypted is the seed offset. An encrypted phrase is
+ * decrypted with the passphrase instead. `birthday` is when the wallet was made (unix seconds).
+ */
+export async function polyseedWallet(phrase: string, passphrase: string, network: NetworkType): Promise<{ seed: string; seedOffset?: string; polyseed: string; encrypted: boolean; birthday: number }> {
+  const { decodePolyseed, spendKeyHex } = await import("@quietmint/polyseed");
+  const d = await decodePolyseed(phrase, passphrase);
+  const lib = await loadEngine();
+  const keys = await lib.createWalletKeys({ networkType: network, privateSpendKey: spendKeyHex(d.key) } as never);
+  d.key.fill(0);
+  const seed = await keys.getSeed();
+  return {
+    seed,
+    ...(!d.encrypted && passphrase ? { seedOffset: passphrase } : {}),
+    polyseed: phrase.trim().split(/\s+/).join(" ").toLowerCase(),
+    encrypted: d.encrypted,
+    birthday: d.birthday,
+  };
+}
+
 /** Derives address and view key from recovery words without touching the network. */
-export async function inspectSeed(seed: string, network: NetworkType): Promise<{ primaryAddress: string; privateViewKey: string }> {
+export async function inspectSeed(seed: string, network: NetworkType, seedOffset?: string): Promise<{ primaryAddress: string; privateViewKey: string }> {
   if (isMyMoneroPhrase(seed)) {
     const { primaryAddress, privateViewKey } = await myMoneroWallet(seed, network);
     return { primaryAddress, privateViewKey };
   }
   const lib = await loadEngine();
-  const keys = await lib.createWalletKeys({ networkType: network, seed: normalizeSeed(seed) });
+  const keys = await lib.createWalletKeys({ networkType: network, seed: normalizeSeed(seed), ...(seedOffset ? { seedOffset } : {}) });
   return { primaryAddress: await keys.getPrimaryAddress(), privateViewKey: await keys.getPrivateViewKey() };
 }
 
@@ -189,6 +216,8 @@ export interface OpenParams {
   network: NetworkType;
   restoreHeight: number;
   seed?: string;
+  /** Seed passphrase for a 25-word seed (see WalletSecrets.seedOffset). */
+  seedOffset?: string;
   primaryAddress?: string;
   privateViewKey?: string;
   /** Previously exported engine state (decrypted by the caller). Resumes sync where it stopped. */
@@ -419,6 +448,11 @@ export interface LiveWallet {
   prepareSend(destinations: Destination[], options?: SendOptions): Promise<PreparedTx>;
   /** Builds (does not send) one payment of everything spendable; the fee comes out of the amount. */
   prepareSweep(address: string, options?: SendOptions): Promise<PreparedTx>;
+  /**
+   * Builds (does not send) the transactions moving everything spendable to `address`; a wallet with
+   * many small payments needs several. Used to empty another wallet into this one (sweep.ts).
+   */
+  prepareSweepAll?(address: string, options?: SendOptions): Promise<{ fee: bigint; amount: bigint; metadata: string[] }>;
   relay(metadata: string): Promise<string>;
   /** Exports the engine state plus the height it is synced to, for sealed local saving. */
   exportState?(): Promise<{ state: EngineState; height: number }>;
@@ -458,7 +492,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       w = await lib.createWalletFull({ ...base, primaryAddress: k.primaryAddress, privateSpendKey: k.privateSpendKey, privateViewKey: k.privateViewKey });
     } else {
       w = p.kind === "full"
-        ? await lib.createWalletFull({ ...base, seed: normalizeSeed(p.seed ?? "") })
+        ? await lib.createWalletFull({ ...base, seed: normalizeSeed(p.seed ?? ""), ...(p.seedOffset ? { seedOffset: p.seedOffset } : {}) })
         : await lib.createWalletFull({ ...base, primaryAddress: p.primaryAddress, privateViewKey: p.privateViewKey });
     }
   }
@@ -752,6 +786,22 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       }
       const amount = BigInt(dests[0]!.getAmount());
       return { fee: tx.getFee(), amount, metadata: tx.getMetadata(), address: target, destinations: [{ address: target, amount }], ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
+    },
+    async prepareSweepAll(address, options = {}) {
+      if (p.kind !== "full") throw new Error("This is a view-only wallet. It can watch funds but cannot send.");
+      const target = address.trim();
+      const txs = await w.sweepUnlocked({ accountIndex: 0, address: target, priority: SPEED_PRIORITY[options.speed ?? "standard"], relay: false } as never).catch((e: unknown) => { throw friendlySendError(e); });
+      if (!txs.length) throw new Error("Nothing is spendable yet. New payments unlock after 10 confirmations (about 20 minutes).");
+      let fee = 0n;
+      let amount = 0n;
+      for (const tx of txs) {
+        const dests = tx.getOutgoingTransfer()?.getDestinations() ?? [];
+        // Every transaction must pay only the target address.
+        if (dests.length !== 1 || dests[0]!.getAddress() !== target) throw new Error("The sweep could not be prepared safely. Please try again.");
+        fee += BigInt(tx.getFee());
+        amount += BigInt(dests[0]!.getAmount());
+      }
+      return { fee, amount, metadata: txs.map((t) => t.getMetadata()) };
     },
     async relay(metadata) {
       return w.relayTx(metadata);

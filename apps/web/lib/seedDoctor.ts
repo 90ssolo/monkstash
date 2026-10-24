@@ -62,14 +62,14 @@ export function diagnose(count: WordCount, madeBy: MadeBy): Diagnosis {
       return {
         name: "A 16-word Polyseed",
         what: "Polyseed is the newer Monero phrase format. Feather uses it since version 2.0 and Cake Wallet makes it by default. The date the wallet was made is built into the words, so you do not need a restore height.",
-        here: "no",
-        hereNote: "MonkStash cannot restore a Polyseed yet.",
-        elsewhere: "Feather and Cake Wallet restore it.",
+        here: "yes",
+        hereNote: "MonkStash restores it, including a Polyseed protected with a passphrase.",
+        elsewhere: "Feather and Cake Wallet restore it too.",
         needsHeight: false,
         steps: [
-          "Restore it in Feather or Cake Wallet.",
-          "To use it in a wallet without Polyseed (such as MonkStash), open the wallet in Feather, go to Wallet, then Seed, tick Show 25 word seed, and write down the restore height with it.",
-          "A 25-word seed cannot be turned back into a Polyseed.",
+          "Choose Restore from recovery words and enter the 16 words. No date is needed.",
+          "If you set a passphrase when the wallet was made, open My seed has a passphrase and type it exactly.",
+          "Check that the address matches the one your old wallet showed. A 25-word seed cannot be turned back into a Polyseed.",
         ],
         guide: { href: "/feather-wallet-review", label: "Feather Wallet review" },
       };

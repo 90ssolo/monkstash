@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { MoveFileError, normalizeNodeUri, NodeUriError, readMoveHeader, type MoveHeader, type NetworkType, type NodeConfig, type TotpConfig, type WalletKind } from "@quietmint/wallet-core";
 import styles from "./wallet.module.css";
+import type { SendSpeed } from "@/lib/wallet/engine";
+import type { SweepPlan, SweepStatus } from "@/lib/wallet/sweep";
 import { EMPTY_START, RestoreStartField, startHeight, type RestoreStart } from "./RestoreStart";
 import { walletAbsoluteUrl, siteHref } from "@/lib/site";
 
@@ -16,10 +18,20 @@ export interface SettingsActions {
   totpEnabled: boolean;
   /** Origin of the user's own node, or null for the MonkStash relay. */
   node: string | null;
+  /** The recovery words need a seed passphrase as well. */
+  seedPassphrase?: boolean;
   /** Throws an Error with a user-facing message. */
   revealSeed(password: string, code: string): Promise<string>;
   /** Tests the node first (when given), saves it in the encrypted vault and reopens the wallet. */
   saveNode(node: NodeConfig | null, password: string, code: string): Promise<void>;
+  /** Opens another wallet from its words and scans it, to empty it into this one (sweep.ts). */
+  sweepStart?(input: { seed: string; seedOffset?: string; restoreHeight: number }): Promise<void>;
+  sweepStatus?(): Promise<SweepStatus>;
+  /** Builds the sweep to this wallet's main address. */
+  sweepPrepare?(speed: SendSpeed): Promise<SweepPlan>;
+  /** Checks the password (and 2FA code), then sends the sweep. Returns the transaction IDs. */
+  sweepSend?(password: string, code: string): Promise<string[]>;
+  sweepCancel?(): Promise<void>;
   /** Re-checks the password (and 2FA code), e.g. before leaving cashier mode. */
   checkAccess(password: string, code: string): Promise<void>;
   /**
@@ -122,6 +134,9 @@ export function RevealWords({ actions }: { actions: SettingsActions }) {
         <ol className={styles.wordGrid} aria-label={`Your ${words.length} recovery words`} translate="no">
           {words.map((w, i) => <li key={i}><span className={styles.wordNum}>{i + 1}</span><span className="mono">{w}</span></li>)}
         </ol>
+        {actions.seedPassphrase ? (
+          <p className="small"><strong>This wallet also has a seed passphrase.</strong> These words alone open a different, empty wallet: keep the passphrase with them (or somewhere just as safe). It is not shown here.</p>
+        ) : null}
         <p className="small muted">Write them on paper, in order. Hiding in {left} seconds.</p>
         <button type="button" className="btn btn-secondary btn-block" onClick={() => setWords(null)}>Hide words now</button>
       </div>
