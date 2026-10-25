@@ -334,7 +334,7 @@ export default function HomePage() {
             </div>
             <div className={styles.timeNote}>
               <ClockIcon />
-              <span>Most people finish all three steps in about two minutes. Syncing the first time can take a little longer, and the wallet shows its progress.</span>
+              <span>Most people finish all three steps in about two minutes. Syncing the first time can take a little longer, and the wallet shows its progress. Want every screen explained first? Read <Link href="/create-monero-wallet">how to create a Monero wallet</Link>.</span>
             </div>
           </div>
         </section>

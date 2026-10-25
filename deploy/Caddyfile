@@ -26,12 +26,14 @@ wallet.{$SITE_DOMAIN} {
 	reverse_proxy web:3000
 }
 
-www.{$SITE_DOMAIN} {
+# Listed with http:// too, so plain-http www goes straight to the https main domain in one hop
+# (otherwise Caddy first upgrades to https://www, then redirects again).
+www.{$SITE_DOMAIN}, http://www.{$SITE_DOMAIN} {
 	redir https://{$SITE_DOMAIN}{uri} permanent
 }
 
 # Someone typing www. in front of the wallet address still lands on the wallet.
-www.wallet.{$SITE_DOMAIN} {
+www.wallet.{$SITE_DOMAIN}, http://www.wallet.{$SITE_DOMAIN} {
 	redir https://wallet.{$SITE_DOMAIN}{uri} permanent
 }
 

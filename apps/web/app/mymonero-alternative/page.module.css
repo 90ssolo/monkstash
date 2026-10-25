@@ -36,7 +36,6 @@
 .safetyGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
 .safety h2 { font-size: clamp(1.8rem, 3.2vw, 2.7rem); line-height: 1.12; margin-bottom: 16px; }
 .safeLead { font-size: 1.1rem; color: var(--ink-2); margin-bottom: 20px; }
-.safety mark { background: rgba(180, 83, 42, 0.14); }
 .tick { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .tick li { position: relative; padding-left: 30px; color: var(--ink-2); }
 .tick li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border: 1.6px solid var(--forest); border-radius: 50%; }

@@ -17,7 +17,7 @@ export const meta: ArticleMeta = {
   h1: { keyword: "How to buy Monero (XMR)", sizzle: "Buy it anywhere. Keep it yours." },
   summary: "How to buy Monero safely: six ways to get XMR, ID checks, fees, the scams to avoid, and how to move your coins into a wallet you control.",
   keyword: "how to buy monero",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 21,
   toc: [
     { id: "short-answer", label: "How to buy Monero: the short answer" },
@@ -129,6 +129,22 @@ export function Body() {
         Whatever route you use, <mark>finish in a wallet where you hold the keys</mark>. Until then, you own a promise, not
         the coins.
       </KeyFact>
+      <h3>Where to buy Monero right now</h3>
+      <p>
+        Named places, each checked on its own documentation. None of these pay us, and availability depends on where you
+        live.
+      </p>
+      <table>
+        <caption>Places to get Monero (last checked 2026-10-25)</caption>
+        <thead><tr><th>Place</th><th>Type</th><th>ID check</th><th>Good to know</th></tr></thead>
+        <tbody>
+          <tr><th>RetoSwap (Haveno)</th><td>Peer to peer, desktop app</td><td>No</td><td>Pay by bank transfer, cash or another coin; your XMR is held in 2-of-3 escrow. See <Link href="/buy-monero-without-kyc">buying without KYC</Link></td></tr>
+          <tr><th>eigenwallet</th><td>Atomic swap from bitcoin</td><td>No</td><td>Bitcoin to Monero only; no company holds your coins. See <Link href="/swap-bitcoin-to-monero">the swap guide</Link></td></tr>
+          <tr><th>Kraken</th><td>Regulated exchange</td><td>Yes</td><td>Not in the EEA, UK, Canada, Ireland or Belgium; check your own account first. See <Link href="/why-monero-delisted">why exchanges dropped XMR</Link></td></tr>
+          <tr><th>Instant exchanges</th><td>Swap services</td><td>Usually no</td><td>Fast, but they hold your coins during the swap; use small amounts</td></tr>
+          <tr><th>Crypto ATMs</th><td>Cash machines</td><td>Varies</td><td>Only where the operator enables XMR; fees are high</td></tr>
+        </tbody>
+      </table>
 
       {/* 2 */}
       <ChapterHead n={2} id="ways" title="Where to buy Monero: 6 ways to get XMR" />
