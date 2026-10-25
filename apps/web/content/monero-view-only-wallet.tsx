@@ -27,7 +27,7 @@ export const meta: ArticleMeta = {
     { id: "safety", label: "Staying safe" },
     { id: "trouble", label: "If something looks off" },
   ],
-  related: ["monero-view-key", "monero-restore-height", "restore-monero-wallet", "monero-wallet-not-showing-balance", "monero-seed-phrase"],
+  related: ["monero-view-key", "check-monero-balance", "monero-restore-height", "restore-monero-wallet", "monero-wallet-not-showing-balance"],
   faq: [
     { q: "What is a Monero view only wallet?", a: "It is a wallet made from your address and private view key, with no spend key or recovery words. It can see payments coming in, but it cannot send or spend anything." },
     { q: "How do I create a Monero view only wallet?", a: "Copy your primary address and private view key from your main wallet, choose the watch-only or restore-from-keys option in a wallet, paste both, leave the spend key empty, and set a restore date. In MonkStash the option is called Add a watch-only wallet." },

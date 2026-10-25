@@ -1,4 +1,4 @@
-import { absoluteUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd } from "@/lib/site";
 import type { PlatformData } from "./types";
 
 export const MODIFIED = "2026-10-15";
@@ -13,7 +13,7 @@ export function platformJsonLd(d: PlatformData) {
       description: d.article.description,
       mainEntityOfPage: absoluteUrl(d.path),
       dateModified: MODIFIED,
-      author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" }, image: absoluteUrl("/opengraph-image"),
+      author: authorLd, publisher: organizationLd, image: absoluteUrl("/opengraph-image"),
     },
     {
       "@context": "https://schema.org",

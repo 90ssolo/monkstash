@@ -71,7 +71,7 @@ export function diagnose(count: WordCount, madeBy: MadeBy): Diagnosis {
           "If you set a passphrase when the wallet was made, open My seed has a passphrase and type it exactly.",
           "Check that the address matches the one your old wallet showed. A 25-word seed cannot be turned back into a Polyseed.",
         ],
-        guide: { href: "/feather-wallet-review", label: "Feather Wallet review" },
+        guide: { href: "/monero-polyseed", label: "Monero Polyseed guide" },
       };
     case 13:
       return {
@@ -188,7 +188,7 @@ export const ZERO_BALANCE_CAUSES: { title: string; body: string }[] = [
 /** Reference rows for the table: words, what it is, made by, restores in, MonkStash. */
 export const FORMAT_TABLE: { words: string; name: string; madeBy: string; restores: string; here: string }[] = [
   { words: "25", name: "Standard Monero seed", madeBy: "Monero GUI and CLI; Feather and Cake (legacy option)", restores: "Monero GUI and CLI, Feather, Cake", here: "Yes" },
-  { words: "16", name: "Polyseed (date built in)", madeBy: "Feather 2.0 and later; Cake (default)", restores: "Feather, Cake", here: "Not yet: use Feather's 25-word seed" },
+  { words: "16", name: "Polyseed (date built in)", madeBy: "Feather 2.0 and later; Cake (default)", restores: "Feather, Cake, MonkStash", here: "Yes, with its passphrase if it has one" },
   { words: "14", name: "Older Feather seed", madeBy: "Feather before 2.0", restores: "Feather", here: "No" },
   { words: "13", name: "MyMonero phrase", madeBy: "MyMonero (shut down January 2026)", restores: "MonkStash; check others first", here: "Yes" },
   { words: "12", name: "BIP39 phrase", madeBy: "Exodus (until August 2025); Cake (option)", restores: "Cake; MonkStash for Exodus", here: "Yes (Cake: without passphrase)" },

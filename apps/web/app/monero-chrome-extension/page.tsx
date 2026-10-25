@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, helpDiscussionsUrl, repoUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd, helpDiscussionsUrl, repoUrl, walletUrl } from "@/lib/site";
 import { extensionRelease as rel } from "@/lib/extensionRelease";
 import {
   RiskPermissions, RiskFake, RiskUpdate, RiskSeed,
@@ -14,11 +14,13 @@ import {
 import styles from "./page.module.css";
 
 const TITLE = "MonkStash Monero Wallet Extension for Chrome and Firefox";
+// The <title>: the search phrase first, and no second brand name (the layout appends " | MonkStash").
+const SEO_TITLE = "Monero Wallet Chrome Extension (and Firefox)";
 const DESCRIPTION = "A non-custodial Monero wallet in your browser toolbar, for Chrome and Firefox. Open source, keys kept on your device. How to recognise the real listing.";
 const UPDATED = "2026-10-22";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: SEO_TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/monero-chrome-extension" },
   openGraph: ogFor({ title: TITLE, description: DESCRIPTION, path: "/monero-chrome-extension" }),
@@ -69,7 +71,7 @@ export default function ChromeExtensionPage() {
   return (
     <>
       <JsonLd data={[
-        { "@context": "https://schema.org", "@type": "Article", headline: TITLE, description: DESCRIPTION, dateModified: UPDATED, mainEntityOfPage: absoluteUrl("/monero-chrome-extension"), author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" } },
+        { "@context": "https://schema.org", "@type": "Article", headline: TITLE, description: DESCRIPTION, dateModified: UPDATED, mainEntityOfPage: absoluteUrl("/monero-chrome-extension"), author: authorLd, publisher: organizationLd },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
           { "@type": "ListItem", position: 2, name: "Browser extension", item: absoluteUrl("/monero-chrome-extension") },

@@ -27,7 +27,7 @@ export const meta: ArticleMeta = {
     { id: "after", label: "After you restore" },
     { id: "next", label: "What to do next" },
   ],
-  related: ["back-up-monero-wallet", "create-monero-wallet", "monero-wallet-not-syncing", "monero-restore-height"],
+  related: ["back-up-monero-wallet", "monero-polyseed", "monero-wallet-not-syncing", "monero-restore-height"],
   faq: [
     { q: "How do I restore a Monero wallet?", a: "Open a Monero wallet, choose the restore option, type your 25 recovery words in order, enter roughly when you made the wallet if you know it, set a new password, and wait for the wallet to scan the network." },
     { q: "Can I restore my wallet on a new device?", a: "Yes. Your recovery words work in any Monero wallet, on any device. That is the whole point of a backup. Enter the 25 words and your money will appear once the wallet finishes checking the network." },

@@ -29,7 +29,7 @@ export const meta: ArticleMeta = {
     { id: "legal", label: "Is it legal?" },
     { id: "next", label: "Next steps" },
   ],
-  related: ["buy-monero", "swap-bitcoin-to-monero", "monero-subaddress", "monero-phishing-sites"],
+  related: ["buy-monero", "swap-bitcoin-to-monero", "monero-eu-2027", "monero-phishing-sites"],
   sources: [
     { label: "Haveno: FAQ (2-of-3 multisig, no-deposit offers up to 1.5 XMR, non-KYC)", href: "https://haveno.exchange/faq/" },
     { label: "Haveno docs: Trade protocol (security deposits and escrow)", href: "https://docs.haveno.exchange/overview/trade-protocol/" },

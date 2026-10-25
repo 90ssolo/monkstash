@@ -221,7 +221,8 @@ export function Body() {
         <a href="https://docs.featherwallet.org/guides/seed-scheme" rel="noopener">Feather explains</a> that a Polyseed wallet can
         show you its 25-word equivalent, but a 25-word wallet can never become a Polyseed one, because Polyseed runs the words
         through a one-way step to make the key. MonkStash restores the 16 words directly, using the same Polyseed library as
-        the Monero wallet itself, so you do not need the 25-word version here.
+        the Monero wallet itself, so you do not need the 25-word version here. Our{" "}
+        <Link href="/monero-polyseed">Polyseed guide</Link> covers passphrases, damaged words and restoring in each wallet.
       </p>
       <h3>14 words: an old Feather seed</h3>
       <p>

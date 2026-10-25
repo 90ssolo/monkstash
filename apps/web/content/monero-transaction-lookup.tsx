@@ -31,7 +31,7 @@ export const meta: ArticleMeta = {
     { label: "Monero documentation: monero-wallet-cli reference", href: "https://docs.getmonero.org/interacting/monero-wallet-cli-reference/" },
     { label: "Feather Wallet documentation: Prove a payment", href: "https://docs.featherwallet.org/guides/prove-payment" },
   ],
-  related: ["monero-view-key", "monero-view-only-wallet", "monero-transaction-time", "send-monero", "monero-wallet-not-syncing", "run-a-monero-node", "monero-remote-node"],
+  related: ["monero-view-key", "check-monero-balance", "monero-view-only-wallet", "monero-transaction-time", "send-monero", "monero-wallet-not-syncing", "run-a-monero-node", "monero-remote-node"],
   faq: [
     { q: "Can you look up a Monero transaction?", a: "Yes, by its transaction ID (also called a tx ID or tx hash) on a block explorer. You will see that it exists, which block it is in, its confirmations and its fee. You will not see the sender, the receiver or the amount, because Monero hides them by default." },
     { q: "Can I see the amount of a Monero transaction on a block explorer?", a: "No. Monero hides amounts, senders and receivers on the blockchain. Only the people involved, using their wallet keys, can see the details of a payment." },

@@ -113,7 +113,7 @@ export function Body() {
 
       <h2 id="seeds">Seed formats</h2>
       <p>
-        New Monero wallets in Cake default to <strong>Polyseed</strong>, a 16-word format. It can also restore a classic{" "}
+        New Monero wallets in Cake default to <strong><Link href="/monero-polyseed">Polyseed</Link></strong>, a 16-word format. It can also restore a classic{" "}
         <strong>Legacy 25-word</strong> Monero seed: Cake&apos;s guide tells users to switch the seed type from Polyseed (16 words)
         to Legacy (25 words) when restoring. Its announcement also mentions a 12-word BIP 39 seed option that can be shared across
         other currencies.

@@ -9,10 +9,10 @@ import { GateArt, LocalArt } from "./Art";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
-  title: "Monero Tools",
+  title: "Free Monero Tools: Address, Fee, QR and Seed",
   description: "Free Monero tools that run in your browser: check an address, identify a recovery phrase, find a restore height, see the fee now, make a payment QR code and estimate mining earnings.",
   alternates: { canonical: "/tools" },
-  openGraph: ogFor({ title: "Monero Tools", description: "Free Monero tools that run in your browser: check an address, identify a recovery phrase, find a restore height, see the fee now, make a payment QR code and estimate mining earnings.", path: "/tools" }),
+  openGraph: ogFor({ title: "Free Monero Tools", description: "Free Monero tools that run in your browser: check an address, identify a recovery phrase, find a restore height, see the fee now, make a payment QR code and estimate mining earnings.", path: "/tools" }),
 };
 
 export default function ToolsPage() {

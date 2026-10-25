@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd, repoUrl, walletUrl } from "@/lib/site";
 import {
   HeroArt, SpectrumArt, CheckArt, ArrowIcon,
   TypeWeb, TypePhone, TypeDesktop, TypeHardware,
@@ -108,7 +108,7 @@ export default function WalletsPage() {
           headline: "Best Monero wallets, compared honestly",
           description: "Compare Monero wallets by type, who holds your keys, and who each one fits.",
           mainEntityOfPage: absoluteUrl("/monero-wallets"),
-          author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" }, image: absoluteUrl("/opengraph-image"),
+          author: authorLd, publisher: organizationLd, image: absoluteUrl("/opengraph-image"),
           dateModified: "2026-10-17",
         },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [

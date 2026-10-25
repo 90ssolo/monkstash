@@ -28,7 +28,7 @@ export const meta: ArticleMeta = {
     { id: "open", label: "What is still open" },
     { id: "next", label: "Next steps" },
   ],
-  related: ["is-monero-legal", "buy-monero", "accept-monero-payments", "buy-monero-without-kyc"],
+  related: ["is-monero-legal", "why-monero-delisted", "buy-monero", "buy-monero-without-kyc"],
   faq: [
     { q: "Is Monero banned in the EU from 2027?", a: "Not in the sense of a ban on owning it, in our reading. Article 79 of Regulation (EU) 2024/1624 prohibits credit institutions, financial institutions and crypto-asset service providers from keeping accounts that allow anonymisation, including through anonymity-enhancing coins. It applies from 10 July 2027. It does not contain a rule addressed to individuals holding coins. This is not legal advice." },
     { q: "What date does the EU privacy coin rule apply from?", a: "Article 90 of the AMLR says the regulation applies from 10 July 2027 (with a later date, 10 July 2029, only for football agents and professional football clubs). Article 79 is part of it." },

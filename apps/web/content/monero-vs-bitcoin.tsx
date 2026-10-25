@@ -24,7 +24,7 @@ export const meta: ArticleMeta = {
     { id: "strengths", label: "Where each one is stronger" },
     { id: "which", label: "Which is right for you" },
   ],
-  related: ["what-is-monero", "is-monero-traceable", "how-monero-works", "monero-vs-zcash"],
+  related: ["what-is-monero", "is-monero-traceable", "swap-bitcoin-to-monero", "monero-vs-zcash"],
   sources: [
     { label: "Monero FAQ (getmonero.org): tail emission of 0.6 XMR per block since June 2022, CryptoNote origins", href: "https://www.getmonero.org/get-started/faq/" },
     { label: "Moneropedia: Tail Emission", href: "https://www.getmonero.org/resources/moneropedia/tail-emission.html" },

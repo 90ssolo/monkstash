@@ -27,7 +27,7 @@ export const meta: ArticleMeta = {
     { id: "safety", label: "Mistakes that cost money" },
     { id: "next", label: "Next steps" },
   ],
-  related: ["buy-monero-without-kyc", "buy-monero", "receive-monero", "monero-subaddress"],
+  related: ["buy-monero-without-kyc", "buy-monero", "sell-monero", "monero-subaddress"],
   sources: [
     { label: "eigenwallet: official site (formerly UnstoppableSwap)", href: "https://eigenwallet.org/" },
     { label: "eigenwallet docs: Overview", href: "https://docs.eigenwallet.org/" },
@@ -210,7 +210,7 @@ export function Body() {
       </ul>
       <p>
         Either way, send from your own wallet, and paste a bitcoin address you have checked twice. Crypto payments cannot be
-        reversed.
+        reversed. To cash out to your bank or to cash instead, see <Link href="/sell-monero">how to sell Monero</Link>.
       </p>
 
       <h2 id="safety">Mistakes that cost money</h2>

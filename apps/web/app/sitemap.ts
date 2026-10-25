@@ -15,7 +15,7 @@ const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" |
   { path: "/verify", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.4 },
   { path: "/server", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.7 },
   { path: "/privacy", updated: "2026-10-25", changeFrequency: "monthly", priority: 0.3 },
-  { path: "/tools", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/tools", updated: "2026-10-25", changeFrequency: "monthly", priority: 0.6 },
   { path: "/tools/monero-address-validator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/tools/monero-restore-height-calculator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/tools/monero-seed-doctor", updated: "2026-10-20", changeFrequency: "monthly", priority: 0.7 },
@@ -27,7 +27,7 @@ const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" |
   { path: "/monero-wallets/iphone", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.7 },
   { path: "/monero-wallets/desktop", updated: "2026-10-17", changeFrequency: "monthly", priority: 0.7 },
   { path: "/monero-wallets/hardware", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/monero-chrome-extension", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/monero-chrome-extension", updated: "2026-10-22", changeFrequency: "monthly", priority: 0.7 },
   { path: "/mymonero-alternative", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/donate", updated: "2026-10-20", changeFrequency: "monthly", priority: 0.6 },
   // Library index pages. Only final URLs belong here (never redirected ones like /wallets).

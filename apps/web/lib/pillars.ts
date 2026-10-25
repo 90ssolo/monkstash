@@ -39,7 +39,7 @@ export const PILLARS: Pillar[] = [
     id: "seed-keys",
     name: "Seed phrase and keys",
     path: "/monero-seed-phrase",
-    cluster: ["/back-up-monero-wallet", "/restore-monero-wallet", "/monero-restore-height", "/tools/monero-restore-height-calculator", "/monero-view-key", "/monero-view-only-wallet"],
+    cluster: ["/back-up-monero-wallet", "/restore-monero-wallet", "/monero-polyseed", "/monero-restore-height", "/tools/monero-restore-height-calculator", "/monero-view-key", "/monero-view-only-wallet"],
   },
   {
     id: "using",
@@ -67,7 +67,7 @@ export const PILLARS: Pillar[] = [
     id: "buying",
     name: "Get Monero",
     path: "/buy-monero",
-    cluster: ["/buy-monero-without-kyc", "/swap-bitcoin-to-monero"],
+    cluster: ["/buy-monero-without-kyc", "/swap-bitcoin-to-monero", "/sell-monero"],
   },
   {
     id: "merchants",
@@ -79,7 +79,7 @@ export const PILLARS: Pillar[] = [
     id: "legal",
     name: "Monero and the law",
     path: "/is-monero-legal",
-    cluster: ["/monero-eu-2027"],
+    cluster: ["/why-monero-delisted", "/monero-eu-2027"],
   },
 ];
 

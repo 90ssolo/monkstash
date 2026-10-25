@@ -105,7 +105,8 @@ export function Body() {
       <p>
         New Feather wallets use <strong>Polyseed</strong> by default, a newer 16-word seed format. Feather&apos;s documentation also
         says it can restore 14 and 25 word seeds. The 25-word format is the classic Monero seed that the official GUI and CLI
-        use, so you can bring a standard wallet into Feather. It also has a guide for recovering a damaged Polyseed.
+        use, so you can bring a standard wallet into Feather. It also has a guide for recovering a damaged Polyseed, and our{" "}
+        <Link href="/monero-polyseed">Polyseed guide</Link> explains the format itself.
       </p>
       <p>
         One practical point: <mark>count your words before you move between wallets</mark>. A 16-word Polyseed and a 25-word seed are different

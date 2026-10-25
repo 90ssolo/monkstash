@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { articleByPath, articlePath, getRelated, SECTION_LABEL, SECTION_PATH, type ArticleModule } from "@/lib/content";
 import { clusterNeighbors, pillarOf } from "@/lib/pillars";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd, walletUrl } from "@/lib/site";
 import { TocActive } from "./TocActive";
 import { ReadingProgress } from "./ReadingProgress";
 import { PillarLayout } from "@/components/pillar/PillarLayout";
@@ -36,9 +36,9 @@ export function ArticleLayout({ module: mod }: { module: ArticleModule }) {
         {
           "@context": "https://schema.org", "@type": "Article", headline: meta.title, description: meta.summary,
           datePublished: meta.published ?? meta.updated, dateModified: meta.updated, mainEntityOfPage: absoluteUrl(path),
-          image: absoluteUrl("/opengraph-image"),
+          image: absoluteUrl(`${path}/opengraph-image`),
           ...(meta.sources?.length ? { citation: meta.sources.map((s) => s.href) } : {}),
-          author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" },
+          author: authorLd, publisher: organizationLd,
         },
         {
           "@context": "https://schema.org", "@type": "BreadcrumbList",

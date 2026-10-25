@@ -26,7 +26,7 @@ export const meta: ArticleMeta = {
     { id: "table", label: "Side by side" },
     { id: "choose", label: "Which one fits you" },
   ],
-  related: ["is-monero-traceable", "monero-vs-bitcoin", "monero-ring-signatures", "monero-stealth-address", "what-is-monero", "is-monero-legal"],
+  related: ["is-monero-traceable", "monero-vs-bitcoin", "monero-ring-signatures", "monero-stealth-address", "monero-eu-2027", "is-monero-legal"],
   faq: [
     { q: "Which is more private, Monero or Zcash?", a: "It depends on how Zcash is used. A fully shielded Zcash transaction hides sender, receiver and amount using zero-knowledge proofs. Monero hides all three on every transaction by default, so there is no choice to get wrong. In practice, Monero's strength is that everyone is in the same crowd, and Zcash's strength is a strong proof system when people actually use shielded addresses." },
     { q: "Is Zcash private by default?", a: "No. Zcash has both transparent addresses, which work like Bitcoin and are public, and shielded addresses, which are private. Whether a given payment is private depends on which type of address each side uses." },

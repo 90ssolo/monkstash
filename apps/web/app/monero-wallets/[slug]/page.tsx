@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ogFor } from "@/lib/og";
+import { articleShare } from "@/lib/og";
 import { notFound } from "next/navigation";
 import { ArticleLayout } from "@/components/article/ArticleLayout";
 import { getArticle, getArticles } from "@/lib/content";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: mod.meta.seoTitle ?? mod.meta.title,
     description: mod.meta.summary,
     alternates: { canonical: path },
-    openGraph: ogFor({ type: "article", title: mod.meta.title, description: mod.meta.summary, path: path }),
+    ...articleShare({ title: mod.meta.title, description: mod.meta.summary, path }),
   };
 }
 

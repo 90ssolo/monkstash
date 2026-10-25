@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd, walletUrl } from "@/lib/site";
 import {
   HeroArt, AddressBarArt, WindowVaultArt,
   StepOpen, StepRestore, StepWords, StepSync,
@@ -62,7 +62,7 @@ export default function MyMoneroAlternativePage() {
   return (
     <>
       <JsonLd data={[
-        { "@context": "https://schema.org", "@type": "Article", headline: TITLE, description: metadata.description as string, dateModified: "2026-10-15", mainEntityOfPage: absoluteUrl("/mymonero-alternative"), author: { "@type": "Organization", name: "MonkStash" }, publisher: { "@type": "Organization", name: "MonkStash" } },
+        { "@context": "https://schema.org", "@type": "Article", headline: TITLE, description: metadata.description as string, dateModified: "2026-10-15", mainEntityOfPage: absoluteUrl("/mymonero-alternative"), author: authorLd, publisher: organizationLd },
         { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
           { "@type": "ListItem", position: 2, name: "MyMonero alternative", item: absoluteUrl("/mymonero-alternative") },

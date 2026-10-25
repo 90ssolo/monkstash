@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   layout: "pillar",
   kicker: "The complete guide",
   title: "How to Buy Monero (XMR): The Complete Guide for 2026",
-  seoTitle: "How to Buy Monero (XMR): The 2026 Guide",
+  seoTitle: "How and Where to Buy Monero (XMR) in 2026",
   h1: { keyword: "How to buy Monero (XMR)", sizzle: "Buy it anywhere. Keep it yours." },
   summary: "How to buy Monero safely: six ways to get XMR, ID checks, fees, the scams to avoid, and how to move your coins into a wallet you control.",
   keyword: "how to buy monero",
@@ -338,7 +338,8 @@ export function Body() {
         hides senders, receivers and amounts by design. Some exchanges decided listing it wasn&apos;t worth the work. These
         are <mark>business decisions about listing</mark>, not a verdict on the coin, and they don&apos;t touch XMR already
         in your own wallet. If your exchange dropped it, a{" "}
-        <Link href="/swap-bitcoin-to-monero">bitcoin to Monero swap</Link> is the usual way around it.
+        <Link href="/swap-bitcoin-to-monero">bitcoin to Monero swap</Link> is the usual way around it. For every major
+        delisting with its date and source, see <Link href="/why-monero-delisted">why Monero was delisted</Link>.
       </p>
       <h3>Is it legal to buy Monero?</h3>
       <p>

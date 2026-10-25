@@ -60,7 +60,7 @@ export const meta: ArticleMeta = {
     { id: "check", label: "How to check your own rules" },
     { id: "bottom", label: "The bottom line" },
   ],
-  related: ["monero-eu-2027", "what-is-monero", "buy-monero", "is-monero-traceable"],
+  related: ["monero-eu-2027", "why-monero-delisted", "what-is-monero", "buy-monero"],
   faq: [
     { q: "Is it illegal to own Monero?", a: "In the 15 jurisdictions we checked, we found no rule that makes it illegal for an individual to own Monero, though Russia now restricts transfers to self-custody wallets. Most rules restrict exchanges and other licensed firms, which affects access rather than ownership. This is not legal advice." },
     { q: "Is Monero legal in the US?", a: "Yes. FinCEN's 2019 guidance says a person who uses privacy coins to pay for goods or services on their own behalf is not a money transmitter, and exchanges may accept them if they verify identities. The IRS treats it like other digital assets: as property for tax." },
@@ -153,7 +153,8 @@ export function Body() {
         Many of these were <mark>business and compliance decisions</mark> by the platforms, such as Kraken citing compliance
         requirements when it delisted XMR in Canada. In a few places the regulator decided for them: South Korea, Dubai and the
         DIFC bar licensed firms from handling privacy coins, and Japan&apos;s exchange association does not allow coins whose
-        transfers cannot be traced. Either way, the effect on you is narrower access, not a ban on holding the coin.
+        transfers cannot be traced. Either way, the effect on you is narrower access, not a ban on holding the coin. Our{" "}
+        <Link href="/why-monero-delisted">dated timeline of Monero delistings</Link> lists each exchange and its stated reason.
       </p>
 
       <h2 id="eu-2027">The EU&apos;s 2027 rule</h2>

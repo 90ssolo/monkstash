@@ -8,7 +8,7 @@ import { ReadingProgress } from "@/components/article/ReadingProgress";
 import { articlePath, type ArticleModule } from "@/lib/content";
 import { ClusterLibrary } from "./ClusterLibrary";
 import { pillarOf } from "@/lib/pillars";
-import { absoluteUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, authorLd, organizationLd, walletUrl } from "@/lib/site";
 import article from "@/components/article/article.module.css";
 import styles from "./pillar.module.css";
 
@@ -29,9 +29,9 @@ export function PillarLayout({ module: mod, hero }: { module: ArticleModule; her
         {
           "@context": "https://schema.org", "@type": "Article", headline: meta.title, description: meta.summary,
           datePublished: meta.published ?? meta.updated, dateModified: meta.updated, mainEntityOfPage: absoluteUrl(path),
-          image: absoluteUrl("/opengraph-image"),
-          author: { "@type": "Organization", name: "MonkStash", url: absoluteUrl("/about") },
-          publisher: { "@type": "Organization", name: "MonkStash" },
+          image: absoluteUrl(`${path}/opengraph-image`),
+          author: authorLd,
+          publisher: organizationLd,
           ...(meta.sources ? { citation: meta.sources.map((s) => s.href) } : {}),
         },
         {

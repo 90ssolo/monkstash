@@ -26,6 +26,22 @@ export const xUrl = `https://x.com/${xHandle}`;
 /** Our official profiles elsewhere, for Organization.sameAs. */
 export const officialProfiles = [repoUrl, xUrl] as const;
 
+/**
+ * The publisher as one schema.org entity (same @id everywhere), so search engines and AI
+ * systems tie every page, the GitHub repo and the X account to one MonkStash.
+ */
+export const organizationLd = {
+  "@type": "Organization",
+  "@id": `${siteUrl}/#organization`,
+  name: "MonkStash",
+  url: `${siteUrl}/`,
+  logo: `${siteUrl}/icon.svg`,
+  sameAs: [...officialProfiles],
+} as const;
+
+/** Article author: the MonkStash team, pointing at the page that says who we are. */
+export const authorLd = { "@type": "Organization", name: "MonkStash", url: `${siteUrl}/about` } as const;
+
 /** Public questions and answers (GitHub Discussions, "Help & Support"). */
 export const helpDiscussionsUrl = `${repoUrl}/discussions/categories/help-support`;
 

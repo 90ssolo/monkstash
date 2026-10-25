@@ -26,7 +26,7 @@ export const meta: ArticleMeta = {
     { id: "fcmp", label: "FCMP++: the planned replacement" },
     { id: "you", label: "What this means for you" },
   ],
-  related: ["how-monero-works", "monero-stealth-address", "is-monero-traceable", "monero-vs-bitcoin"],
+  related: ["monero-fcmp", "how-monero-works", "monero-stealth-address", "is-monero-traceable"],
   faq: [
     { q: "What is a ring signature in Monero?", a: "A ring signature is a digital signature that proves one member of a group approved a payment, without showing which member. In Monero the group is your real coin plus decoy coins taken from the blockchain." },
     { q: "What is the Monero ring size?", a: "The ring size is 16: one real input and 15 decoys, until the FCMP++ upgrade replaces rings. It rose from 11 to 16 in the August 2022 network upgrade, and every transaction must use it so that all transactions look alike." },

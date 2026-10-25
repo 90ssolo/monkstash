@@ -13,7 +13,7 @@ import {
   ProofNonCustodial, ProofOpenSource, ProofNoAccounts, ProofNoTracking,
   FaqArt, SealArt,
 } from "@/components/home/HomeArt";
-import { absoluteUrl, repoUrl, site, walletUrl } from "@/lib/site";
+import { absoluteUrl, organizationLd, repoUrl, site, walletUrl } from "@/lib/site";
 import { ClusterLinks, PILLAR_COUNT_TEXT, PillarIndex } from "@/components/pillar/ClusterLibrary";
 import styles from "./home.module.css";
 
@@ -55,6 +55,17 @@ export default function HomePage() {
     <>
       <JsonLd
         data={[
+          { "@context": "https://schema.org", ...organizationLd },
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "@id": absoluteUrl("/#website"),
+            name: site.name,
+            url: absoluteUrl("/"),
+            description: site.description,
+            inLanguage: "en",
+            publisher: { "@id": organizationLd["@id"] },
+          },
           {
             "@context": "https://schema.org",
             "@type": "WebApplication",
@@ -64,6 +75,7 @@ export default function HomePage() {
             operatingSystem: "Any (modern web browser)",
             description: site.description,
             offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            publisher: { "@id": organizationLd["@id"] },
           },
           {
             "@context": "https://schema.org",
