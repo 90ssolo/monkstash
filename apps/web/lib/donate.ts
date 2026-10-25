@@ -25,7 +25,7 @@ export const donate = {
   /** How donations are spent. Shown on the page and in the FAQ. */
   spendingPolicy:
     "Donations fund the feature at the front of the line and keep the free web wallet running. There are no targets and no countdowns: we build in this order, at the pace support allows, and never spend on anything outside this roadmap.",
-  /** The public roadmap: six user-facing steps, built in this order. */
+  /** The public roadmap: user-facing steps, built in this order. */
   milestones: [
     {
       id: "web-wallet",
@@ -54,13 +54,6 @@ export const donate = {
       outcome: "Support for FCMP++, the planned upgrade that replaces ring signatures with full-chain membership proofs, so your wallet keeps working when the network switches over.",
       why: "When Monero upgrades, your wallet has to be ready on day one.",
       status: "next",
-    },
-    {
-      id: "security-review",
-      title: "An independent security review",
-      outcome: "An outside firm reviews the wallet code, and we publish the report.",
-      why: "Funded by donations. A review is only worth something if someone independent does it.",
-      status: "later",
     },
     {
       id: "extension",

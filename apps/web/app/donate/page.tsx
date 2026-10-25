@@ -14,7 +14,7 @@ import styles from "./page.module.css";
 
 const TITLE = "Donate to MonkStash: Fund Private Monero Tools";
 const DESCRIPTION =
-  "MonkStash is free and checkable. Help fund what comes next: FCMP++ support, an independent security review, and the extension and phone apps.";
+  "MonkStash is free and checkable. Help fund what comes next: support for Monero's FCMP++ upgrade, the extension in the stores, and phone apps.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 const faqs = [
-  { q: "Why donate if the wallet is free?", a: "Free to use is not free to build. FCMP++ support, an independent security review, store releases of the extension and phone apps all cost real money and time. MonkStash has no ads on wallet pages, no tracking and no account fees, so community funding is how the next pieces get built." },
+  { q: "Why donate if the wallet is free?", a: "Free to use is not free to build. FCMP++ support, store releases of the extension and phone apps all cost real money and time. MonkStash has no ads on wallet pages, no tracking and no account fees, so community funding is how the next pieces get built." },
   { q: "Can I check where the money goes?", a: "You can check every coin that comes in: we publish the donation wallet's view key, so anyone can make a view-only copy of the wallet and see every incoming payment. What the money builds is public too. Every change is in the open-source code on GitHub, and the roadmap on this page moves as each item ships." },
   { q: "Is there a funding target?", a: donate.spendingPolicy },
   { q: "Can I donate anonymously?", a: "Yes. Monero is private by default, so a donation does not reveal who you are. Being listed as a founding supporter is optional, and a pseudonym is fine." },
@@ -306,7 +306,7 @@ export default function DonatePage() {
           <div className={`container-wide ${styles.finalGrid}`}>
             <div>
               <h2 id="finalH">Use it for free. Help it grow if you can.</h2>
-              <p>The wallet is yours either way. If it earns a place in your life, you can help fund FCMP++ support, the independent security review and the apps that make it better for everyone.</p>
+              <p>The wallet is yours either way. If it earns a place in your life, you can help fund FCMP++ support and the apps that make it better for everyone.</p>
               <div className={styles.ctaRow}>
                 <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the free wallet</Link>
                 <Link className="btn btn-ghost btn-lg" href="#give">How to give</Link>
