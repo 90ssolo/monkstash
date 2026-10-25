@@ -30,7 +30,7 @@ test("dark theme: chosen in Settings, kept after a reload, the content site stay
     if (shots) await page.screenshot({ path: `${shots}/theme-${name.toLowerCase()}.png`, fullPage: true });
   }
 
-  // The unlock screen after a reload is dark from the first frame (the early script on the page).
+  // The unlock screen after a reload is dark too (applied as the wallet loads).
   await lock(page);
   await page.reload();
   await expect(page.locator("#upw")).toBeVisible();

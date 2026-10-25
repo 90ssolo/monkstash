@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { WalletApp } from "@/components/wallet/WalletApp";
 import { walletAbsoluteUrl } from "@/lib/site";
 
@@ -13,16 +12,9 @@ export const metadata: Metadata = {
   alternates: { canonical: walletAbsoluteUrl },
 };
 
-// Puts a chosen light or dark theme on the page before it is drawn (lib/wallet/theme.ts keeps the same key).
-const THEME_EARLY = `try{var t=localStorage.getItem("monkstash.theme.v1");if(t==="light"||t==="dark")document.documentElement.dataset.walletTheme=t}catch(e){}`;
-
-export default async function WalletPage() {
-  const csp = (await headers()).get("content-security-policy") ?? "";
-  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
-  return (
-    <>
-      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_EARLY }} />
-      <WalletApp />
-    </>
-  );
+// No inline script here: every script the wallet page runs comes from the build, so anyone can
+// check it against the public source (scripts/verify-build.mjs). A dark theme chosen by hand is
+// therefore applied when the wallet loads; following the system needs no script (globals.css).
+export default function WalletPage() {
+  return <WalletApp />;
 }
