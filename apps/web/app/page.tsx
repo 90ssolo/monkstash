@@ -437,7 +437,7 @@ export default function HomePage() {
             </div>
             <div className={styles.fix}>
               <p>The one caveat, said plainly: to find your payments, your wallet asks a Monero node through our relay server. The relay can see your IP address and those requests, and the node sees the requests, but <mark>neither ever sees your keys or your seed</mark>. Run your own node? Connect MonkStash to it in the wallet&apos;s settings, and no one else is in the loop.</p>
-              <Link href="/is-monero-safe">Read the full threat model</Link>
+              <Link href="/is-monero-web-wallet-safe">Read the full threat model</Link>
             </div>
           </div>
         </section>

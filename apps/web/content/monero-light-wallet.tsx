@@ -26,7 +26,7 @@ export const meta: ArticleMeta = {
     { id: "choose", label: "How to choose" },
     { id: "safe", label: "Using a light wallet more safely" },
   ],
-  related: ["monero-node", "monero-remote-node", "monero-view-key", "run-a-monero-node", "restore-mymonero-seed"],
+  related: ["monero-node", "monero-remote-node", "monero-view-key", "run-a-monero-node", "is-monero-web-wallet-safe"],
   faq: [
     { q: "What is a Monero light wallet?", a: "A light wallet hands the heavy work of finding your payments to a server. You give the server your private view key, it scans the blockchain for you, and your wallet only downloads the results. Your spend key stays on your device." },
     { q: "Is a light wallet the same as a remote node wallet?", a: "No. A remote node wallet downloads blocks from someone's node and does the scanning itself, so the node never receives your keys. A light wallet server wallet gives the server your view key so the server can scan for you." },

@@ -112,6 +112,7 @@ import * as swapBitcoinToMonero from "@/content/swap-bitcoin-to-monero";
 import * as moneroPolyseed from "@/content/monero-polyseed";
 import * as whyMoneroDelisted from "@/content/why-monero-delisted";
 import * as sellMonero from "@/content/sell-monero";
+import * as isMoneroWebWalletSafe from "@/content/is-monero-web-wallet-safe";
 
 const MODULES: ArticleModule[] = [
   // learn
@@ -127,7 +128,7 @@ const MODULES: ArticleModule[] = [
   acceptMoneroPayments, moneroPaymentLink, moneroPos, moneroPaymentGateway, moneroWoocommerce,
   // added October 2026
   exodusMonero, checkMoneroBalance, moneroUnlockedBalance, moneroFcmp, moneroEu2027, buyMoneroWithoutKyc, swapBitcoinToMonero,
-  moneroPolyseed, whyMoneroDelisted, sellMonero,
+  moneroPolyseed, whyMoneroDelisted, sellMonero, isMoneroWebWalletSafe,
   // wallets (served under /monero-wallets)
   safestMoneroWallet, featherWalletReview, cakeWalletReview, moneroGuiVsCli,
 ];

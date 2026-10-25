@@ -25,7 +25,7 @@ export const meta: ArticleMeta = {
     { id: "limits", label: "What no wallet can promise" },
     { id: "next", label: "What to do next" },
   ],
-  related: ["is-monero-traceable", "back-up-monero-wallet", "create-monero-wallet", "monero-phishing-sites"],
+  related: ["is-monero-traceable", "back-up-monero-wallet", "is-monero-web-wallet-safe", "monero-phishing-sites"],
   faq: [
     { q: "Is Monero safe to buy and hold?", a: "The technology is mature, but the price of any cryptocurrency can rise and fall sharply, so only hold what you can afford to see change in value. Keeping it safe from theft comes down to protecting your recovery words and using a trustworthy wallet." },
     { q: "Is the Monero wallet a virus?", a: "Official Monero software is not a virus. Antivirus tools sometimes flag crypto software by mistake, which is called a false positive. The real danger is downloading a fake wallet from an unofficial source, so always use official sites and check the address bar." },

@@ -30,7 +30,7 @@ const GROUPS: { id: string; title: string; blurb: string; slugs: string[]; more?
   { id: "privacy", title: "How the privacy works", blurb: "Who paid, who got paid, and what stays hidden.", slugs: ["monero-ring-signatures", "monero-stealth-address", "is-monero-traceable"] },
   { id: "nodes", title: "Nodes and light wallets", blurb: "Who your wallet talks to, and how to run your own.", slugs: ["monero-node", "monero-remote-node", "monero-light-wallet", "run-a-monero-node", "monero-pruned-node"] },
   { id: "buy-mine", title: "Buy and mine", blurb: "Where your first XMR comes from.", slugs: ["buy-monero", "buy-monero-without-kyc", "swap-bitcoin-to-monero", "sell-monero", "mine-monero", "monero-p2pool"] },
-  { id: "safe-legal", title: "Stay safe and legal", blurb: "Avoid the fakes, and know the rules where you live.", slugs: ["monero-phishing-sites", "is-monero-legal", "why-monero-delisted", "monero-eu-2027"] },
+  { id: "safe-legal", title: "Stay safe and legal", blurb: "Avoid the fakes, and know the rules where you live.", slugs: ["is-monero-web-wallet-safe", "monero-phishing-sites", "is-monero-legal", "why-monero-delisted", "monero-eu-2027"] },
   { id: "get-paid", title: "Get paid in Monero", blurb: "Payment links, a till for your counter, and shop checkout.", slugs: ["accept-monero-payments", "monero-payment-link", "monero-pos", "monero-payment-gateway", "monero-woocommerce"], more: { href: "/business", label: "MonkStash for business" } },
   { id: "wallets", title: "Choose a wallet", blurb: "Honest reviews and comparisons.", slugs: ["safest-monero-wallet", "cake-wallet-review", "feather-wallet-review", "monero-gui-vs-cli"], more: { href: "/monero-wallets", label: "Compare all Monero wallets" } },
 ];

@@ -27,7 +27,7 @@ export const meta: ArticleMeta = {
     { id: "habits", label: "Habits that matter more than the wallet" },
     { id: "monkstash", label: "Where MonkStash fits" },
   ],
-  related: ["feather-wallet-review", "monero-gui-vs-cli", "cake-wallet-review"],
+  related: ["is-monero-web-wallet-safe", "feather-wallet-review", "monero-gui-vs-cli", "cake-wallet-review"],
   faq: [
     { q: "What is the safest Monero wallet?", a: "There is no single safest wallet. For savings, a hardware wallet paired with the official Monero GUI or Feather, ideally using your own node, is the setup most people trust. For small everyday amounts, a mobile or web wallet is a reasonable trade of safety for convenience." },
     { q: "What is the most secure Monero wallet for large amounts?", a: "A hardware wallet used with a desktop companion wallet keeps your keys on a separate device. Advanced users can also use offline transaction signing, which the Monero documentation describes, though it says a hardware wallet is generally the better choice." },

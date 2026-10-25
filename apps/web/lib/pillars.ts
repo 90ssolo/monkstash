@@ -23,7 +23,7 @@ export const PILLARS: Pillar[] = [
     id: "web-wallet",
     name: "Monero web wallet",
     path: "/",
-    cluster: ["/create-monero-wallet", "/monero-light-wallet", "/monero-chrome-extension", "/mymonero-alternative", "/restore-mymonero-seed", "/exodus-monero", "/monero-phishing-sites"],
+    cluster: ["/create-monero-wallet", "/is-monero-web-wallet-safe", "/monero-light-wallet", "/monero-chrome-extension", "/mymonero-alternative", "/restore-mymonero-seed", "/exodus-monero", "/monero-phishing-sites"],
   },
   {
     id: "wallets",

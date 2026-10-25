@@ -28,7 +28,7 @@ export const meta: ArticleMeta = {
     { id: "mistakes", label: "Common mistakes to avoid" },
     { id: "next", label: "What to do next" },
   ],
-  related: ["back-up-monero-wallet", "restore-monero-wallet", "receive-monero", "monero-seed-phrase"],
+  related: ["back-up-monero-wallet", "is-monero-web-wallet-safe", "receive-monero", "monero-seed-phrase"],
   faq: [
     { q: "Is it safe to create a Monero wallet online?", a: "It is safe when the wallet is non-custodial, meaning your recovery words are created and encrypted in your browser and never sent to a server. The main risks are losing your recovery words and fake websites, so back up your words offline and always check the address bar before entering anything." },
     { q: "Do I need to download anything to create a Monero wallet?", a: "No. A web wallet like MonkStash runs in your browser. There is nothing to install and no blockchain to download. It connects to a Monero node to find your payments and broadcast the ones you send." },
