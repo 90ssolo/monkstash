@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { JsonLd } from "@/components/JsonLd";
 import { CopyButton } from "@/components/wallet/CopyButton";
 import { StaticQr } from "@/components/StaticQr";
-import { absoluteUrl, repoUrl, walletUrl } from "@/lib/site";
+import { absoluteUrl, organizationLd, repoUrl, walletUrl } from "@/lib/site";
 import { donate } from "@/lib/donate";
 import { LiveJar, RoadmapLadder } from "./Live";
 import { HeroArt, GapArt, LadderArt, JarCompareArt, ProofArt, SealArt } from "./Art";
@@ -14,7 +14,7 @@ import styles from "./page.module.css";
 
 const TITLE = "Donate to MonkStash: Fund Private Monero Tools";
 const DESCRIPTION =
-  "MonkStash is free. Help fund what comes next: verifiable builds, FCMP++ support, an independent security review and a browser extension.";
+  "MonkStash is free and checkable. Help fund what comes next: FCMP++ support, an independent security review, and the extension and phone apps.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 const faqs = [
-  { q: "Why donate if the wallet is free?", a: "Free to use is not free to build. Verifiable builds, FCMP++ support, a security review and a browser extension all cost real money and time. MonkStash has no ads on wallet pages, no tracking and no account fees, so community funding is how the next pieces get built." },
+  { q: "Why donate if the wallet is free?", a: "Free to use is not free to build. FCMP++ support, an independent security review, store releases of the extension and phone apps all cost real money and time. MonkStash has no ads on wallet pages, no tracking and no account fees, so community funding is how the next pieces get built." },
   { q: "Can I check where the money goes?", a: "You can check every coin that comes in: we publish the donation wallet's view key, so anyone can make a view-only copy of the wallet and see every incoming payment. What the money builds is public too. Every change is in the open-source code on GitHub, and the roadmap on this page moves as each item ships." },
   { q: "Is there a funding target?", a: donate.spendingPolicy },
   { q: "Can I donate anonymously?", a: "Yes. Monero is private by default, so a donation does not reveal who you are. Being listed as a founding supporter is optional, and a pseudonym is fine." },
@@ -45,7 +45,7 @@ export default function DonatePage() {
     <>
       <JsonLd
         data={[
-          { "@context": "https://schema.org", "@type": "WebPage", name: TITLE, description: DESCRIPTION, url: absoluteUrl("/donate"), dateModified: "2026-10-17", publisher: { "@type": "Organization", name: "MonkStash" } },
+          { "@context": "https://schema.org", "@type": "WebPage", name: TITLE, description: DESCRIPTION, url: absoluteUrl("/donate"), dateModified: "2026-10-25", publisher: organizationLd },
           { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
             { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
             { "@type": "ListItem", position: 2, name: "Support the project", item: absoluteUrl("/donate") },
@@ -87,7 +87,7 @@ export default function DonatePage() {
                 <h2>Two things Monero users still do not have.</h2>
               </div>
               <p className={styles.body}>A simple web wallet you can trust, and a good wallet that lives in your browser toolbar. <Link className={styles.inlineLink} href="/mymonero-alternative">MyMonero closed in January 2026</Link>, and look-alike clones took its place in search results. A <Link className={styles.inlineLink} href="/monero-chrome-extension">Monero browser extension</Link> that is actually good has never existed.</p>
-              <p className={styles.body}>MonkStash already covers the first. <mark>The roadmap below is how we cover the second</mark>, and how we make the whole thing something you can verify instead of just believe.</p>
+              <p className={styles.body}>MonkStash already covers the first. The extension for the second is built and <mark>waiting for store approval</mark>, and the whole thing is something you can verify instead of just believe.</p>
             </div>
             <figure className={styles.fig}>
               <div className={styles.figBox}><GapArt /></div>
@@ -306,7 +306,7 @@ export default function DonatePage() {
           <div className={`container-wide ${styles.finalGrid}`}>
             <div>
               <h2 id="finalH">Use it for free. Help it grow if you can.</h2>
-              <p>The wallet is yours either way. If it earns a place in your life, you can help fund the verifiable builds, the security review and the extension that make it better for everyone.</p>
+              <p>The wallet is yours either way. If it earns a place in your life, you can help fund FCMP++ support, the independent security review and the apps that make it better for everyone.</p>
               <div className={styles.ctaRow}>
                 <Link className="btn btn-primary btn-lg" href={walletUrl}>Open the free wallet</Link>
                 <Link className="btn btn-ghost btn-lg" href="#give">How to give</Link>

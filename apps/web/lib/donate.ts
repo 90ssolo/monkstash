@@ -30,7 +30,7 @@ export const donate = {
     {
       id: "web-wallet",
       title: "A private wallet in your browser",
-      outcome: "A free, non-custodial Monero wallet in your browser. Restores 25-word seeds, MyMonero's 13 words and Exodus's 12 words, and can use your own node.",
+      outcome: "A free, non-custodial Monero wallet in your browser. Restores 25-word seeds, 16-word Polyseeds from Cake and Feather, MyMonero's 13 words and Exodus's 12 words. Gift links, coin control, several wallets in one browser, a printable emergency kit, dark mode and your own node.",
       why: "The gift that comes first. It is live and free, and it stays free.",
       status: "live",
     },
@@ -44,9 +44,9 @@ export const donate = {
     {
       id: "verifiable-builds",
       title: "Proof the code is genuine",
-      outcome: "Open source (BSD-3-Clause) and reproducible builds with a free checker are live: anyone can rebuild the wallet and confirm the site serves exactly the published code. Still to come: signed releases.",
+      outcome: "Open source (BSD-3-Clause) and reproducible builds with a free checker: anyone can rebuild the wallet and confirm the site serves exactly the published code. Extension releases list their fingerprints, and the server installer is signed.",
       why: "A web wallet should never ask for blind trust. Open code lets you read it; verifiable builds let you check it.",
-      status: "building",
+      status: "live",
     },
     {
       id: "fcmp",
@@ -65,7 +65,7 @@ export const donate = {
     {
       id: "extension",
       title: "Extension and phone apps",
-      outcome: "MonkStash in your Chrome and Firefox toolbar (built, going through store review), then as an app on iPhone and Android, built on the same wallet core.",
+      outcome: "MonkStash in your Chrome and Firefox toolbar: built, installable by hand from our official release today, and going through store review. Then an app for iPhone and Android, built on the same wallet core.",
       why: "There is still no good Monero browser extension. This fills the gap.",
       status: "building",
     },

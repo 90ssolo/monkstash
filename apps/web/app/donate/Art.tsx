@@ -93,7 +93,7 @@ export function GapArt(p: P) {
         <path d="M508 96V122" stroke="#b4532a" strokeWidth="1.6" strokeDasharray="4 4" strokeLinecap="round" />
       </g>
       <text x="412" y="150" style={D} fontStyle="italic" fontSize="16" fill="#b4532a" textAnchor="middle">an empty slot for Monero</text>
-      <text x="412" y="240" style={D} fontStyle="italic" fontSize="16" fill="#1f4733" textAnchor="middle">still no good extension</text>
+      <text x="412" y="240" style={D} fontStyle="italic" fontSize="16" fill="#1f4733" textAnchor="middle">the slot we are filling</text>
       <path d="M262 126h-6M262 126l-8-5M262 126l-8 5" fill="none" stroke="#c7c8bb" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
