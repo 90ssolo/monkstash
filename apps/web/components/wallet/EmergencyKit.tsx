@@ -41,11 +41,20 @@ export function EmergencyKitForm({ pub, actions }: { pub: WalletPublic; actions:
     };
     root.classList.add(PRINT_CLASS);
     window.addEventListener("afterprint", done, { once: true });
+    // Some phone browsers never send afterprint: the words also leave the page when it is closed,
+    // and a minute after the print dialog opened at the latest.
+    window.addEventListener("pagehide", done, { once: true });
+    let fallback = 0;
     // Let the browser lay the kit out before the dialog takes a snapshot of it.
-    const t = window.setTimeout(() => window.print(), 50);
+    const t = window.setTimeout(() => {
+      window.print();
+      fallback = window.setTimeout(done, 60_000);
+    }, 50);
     return () => {
       window.clearTimeout(t);
+      window.clearTimeout(fallback);
       window.removeEventListener("afterprint", done);
+      window.removeEventListener("pagehide", done);
       root.classList.remove(PRINT_CLASS);
     };
   }, [content]);

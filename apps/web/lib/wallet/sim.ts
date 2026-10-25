@@ -55,9 +55,10 @@ function simFee(options: SendOptions, recipients: number): bigint {
   return (xmr(0.00006) + xmr(0.00002) * BigInt(recipients)) * multiplier;
 }
 
-export function createSimWallet(address: string): LiveWallet {
-  let txs = seedTxs(address);
-  let coins = seedCoins();
+export function createSimWallet(address: string, only?: { amount: bigint }): LiveWallet {
+  // `only`: a wallet holding one confirmed payment of this amount (a gift being claimed).
+  let txs = only ? [{ hash: "sim" + "e".repeat(61), direction: "in" as const, amount: only.amount, confirmations: 20, timestamp: Math.floor(Date.now() / 1000) - 3600, pending: false }] : seedTxs(address);
+  let coins = only ? [{ keyImage: "5".repeat(64), amount: only.amount, subaddressIndex: 0, hash: "sim" + "e".repeat(61), height: 2_225_900, timestamp: Math.floor(Date.now() / 1000) - 3600, frozen: false, locked: false }] : seedCoins();
   const frozenTotal = () => coins.filter((c) => c.frozen).reduce((s, c) => s + c.amount, 0n);
   const fromOf = (picked: Coin[]) => [...new Set(picked.map((c) => c.subaddressIndex))].sort((a, b) => a - b);
   let balanceListener: ((b: Balances) => void) | null = null;

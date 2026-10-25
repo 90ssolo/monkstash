@@ -4,10 +4,12 @@
  * shares a link holding its key; whoever opens the link moves the gift into their own wallet. The
  * sender keeps every link (sealed on this device) and can take an unclaimed gift back.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatXmr, GIFT_MESSAGE_MAX, parseXmr, xmrAmountProblem, type NetworkType } from "@quietmint/wallet-core";
 import { Credentials, type GiftView, type SettingsActions } from "./WalletSettings";
 import { Sweep } from "./Sweep";
+import { GiftNote } from "./GiftNote";
+import giftStyles from "./gift.module.css";
 import { CopyButton } from "./CopyButton";
 import { Qr } from "./Qr";
 import styles from "./wallet.module.css";
@@ -47,7 +49,7 @@ export function GiftLinks({ actions, network, unlocked, synced, hidden, onSent }
       {making ? <GiftMaker actions={actions} unlocked={unlocked} synced={synced} hidden={hidden} onClose={() => { setMaking(false); void reload(); }} onSent={() => { onSent(); void reload(); }} /> : null}
       {reclaiming ? (
         <Sweep actions={actions} network={network} onClose={() => { setReclaiming(null); void reload(); }} onSent={() => { onSent(); void reload(); }}
-          gift={{ mine: true, message: reclaiming.message, onCheckAgain: async () => { await actions.giftOpen?.(reclaiming.id); } }} />
+          gift={{ mine: true, message: reclaiming.message, amount: BigInt(reclaiming.amount), onCheckAgain: async () => { await actions.giftOpen?.(reclaiming.id); } }} />
       ) : null}
       {gifts?.length ? (
         <ul className={styles.giftList}>
@@ -73,6 +75,8 @@ function GiftRow({ gift, hidden, busy, onCheck, onForget }: { gift: GiftView; hi
   const [error, setError] = useState<string | null>(null);
   const [confirmForget, setConfirmForget] = useState(false);
   const done = !!gift.claimedAt;
+  // A gift taken back is empty for sure; one seen as claimed can still be checked again.
+  const empty = !!gift.reclaimed;
   return (
     <li>
       <div className={styles.giftRowMain}>
@@ -84,14 +88,23 @@ function GiftRow({ gift, hidden, busy, onCheck, onForget }: { gift: GiftView; hi
       </div>
       <div className={styles.giftRowActions}>
         {!done ? <CopyButton value={gift.link} label="Copy link" /> : null}
-        {!done ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => { setError(null); void onCheck().catch((e: Error) => setError(e.message)); }}>Check or take back</button> : null}
-        {done || confirmForget ? (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void onForget().catch((e: Error) => setError(e.message))}>{confirmForget ? "Yes, remove it" : "Remove"}</button>
+        {!empty ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => { setError(null); void onCheck().catch((e: Error) => setError(e.message)); }}>{done ? "Check again" : "Check or take back"}</button> : null}
+        {confirmForget ? (
+          <>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void onForget().catch((e: Error) => setError(e.message))}>Yes, remove it</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmForget(false)}>Keep it</button>
+          </>
         ) : (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmForget(true)}>Remove</button>
         )}
       </div>
-      {confirmForget && !done ? <p className="small" role="alert" style={{ margin: 0 }}>Removing an unclaimed gift deletes its link from this wallet: you could no longer take it back. The money stays in the gift until someone with the link claims it.</p> : null}
+      {confirmForget ? (
+        <p className="small" role="alert" style={{ margin: 0 }}>
+          {empty
+            ? "This removes the gift from your list. It was taken back, so nothing is lost."
+            : "Removing a gift deletes its link from this wallet: you could no longer check it or take it back. Any money still in it stays there until someone with the link claims it."}
+        </p>
+      ) : null}
       {error ? <p className="error small" role="alert" style={{ margin: 0 }}>{error}</p> : null}
     </li>
   );
@@ -151,12 +164,16 @@ function GiftMaker({ actions, unlocked, synced, hidden, onClose, onSent }: { act
   if (made) {
     const share = typeof navigator !== "undefined" && typeof navigator.share === "function";
     return (
-      <div className={styles.giftMade} role="status">
-        <p style={{ margin: 0 }}><strong>Your gift of {formatXmr(BigInt(made.amount))} XMR is ready.</strong> Send this link to the person, in a private message.</p>
+      <div className={styles.giftMade}>
+        <p role="status" style={{ margin: 0 }}><strong>Your gift of {formatXmr(BigInt(made.amount))} XMR is ready.</strong> Send this link to the person, in a private message.</p>
+        <div className={giftStyles.preview}>
+          <p className={giftStyles.previewLabel}>When they open the link, they see this note in an envelope, with a button to claim it:</p>
+          <GiftNote amount={BigInt(made.amount)} message={made.message} />
+        </div>
         <textarea className="textarea mono" readOnly value={made.link} rows={3} aria-label="Gift link" onFocus={(e) => e.currentTarget.select()} />
         <div className={styles.exportActions}>
           <CopyButton value={made.link} label="Copy link" />
-          {share ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => void navigator.share({ text: made.message || "A Monero gift for you", url: made.link }).catch(() => {})}>Share</button> : null}
+          {share ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => void navigator.share({ text: made.message ? `${made.message} (a Monero gift for you)` : "I sent you a Monero gift. Open the link to claim it.", url: made.link }).catch(() => {})}>Share</button> : null}
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setQr(!qr)} aria-expanded={qr}>{qr ? "Hide QR code" : "Show QR code"}</button>
         </div>
         {qr ? <Qr value={made.link} size={220} label="QR code of the gift link" /> : null}
@@ -211,7 +228,7 @@ function GiftMaker({ actions, unlocked, synced, hidden, onClose, onSent }: { act
 /** Claims a gift link into this wallet: from a link opened in this tab, or one pasted here. */
 export function GiftClaim({ actions, network, code, onClose, onSent }: { actions: SettingsActions; network: NetworkType; code?: string; onClose: () => void; onSent: () => void }) {
   const [pasted, setPasted] = useState("");
-  const [gift, setGift] = useState<{ link: string; message: string; mine: boolean } | null>(null);
+  const [gift, setGift] = useState<{ link: string; message: string; mine: boolean; amount?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -226,11 +243,18 @@ export function GiftClaim({ actions, network, code, onClose, onSent }: { actions
     }
     setBusy(false);
   }, [actions]);
-  useEffect(() => { if (code) void open(`#gift=${code}`); }, [code, open]);
+  // Once per code: the actions object is rebuilt on every render of the app, and opening again
+  // would restart the scan (or drop a prepared claim).
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!code || opened.current === code) return;
+    opened.current = code;
+    void open(`#gift=${code}`);
+  }, [code, open]);
 
   if (gift) {
     return <Sweep actions={actions} network={network} onClose={onClose} onSent={onSent}
-      gift={{ mine: gift.mine, message: gift.message, onCheckAgain: async () => { await actions.giftOpen!(gift.link); } }} />;
+      gift={{ mine: gift.mine, message: gift.message, ...(gift.amount ? { amount: BigInt(gift.amount) } : {}), onCheckAgain: async () => { await actions.giftOpen!(gift.link); } }} />;
   }
   return (
     <section className={styles.sweep} aria-labelledby="claim-h">

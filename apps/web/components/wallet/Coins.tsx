@@ -25,7 +25,6 @@ export function Coins({ wallet, labels, hidden, synced, balance, onChanged }: {
   labels: WalletLabels;
   hidden: boolean;
   synced: boolean;
-  /** After a freeze or unfreeze: the balance changes. */
   /** The wallet's balance: it also counts change from a payment that has no block yet, which has no coin yet. */
   balance: bigint;
   onChanged: () => void;
@@ -117,7 +116,7 @@ export function Coins({ wallet, labels, hidden, synced, balance, onChanged }: {
                   </span>
                 </span>
                 {c.keyImage ? (
-                  <button type="button" className={`btn btn-sm ${c.frozen ? "btn-primary" : "btn-secondary"}`} disabled={busy !== null} aria-pressed={c.frozen}
+                  <button type="button" className={`btn btn-sm ${c.frozen ? "btn-primary" : "btn-secondary"}`} disabled={busy !== null}
                     aria-label={`${c.frozen ? "Unfreeze" : "Freeze"} the ${hidden ? "" : `${formatXmr(c.amount)} XMR `}coin`} onClick={() => void toggle(c)}>
                     {busy === c.keyImage ? "Saving…" : c.frozen ? "Unfreeze" : "Freeze"}
                   </button>

@@ -724,5 +724,3 @@
 .giftRowActions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .giftMade { display: grid; gap: var(--s-3); justify-items: start; }
 .giftMade textarea { width: 100%; font-size: var(--step--1); word-break: break-all; }
-.giftMsg { margin: 0; padding: var(--s-2) var(--s-3); border-left: 3px solid var(--clay); background: var(--clay-soft); color: var(--ink); font-family: var(--font-display); font-size: var(--step-1); overflow-wrap: anywhere; }
-.giftNotice { margin-bottom: var(--s-4); }

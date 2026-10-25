@@ -13,12 +13,13 @@ import { EMPTY_START, RestoreStartField, startHeight, type RestoreStart } from "
 import { SeedPassphrase } from "./Onboarding";
 import { SpeedPicker, speedLabel } from "./SendParts";
 import { CopyButton } from "./CopyButton";
+import { GiftNote } from "./GiftNote";
 import styles from "./wallet.module.css";
 
 const POLL_MS = 1000;
 
 /** A gift link being claimed (or one of this wallet's own gifts being taken back): the scan is already started. */
-export interface GiftSweep { mine: boolean; message: string; onCheckAgain: () => Promise<void> }
+export interface GiftSweep { mine: boolean; message: string; amount?: bigint; onCheckAgain: () => Promise<void> }
 
 export function Sweep({ actions, network, onClose, onSent, gift }: { actions: SettingsActions; network: NetworkType; onClose: () => void; onSent: () => void; gift?: GiftSweep }) {
   const [status, setStatus] = useState<SweepStatus>({ state: "idle" });
@@ -130,7 +131,8 @@ export function Sweep({ actions, network, onClose, onSent, gift }: { actions: Se
   const head = (
     <div className={styles.listHead}>
       <h3 id="sweep-h" className={styles.recentH}>{title}</h3>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void (status.state === "scanning" || status.state === "ready" || status.state === "opening" ? stop() : Promise.resolve()).then(onClose); }}>
+      {/* Always stopped on the way out, even after an error: the next scan must start clean. */}
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void stop().then(onClose); }}>
         {status.state === "scanning" || status.state === "ready" ? "Cancel" : "Close"}
       </button>
     </div>
@@ -147,7 +149,7 @@ export function Sweep({ actions, network, onClose, onSent, gift }: { actions: Se
         </p>
         <div className={styles.sweepBar} aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
         {status.state === "scanning" && !gift ? <p className="small muted" style={{ margin: 0 }}>From <span className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</span>. This can take a while for an old wallet. You can keep using this one; the scan stops if it locks.</p> : null}
-        {gift ? <GiftMessage text={gift.message} /> : null}
+        {gift ? <GiftNote amount={gift.amount} message={gift.message} kicker={gift.mine ? "Your gift" : "A gift for you"} /> : null}
       </section>
     );
   }
@@ -171,10 +173,10 @@ export function Sweep({ actions, network, onClose, onSent, gift }: { actions: Se
     return (
       <section className={styles.sweep} aria-labelledby="sweep-h">
         {head}
-        {gift ? <GiftMessage text={gift.message} /> : null}
+        {gift ? <GiftNote amount={gift.amount} message={gift.message} kicker={gift.mine ? "Your gift" : "A gift for you"} /> : null}
         {gift && status.total === 0n ? null : (
           <dl className={styles.facts}>
-            <dt>{gift ? "Gift" : "Other wallet"}</dt>{gift ? <dd><strong>{formatXmr(status.total)} XMR</strong></dd> : <dd className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</dd>}
+            <dt>{gift ? "Found in the gift" : "Other wallet"}</dt>{gift ? <dd><strong>{formatXmr(status.total)} XMR</strong></dd> : <dd className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</dd>}
             {gift ? null : <><dt>Balance</dt><dd>{formatXmr(status.total)} XMR</dd></>}
             {locked > 0n ? <><dt>Not spendable yet</dt><dd>{formatXmr(locked)} XMR</dd></> : null}
           </dl>
@@ -221,6 +223,7 @@ export function Sweep({ actions, network, onClose, onSent, gift }: { actions: Se
     return (
       <section className={styles.sweep} aria-labelledby="sweep-h">
         {head}
+        <GiftNote amount={gift.amount} message={gift.message} kicker={gift.mine ? "Your gift" : "A gift for you"} />
         {status.state === "error" ? <p className="error small" role="alert" style={{ margin: 0 }}>{status.message}</p> : <p className="small" role="status">Opening the gift…</p>}
       </section>
     );
@@ -257,10 +260,4 @@ function giftWaitText(total: bigint, received: bigint, mine: boolean): string {
   return mine
     ? "Nothing has arrived at this gift yet. A new gift shows up after a block or two (a few minutes)."
     : "Nothing has arrived at this gift yet. If it was just sent, it shows up after a block or two (a few minutes).";
-}
-
-/** The sender's line, shown as plain text. */
-function GiftMessage({ text }: { text: string }) {
-  if (!text) return null;
-  return <blockquote className={styles.giftMsg}><span className="visually-hidden">Message from the sender: </span>{text}</blockquote>;
 }

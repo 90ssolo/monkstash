@@ -53,6 +53,10 @@ export function siteHref(path: string): string {
 /** The wallet's full URL, for places that need one (metadata, llms.txt). */
 export const walletAbsoluteUrl = walletOrigin ? `${walletOrigin}/` : absoluteUrl("/wallet");
 
+/** The page a gift link opens (the gift itself travels after the #). Links made before it pointed
+ *  at the wallet itself, which still accepts them. */
+export const giftPageUrl = walletOrigin ? `${walletOrigin}/gift` : absoluteUrl("/wallet/gift");
+
 /**
  * Where /pay links point. Payment pages live on the main site, not on the wallet's origin:
  * customers never need to visit the wallet's address.

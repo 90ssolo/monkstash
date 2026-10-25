@@ -56,14 +56,23 @@ test("gift link: make one, take it back, and claim one in a fresh browser", asyn
   await p2.addInitScript(() => {
     localStorage.setItem("quietmint.demo.session.v1", JSON.stringify({ assignedLabel: "e2e", mode: "simulation" }));
   });
+  // The link opens the gift page: the note shows the amount and message, the code leaves the address bar.
   const code = link.slice(link.indexOf("#"));
-  await p2.goto(`/wallet${code}`);
-  await expect(p2.getByText(/Someone sent you Monero as a gift/)).toBeVisible();
+  expect(link).toContain("/wallet/gift#gift=");
+  await p2.goto(`/wallet/gift${code}`);
+  await expect(p2.getByRole("heading", { name: "Someone sent you Monero." })).toBeVisible();
+  const note = p2.getByRole("figure", { name: "Your gift" });
+  await expect(note.getByText("0.5", { exact: true })).toBeVisible();
+  await expect(note.getByText("Happy birthday!")).toBeVisible();
   expect(p2.url()).not.toContain("gift=");
+  if (shots) await p2.screenshot({ path: `${shots}/gift-page.png`, fullPage: true });
+  await p2.getByRole("link", { name: "Claim your gift" }).click();
+  await expect(p2.getByRole("heading", { name: "Your gift is waiting" })).toBeVisible();
   await restore(p2, wallet("Test B"));
   await dashboard(p2);
   const claim = p2.getByRole("region", { name: "Claim your gift" });
   await expect(claim.getByText("Happy birthday!")).toBeVisible();
+  await expect(claim.getByText("0.5 XMR", { exact: true })).toBeVisible();
   await claim.getByRole("button", { name: "Review the claim" }).click();
   await claim.locator("#sweep-pw").fill(PASSWORD);
   await claim.getByRole("button", { name: /^Claim .* XMR now$/ }).click();
@@ -72,4 +81,34 @@ test("gift link: make one, take it back, and claim one in a fresh browser", asyn
   await claim.getByRole("button", { name: "Done" }).click();
   await expect(p2.getByRole("region", { name: "Claim your gift" })).toHaveCount(0);
   await other.close();
+});
+
+test("a link made before the gift page (wallet address + #gift=) still opens the gift", async ({ page, browser }) => {
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await expect(page.getByText("Up to date", { exact: true })).toBeVisible();
+  await section(page, "Send").click();
+  const gifts = page.getByRole("region", { name: "Gift links" });
+  await gifts.getByRole("button", { name: "Make a gift link" }).click();
+  await gifts.getByLabel("Amount (XMR)").fill("0.25");
+  await gifts.getByRole("button", { name: "Review the gift" }).click();
+  await gifts.locator("#gift-pw").fill(PASSWORD);
+  await gifts.getByRole("button", { name: "Make the gift link" }).click();
+  const link = await gifts.getByLabel("Gift link").inputValue();
+
+  const other = await browser.newContext();
+  const p2 = await other.newPage();
+  await p2.addInitScript(() => {
+    localStorage.setItem("quietmint.demo.session.v1", JSON.stringify({ assignedLabel: "e2e", mode: "simulation" }));
+  });
+  await p2.goto(`/wallet${link.slice(link.indexOf("#"))}`);
+  await expect(p2.getByRole("heading", { name: "Your gift is waiting" })).toBeVisible();
+  expect(p2.url()).not.toContain("gift=");
+  await other.close();
+});
+
+test("a damaged gift link explains itself", async ({ page }) => {
+  await page.goto("/wallet/gift#gift=1LWcWdhCycHTxA2WPSX6VB3GXF64tC8Bx3U2aVzN4iZRLue34Qqpwe");
+  await expect(page.getByRole("heading", { name: "This gift link does not open" })).toBeVisible();
 });

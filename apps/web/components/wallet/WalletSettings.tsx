@@ -50,7 +50,7 @@ export interface SettingsActions {
    * Starts scanning a gift (a pasted link, or the id of one this wallet made) to move it into this
    * wallet; then sweepStatus, sweepPrepare and sweepSend as for any sweep.
    */
-  giftOpen?(linkOrId: string): Promise<{ message: string; mine: boolean }>;
+  giftOpen?(linkOrId: string): Promise<{ message: string; mine: boolean; amount?: string }>;
   /** Re-checks the password (and 2FA code), e.g. before leaving cashier mode. */
   checkAccess(password: string, code: string): Promise<void>;
   /**

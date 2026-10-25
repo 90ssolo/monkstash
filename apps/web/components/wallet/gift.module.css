@@ -1,0 +1,187 @@
+/* The gift page (/gift): the envelope, the claim pitch, the steps and who we are. */
+
+.page { min-height: 100vh; min-height: 100dvh; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; }
+
+.bar {
+  width: min(100% - 2 * var(--s-4), 1120px); margin-inline: auto;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+  padding: var(--s-4) 0; border-bottom: 1px solid var(--line);
+}
+.barNote { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); font-weight: 600; color: var(--ink-2); }
+.barNote svg { width: 15px; height: 15px; flex: none; }
+@media (max-width: 419px) { .barNote { display: none; } }
+
+.main { width: min(100% - 2 * var(--s-4), 1120px); margin-inline: auto; padding: clamp(24px, 5vw, 56px) 0 var(--s-8); flex: 1; }
+
+/* Hero: the envelope beside the pitch (stacked on phones, envelope first). */
+.hero { display: grid; gap: clamp(28px, 5vw, 64px); align-items: center; }
+@media (min-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+}
+
+.h1 { font-family: var(--font-display); font-weight: 600; font-size: var(--step-4); line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 var(--s-4); text-wrap: balance; }
+.h1Accent { font-style: italic; color: var(--clay-ink); }
+.lead { font-size: var(--step-1); line-height: 1.5; color: var(--ink-2); margin: 0 0 var(--s-5); max-width: 34rem; }
+.cta { gap: 10px; }
+@media (max-width: 559px) { .cta { width: 100%; } }
+.ctaNote { margin: var(--s-3) 0 0; font-size: var(--step--1); color: var(--ink-3); max-width: 30rem; }
+.bearer { margin: var(--s-5) 0 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--clay); font-size: var(--step--1); line-height: 1.55; color: var(--ink-2); max-width: 32rem; }
+.bearer strong { color: var(--ink); }
+
+/* The envelope. It keeps its own colours in light and dark: a dark envelope, a paper note. */
+.env {
+  --pocket-h: clamp(118px, 24vw, 168px);
+  --flap-h: calc(var(--pocket-h) * 0.66);
+  position: relative; margin: 0; padding: 18px 8% 0; overflow: hidden;
+  perspective: 1100px;
+}
+.envBack {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--pocket-h);
+  background: #1b2a22; border-radius: 18px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.envFlap {
+  position: absolute; left: 0; width: 100%; height: var(--flap-h);
+  bottom: calc(var(--pocket-h) - var(--flap-h));
+  transform-origin: top center; z-index: 4;
+  fill: #2a4135; filter: drop-shadow(0 7px 9px rgba(0, 0, 0, 0.28));
+}
+.envOpen .envFlap { transform: rotateX(180deg); z-index: 1; filter: none; fill: #22362b; }
+
+.note {
+  position: relative; z-index: 2;
+  background: #f8f7ef; color: #1b2a22;
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 18px 40px -22px rgba(0, 0, 0, 0.55);
+  padding: clamp(20px, 4vw, 34px) clamp(20px, 4vw, 34px) calc(var(--pocket-h) * 0.55 + 22px);
+  margin-bottom: calc(var(--pocket-h) * 0.45);
+  min-height: 200px;
+  transform: translateY(calc(100% + 60px));
+}
+.envOpen .note { transform: none; }
+
+.pocket { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pocket-h); z-index: 3; border-radius: 0 0 18px 18px; overflow: hidden; }
+.pocket > svg { display: block; width: 100%; height: 100%; fill: #213429; filter: drop-shadow(0 -3px 6px rgba(0, 0, 0, 0.18)); }
+.pocket::after { content: ""; position: absolute; inset: 0; border-radius: 0 0 18px 18px; box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05); pointer-events: none; }
+.sentWith {
+  position: absolute; left: 0; right: 0; bottom: clamp(14px, 3vw, 22px);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: var(--step--2); font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(246, 247, 239, 0.72);
+}
+.sentMark { width: 11px; height: 15px; flex: none; color: rgba(246, 247, 239, 0.85); }
+
+.seal {
+  position: absolute; left: 50%; z-index: 5;
+  bottom: calc(var(--pocket-h) - var(--flap-h) - 31px);
+  width: 62px; height: 62px; border-radius: 50%;
+  display: grid; place-items: center; color: #f8f7ef;
+  background: radial-gradient(circle at 34% 30%, #cf7148 0%, #b4532a 52%, #8f3d1b 100%);
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.14), inset 0 0 0 8px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%);
+}
+.sealMark { width: 24px; height: 32px; }
+.envOpen .seal { opacity: 0; transform: translateX(-50%) scale(0.6); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .envOpen .seal { animation: sealOff 300ms var(--ease) 300ms both; }
+  .envOpen .envFlap { animation: flapOpen 520ms var(--ease) 480ms both; }
+  .envOpen .note { animation: noteRise 760ms var(--ease-out) 900ms both; }
+}
+@keyframes sealOff {
+  from { opacity: 1; transform: translateX(-50%) scale(1); }
+  to { opacity: 0; transform: translateX(-50%) scale(0.6); }
+}
+@keyframes flapOpen {
+  0% { transform: rotateX(0deg); z-index: 4; fill: #2a4135; }
+  49% { z-index: 4; }
+  50% { z-index: 1; }
+  100% { transform: rotateX(180deg); z-index: 1; fill: #22362b; }
+}
+@keyframes noteRise {
+  from { transform: translateY(calc(100% + 60px)); }
+  to { transform: none; }
+}
+
+/* What the note says. */
+.noteKicker { margin: 0; font-size: var(--step--1); font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: #9a4420; }
+.amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 10px 0 4px; font-family: var(--font-display); font-weight: 600; font-size: clamp(2.6rem, 1.9rem + 3.6vw, 4.4rem); line-height: 1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.unit { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: var(--step-1); font-weight: 650; letter-spacing: 0; color: #415249; }
+.value { margin: 0; min-height: 1.5em; font-size: var(--step--1); color: #566459; }
+.testChip { display: inline-block; padding: 2px 8px; border-radius: 6px; background: #f3ead6; color: #7a4f0f; font-weight: 600; }
+.message { margin: var(--s-5) 0 0; padding: 2px 0 2px 16px; border-left: 3px solid #b4532a; }
+.message p { margin: 0; font-family: var(--font-display); font-style: italic; font-size: var(--step-2); line-height: 1.28; color: #1b2a22; overflow-wrap: anywhere; }
+
+/* Three steps, on a ruled line rather than in cards. */
+.h2 { font-family: var(--font-display); font-weight: 600; font-size: var(--step-3); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 var(--s-5); text-wrap: balance; }
+.steps { margin-top: clamp(56px, 9vw, 96px); }
+.stepList { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-5); }
+@media (min-width: 760px) { .stepList { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-6); } }
+.stepList li { display: grid; grid-template-columns: auto 1fr; gap: var(--s-4); padding-top: var(--s-4); border-top: 2px solid var(--ink); }
+.stepNo { font-family: var(--font-display); font-size: var(--step-3); line-height: 0.9; color: var(--clay-ink); font-weight: 600; }
+.stepList h3 { margin: 0 0 6px; font-size: var(--step-1); font-weight: 650; }
+.stepList p { margin: 0; color: var(--ink-2); line-height: 1.55; }
+.stepList a, .facts a, .foot a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.stepList a { color: var(--clay-ink); }
+
+/* Who we are: a dark band, the one place the page talks about MonkStash. */
+.about {
+  margin-top: clamp(56px, 9vw, 96px);
+  display: grid; gap: var(--s-6);
+  padding: clamp(28px, 5vw, 56px);
+  border-radius: var(--r-4);
+  background: var(--deep); color: #e9ece2;
+}
+@media (min-width: 900px) { .about { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--s-8); } }
+.about :global(.eyebrow) { color: var(--clay-dim); }
+.about :global(.eyebrow)::before { background: var(--clay-dim); }
+.about .h2 { color: #f6f7ef; }
+.aboutLead { margin: 0; color: #c0c9bd; font-size: var(--step-0); line-height: 1.6; }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; }
+.facts li { display: grid; gap: 4px; padding: var(--s-4) 0; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.facts li:first-child { border-top: 0; padding-top: 0; }
+.facts strong { color: #f6f7ef; font-size: var(--step-0); }
+.facts span { color: #c0c9bd; line-height: 1.55; }
+.facts a { color: #e9a07a; }
+
+.foot {
+  width: min(100% - 2 * var(--s-4), 1120px); margin-inline: auto;
+  display: grid; gap: var(--s-3);
+  padding: var(--s-5) 0 var(--s-6); border-top: 1px solid var(--line);
+  font-size: var(--step--1); color: var(--ink-3);
+}
+.foot p { margin: 0; max-width: 46rem; line-height: 1.55; }
+.foot strong { color: var(--ink); font-family: var(--font-mono); font-size: 0.95em; overflow-wrap: anywhere; }
+.foot nav { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+
+/* No gift in the link, or a broken one. */
+.empty { max-width: 560px; margin: clamp(24px, 8vw, 72px) auto 0; text-align: center; display: grid; justify-items: center; gap: var(--s-3); }
+.empty p { margin: 0; color: var(--ink-2); }
+.emptySeal { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; color: #f8f7ef; background: #b4532a; margin-bottom: var(--s-2); }
+
+/* The small note in the wallet (GiftNote.tsx): paper in both themes, like the gift page. */
+.giftNote {
+  position: relative; display: grid; gap: 6px;
+  padding: var(--s-4) calc(var(--s-4) + 44px) var(--s-4) var(--s-4);
+  background: #f8f7ef; color: #1b2a22;
+  border: 1px solid #e2dfd2; border-top: 3px solid #b4532a; border-radius: var(--r-2);
+  box-shadow: 0 14px 30px -24px rgba(27, 42, 34, 0.5);
+}
+.giftNoteSeal {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: #f8f7ef;
+  background: radial-gradient(circle at 34% 30%, #cf7148 0%, #b4532a 52%, #8f3d1b 100%);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+.giftNoteMark { width: 13px; height: 18px; }
+.giftNoteAmount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--step-3); line-height: 1.05; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.giftNoteAmount .unit { font-size: var(--step-0); }
+.giftNoteMsg { margin: 4px 0 0; padding: 0 0 0 12px; border-left: 3px solid #b4532a; font-family: var(--font-display); font-style: italic; font-size: var(--step-1); line-height: 1.3; color: #1b2a22; overflow-wrap: anywhere; }
+
+/* A gift waiting in the wallet, before setup or unlock. */
+.waiting { display: grid; gap: var(--s-4); margin-bottom: var(--s-5); padding: var(--s-5); border-radius: var(--r-3); background: var(--deep); color: #e9ece2; }
+@media (min-width: 720px) { .waiting { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; gap: var(--s-6); } }
+.waiting h2 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 600; font-size: var(--step-2); line-height: 1.15; color: #f6f7ef; }
+.waiting h2 + p { margin: 0; color: #c0c9bd; line-height: 1.55; }
+
+/* The sender's preview of what the recipient sees. */
+.preview { display: grid; gap: 6px; width: 100%; max-width: 420px; }
+.previewLabel { margin: 0; font-size: var(--step--1); font-weight: 600; color: var(--ink-3); }

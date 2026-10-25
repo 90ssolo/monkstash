@@ -33,6 +33,9 @@ export function proxy(request: NextRequest) {
 
   if (walletHost && host === walletHost) {
     if (path === "/") return strict(request, onion, new URL("/wallet", request.url));
+    // The page a gift link opens.
+    if (path === "/gift") return strict(request, onion, new URL("/wallet/gift", request.url));
+    if (path === "/wallet/gift") return NextResponse.redirect(new URL(`/gift${request.nextUrl.search}`, request.url), 308);
     if (isWalletPath(path)) return NextResponse.redirect(new URL(`/${request.nextUrl.search}`, request.url), 308);
     if (walletAsset(path)) {
       const res = NextResponse.next();

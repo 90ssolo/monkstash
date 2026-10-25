@@ -184,7 +184,7 @@ export default function PrivacyPage() {
                 A MonkStash payment link keeps the address, amount and note after the <code>#</code> sign. Browsers never send that part of a link to a server, so <mark>opening a payment link tells us nothing about the payment</mark>. Your browser reads it and draws the QR code on its own.
               </p>
               <p>
-                A gift link works the same way: the key to the gift and the sender&apos;s message sit after the <code>#</code>, so <mark>we never see a gift, its amount or who claims it</mark>. When you open one, the wallet takes the key out of the address bar and keeps it only in that tab until the gift is claimed. Anyone who has a gift link can claim it, so it is shared like cash.
+                A gift link works the same way: the key to the gift, its amount and the sender&apos;s message sit after the <code>#</code>, so <mark>we never see a gift, its amount or who claims it</mark>. When you open one, the wallet takes the key out of the address bar and keeps it only in that tab until the gift is claimed. Anyone who has a gift link can claim it, so it is shared like cash.
               </p>
               <p>
                 <Link className={trust.inlineLink} href="/monero-payment-gateway">MonkStash Pay</Link>, the checkout for websites, runs on the merchant&apos;s own server. Invoices and orders stay with the merchant. We receive nothing from it.

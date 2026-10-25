@@ -22,7 +22,7 @@ test("coins: freeze keeps a coin out of the balance and of Send; a send across a
 
   // Freeze the 3.5 XMR coin: out of the balance, shown apart on Home and Send.
   await coins.getByRole("button", { name: "Freeze the 3.5 XMR coin" }).click();
-  await expect(coins.getByRole("button", { name: "Unfreeze the 3.5 XMR coin" })).toHaveAttribute("aria-pressed", "true");
+  await expect(coins.getByRole("button", { name: "Unfreeze the 3.5 XMR coin" })).toHaveText("Unfreeze");
   await expect(coins.getByText(/Frozen/).first()).toBeVisible();
   if (shots) await page.screenshot({ path: `${shots}/coins.png`, fullPage: true });
   await section(page, "Home").click();
@@ -51,7 +51,7 @@ test("coins: freeze keeps a coin out of the balance and of Send; a send across a
   // Unfreeze: back in the balance.
   await section(page, "Coins").click();
   await coins.getByRole("button", { name: "Unfreeze the 3.5 XMR coin" }).click();
-  await expect(coins.getByRole("button", { name: "Freeze the 3.5 XMR coin" })).toHaveAttribute("aria-pressed", "false");
+  await expect(coins.getByRole("button", { name: "Freeze the 3.5 XMR coin" })).toHaveText("Freeze");
   await section(page, "Home").click();
   await expect(page.getByText(/in frozen coins/)).toHaveCount(0);
 });

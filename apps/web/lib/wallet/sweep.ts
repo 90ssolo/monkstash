@@ -64,8 +64,9 @@ export class SweepRunner {
           });
           if (gen !== this.gen) return;
           const b = await w.balances();
-          // Everything it ever received: an empty wallet that received money was already emptied.
-          const received = (await w.txs()).filter((t) => t.direction !== "out").reduce((s, t) => s + t.amount, 0n);
+          // Everything it ever received in a block: an empty wallet that received money was already emptied.
+          // (A payment still waiting for its first block is not in the balance yet, so it must not count here.)
+          const received = (await w.txs()).filter((t) => t.direction !== "out" && !t.pending).reduce((s, t) => s + t.amount, 0n);
           if (gen === this.gen) this.current = { state: "ready", from, total: b.total, unlocked: b.unlocked, received };
           return;
         } catch (e) {

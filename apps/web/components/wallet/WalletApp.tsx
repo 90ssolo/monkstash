@@ -23,6 +23,9 @@ import { siteHref } from "@/lib/site";
 import { useSingleTab } from "@/lib/wallet/tabLock";
 import { useApplyWalletTheme } from "@/lib/wallet/theme";
 import { giftInInbox, takeGiftFromUrl } from "@/lib/wallet/giftInbox";
+import { decodeGift } from "@quietmint/wallet-core";
+import { GiftNote } from "./GiftNote";
+import giftStyles from "./gift.module.css";
 import { forget, mayResume, readRefreshUnlock, recall, remember, touch, writeRefreshUnlock } from "@/lib/wallet/refreshUnlock";
 
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
@@ -153,9 +156,9 @@ export function WalletApp() {
   const setCashierOn = (on: boolean) => { controller.cashierOn = on; setTillShown(on); };
   useApplyWalletTheme();
   // A gift link (#gift=...) is taken out of the address bar and kept for this tab; the dashboard picks it up.
-  const [giftWaiting, setGiftWaiting] = useState(false);
+  const [giftWaiting, setGiftWaiting] = useState<WaitingGift | null>(null);
   useEffect(() => { takeGiftFromUrl(); }, []);
-  useEffect(() => { setGiftWaiting(!!giftInInbox()); }, [view.name]);
+  useEffect(() => { setGiftWaiting(readWaitingGift()); }, [view.name]);
 
   return (
     <div className={styles.shell} data-wallet-root="">
@@ -188,9 +191,17 @@ export function WalletApp() {
         {tab.state !== "owner" ? null : (
           <>
             {giftWaiting && view.name !== "open" && view.name !== "boot" ? (
-              <div className={`notice ${styles.giftNotice}`} role="status">
-                <span><strong>Someone sent you Monero as a gift.</strong> {view.name === "locked" ? "Unlock your wallet" : "Create a wallet (it takes a minute) or open the one you have"}, and the gift will be ready to claim on its first screen.</span>
-              </div>
+              <section className={giftStyles.waiting} role="status" aria-labelledby="waiting-h">
+                <GiftNote amount={giftWaiting.amount} message={giftWaiting.message} />
+                <div>
+                  <h2 id="waiting-h">Your gift is waiting</h2>
+                  <p>
+                    {view.name === "locked"
+                      ? "Unlock your wallet and the gift is ready to claim on its first screen."
+                      : "Make your wallet below (about a minute), or open the one you have. The gift is ready to claim on its first screen."}
+                  </p>
+                </div>
+              </section>
             ) : null}
             {view.name === "boot" || (view.name === "locked" && resuming) ? <Loading text={resuming ? "Opening your wallet…" : "Loading…"} /> : null}
             {view.name === "welcome" ? (
@@ -447,4 +458,18 @@ function ForgotPassword({ kind, count = 1, onForget }: { kind: WalletPublic["kin
       <button type="submit" className="btn btn-danger btn-sm" disabled={text !== "REMOVE"}>{count > 1 ? `Remove all ${count} wallets from this browser` : "Remove wallet from this browser"}</button>
     </form>
   );
+}
+
+type WaitingGift = { amount: bigint | null; message: string };
+
+/** The gift waiting in this tab, for the banner: what its link says (an unreadable one still shows). */
+function readWaitingGift(): WaitingGift | null {
+  const code = giftInInbox();
+  if (!code) return null;
+  try {
+    const g = decodeGift(code);
+    return { amount: g.amount ? BigInt(g.amount) : null, message: g.message };
+  } catch {
+    return { amount: null, message: "" };
+  }
 }

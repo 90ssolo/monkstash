@@ -3,7 +3,7 @@
 //
 //   node scripts/verify-build.mjs https://wallet.monkstash.com
 //     Downloads build.json and every file it lists, and checks each one's SHA-256. Also checks that
-//     every script the home and wallet pages load is one of those files, served from the site
+//     every script the home, wallet and gift pages load is one of those files, served from the site
 //     itself, and that their security policy allows no other script source.
 //
 //   node scripts/verify-build.mjs https://wallet.monkstash.com --compare my-build.json
@@ -66,7 +66,7 @@ const attr = (tag, name) => {
   const m = new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i").exec(tag);
   return m ? (m[1] ?? m[2] ?? m[3] ?? "") : null;
 };
-for (const page of [`${site}/`, `${site}/wallet`]) {
+for (const page of [`${site}/`, `${site}/wallet`, `${site}/wallet/gift`]) {
   let res, html;
   try {
     res = await fetchOk(page);
@@ -106,7 +106,7 @@ for (const page of [`${site}/`, `${site}/wallet`]) {
   const allowedTokens = new Set(["'self'", "'strict-dynamic'", "'wasm-unsafe-eval'", "'unsafe-inline'", "'none'"]);
   const foreign = scriptSrc.filter((t) => !allowedTokens.has(t) && !t.startsWith("'nonce-"));
   if (foreign.length) fail(`${page}: the security policy lets scripts come from ${foreign.join(" ")}`);
-  if (/\/wallet$/.test(page) || new URL(res.url).hostname.startsWith("wallet.")) {
+  if (/\/wallet(\/gift)?$/.test(page) || new URL(res.url).hostname.startsWith("wallet.")) {
     if (!scriptSrc.some((t) => t.startsWith("'nonce-"))) fail(`${page}: the wallet page's policy has no per-request nonce`);
     if (scriptSrc.includes("'unsafe-inline'") && !scriptSrc.includes("'strict-dynamic'")) fail(`${page}: the wallet page's policy allows any inline script`);
   }

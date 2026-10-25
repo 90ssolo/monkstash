@@ -11,6 +11,18 @@ describe("gift links", () => {
     expect(decodeGift(encodeGift({ ...base, network: "stagenet", message: "" }))).toEqual({ ...base, network: "stagenet", message: "" });
   });
 
+  it("carries the amount in version 2 links, and still reads version 1 links", () => {
+    const withAmount = { ...base, amount: "500000000000" };
+    const code = encodeGift(withAmount);
+    expect(decodeGift(code)).toEqual(withAmount);
+    expect(decodeGift(encodeGift({ ...withAmount, message: "" }))).toEqual({ ...withAmount, message: "" });
+    // A version 1 link made before amounts existed: no amount, everything else intact.
+    const v1 = encodeGift(base);
+    expect(decodeGift(v1)).toEqual(base);
+    expect(code.length).toBeGreaterThan(v1.length);
+    expect(() => encodeGift({ ...base, amount: "0" })).toThrow(GiftLinkError);
+  });
+
   it("keeps a multi-byte message within one length byte", () => {
     const long = "\u{1F381}".repeat(200);
     const decoded = decodeGift(encodeGift({ ...base, message: long }));
@@ -44,5 +56,13 @@ describe("gift links", () => {
     const g = (id: string, createdAt: number): GiftRecord => ({ ...base, id, amount: "1000", createdAt });
     expect(mergeGifts([g("a", 2)], [g("a", 9), g("b", 3)]).map((x) => x.id)).toEqual(["b", "a"]);
     expect(readGifts([g("a", 1), { id: "x" }, null, { ...g("c", 1), spendKey: "zz" }]).map((x) => x.id)).toEqual(["a"]);
+  });
+
+  it("keeps what either device learned about a gift when merging", () => {
+    const g: GiftRecord = { ...base, id: "a", amount: "1000", createdAt: 1 };
+    const [m] = mergeGifts([g], [{ ...g, hash: "ab", claimedAt: 5, reclaimed: true }]);
+    expect(m).toMatchObject({ hash: "ab", claimedAt: 5, reclaimed: true });
+    const [k] = mergeGifts([{ ...g, hash: "cd" }], [{ ...g, hash: "ab" }]);
+    expect(k!.hash).toBe("cd");
   });
 });

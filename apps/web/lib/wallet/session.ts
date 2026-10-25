@@ -14,7 +14,7 @@
 import { createTotpSecret, mergeHandedOut, openBytes, openMoveFile, packParts, sealBytes, sealMoveFile, totpUri, unpackParts, verifyTotp, VaultError, EMPTY_LABELS, mergeLabels, readLabels, cleanGiftMessage, decodeGift, encodeGift, giftCodeIn, giftLink, mergeGifts, readGifts, type GiftRecord, type Contact, type WalletLabels, type NodeConfig, type StoredWallet, type WalletKind, type WalletPublic, type WalletSecrets } from "@quietmint/wallet-core";
 import type { OnboardingResult } from "@/components/wallet/Onboarding";
 import type { GiftView, SettingsActions } from "@/components/wallet/WalletSettings";
-import { walletAbsoluteUrl } from "@/lib/site";
+import { giftPageUrl } from "@/lib/site";
 import { fullMoveSecret, giftWallet, inspectSeed, newGiftKeys, normalizeSeed, NodeTestError, openWallet, testNode, type EngineState, type LiveWallet, type SendSpeed } from "./engine";
 import { SweepRunner } from "./sweep";
 import { recordHandedOut, type HandedOut, type HandedOutStore } from "./addresses";
@@ -124,7 +124,7 @@ function giftList(pub: WalletPublic, secrets: Secrets): { load(): Promise<GiftRe
   return { load: async () => readGifts(await list.load()), save: (g) => list.save(g) };
 }
 
-const giftView = (g: GiftRecord): GiftView => ({ ...g, link: giftLink(walletAbsoluteUrl, encodeGift(g)) });
+const giftView = (g: GiftRecord): GiftView => ({ ...g, link: giftLink(giftPageUrl, encodeGift(g)) });
 
 /**
  * The secret a move file is sealed with. It carries the engine's keys file, which can spend for a
@@ -572,8 +572,7 @@ export class WalletController {
     }
     const movedGifts = readGifts(moved.records.gifts);
     if (movedGifts.length) {
-      const gifts = giftList(pub, s);
-      await gifts.save(mergeGifts(await gifts.load(), movedGifts));
+      await this.editGifts(pub, s, (all) => mergeGifts(all, movedGifts));
       added.push("gift links");
     }
     return added;
@@ -583,11 +582,23 @@ export class WalletController {
   private async markGift(pub: WalletPublic, id: string, change: Partial<GiftRecord>) {
     const s = this.session;
     if (!s || s.pub.id !== pub.id) return;
-    const list = giftList(pub, s.secrets);
-    const all = await list.load();
-    const g = all.find((x) => x.id === id);
-    if (!g || (g.claimedAt && !change.reclaimed)) return;
-    await list.save(all.map((x) => (x.id === id ? { ...x, ...change } : x)));
+    await this.editGifts(pub, s.secrets, (all) => {
+      const g = all.find((x) => x.id === id);
+      if (!g || (g.claimedAt && !change.reclaimed)) return all;
+      return all.map((x) => (x.id === id ? { ...x, ...change } : x));
+    });
+  }
+
+  /** Every change to the gift list goes through here, one at a time: two overlapping
+   *  load-and-save rounds could otherwise drop a gift, and with it the only copy of its key. */
+  private giftQueue: Promise<unknown> = Promise.resolve();
+  private editGifts(pub: WalletPublic, secrets: Secrets, edit: (all: GiftRecord[]) => GiftRecord[]): Promise<void> {
+    const run = this.giftQueue.then(async () => {
+      const list = giftList(pub, secrets);
+      await list.save(edit(await list.load()));
+    });
+    this.giftQueue = run.catch(() => {});
+    return run;
   }
 
   onboarded = async (r: OnboardingResult) => {
@@ -882,6 +893,8 @@ export class WalletController {
       sweepStart: async (input) => {
         const v = this.view;
         if (v.name !== "open" || v.pub.id !== pub.id) throw new Error("Open the wallet first.");
+        // Another wallet, not a gift: a gift checked earlier must not be marked by this sweep.
+        this.sweepGift = null;
         const node = this.session?.secrets.node;
         await this.sweeper.start(async () => {
           if (v.mode === "simulation") {
@@ -934,11 +947,11 @@ export class WalletController {
         if (!pending || !w) throw new Error("Make the gift again: it was not prepared, or the wallet was reopened.");
         this.pendingGift = null;
         // Saved before it is sent: once the money moves, its key must already be kept here.
-        const list = giftList(pub, s);
-        await list.save([pending.record, ...(await list.load())]);
+        await this.editGifts(pub, s, (all) => [pending.record, ...all.filter((g) => g.id !== pending.record.id)]);
         const hash = await w.relay(pending.metadata);
         const record = { ...pending.record, hash };
-        await list.save((await list.load()).map((g) => (g.id === record.id ? record : g))).catch(() => {});
+        // Put back in full if anything dropped it meanwhile.
+        await this.editGifts(pub, s, (all) => [record, ...all.filter((g) => g.id !== record.id)]).catch(() => {});
         void w.syncNow?.().catch(() => {});
         return giftView(record);
       },
@@ -946,15 +959,14 @@ export class WalletController {
       giftForget: async (id: string) => {
         const s = this.session;
         if (!s) throw new Error("Open the wallet first.");
-        const list = giftList(pub, s.secrets);
-        await list.save((await list.load()).filter((g) => g.id !== id));
+        await this.editGifts(pub, s.secrets, (all) => all.filter((g) => g.id !== id));
       },
       giftOpen: async (linkOrId: string) => {
         const v = this.view;
         const s = this.session;
         if (v.name !== "open" || v.pub.id !== pub.id || !s) throw new Error("Open the wallet first.");
         const mineList = await giftList(pub, s.secrets).load();
-        let gift: { network: GiftRecord["network"]; spendKey: string; height: number; message: string } | undefined = mineList.find((g) => g.id === linkOrId);
+        let gift: { network: GiftRecord["network"]; spendKey: string; height: number; message: string; amount?: string } | undefined = mineList.find((g) => g.id === linkOrId);
         if (!gift) {
           const code = giftCodeIn(linkOrId);
           if (!code) throw new Error("That is not a MonkStash gift link. Paste the whole link, starting with https.");
@@ -964,17 +976,19 @@ export class WalletController {
         if (found.network !== pub.network) throw new Error(`This gift is on Monero ${found.network}, and this wallet is on ${pub.network}.`);
         const { seed } = await giftWallet(found.spendKey, pub.network);
         const mine = mineList.find((g) => g.spendKey === found.spendKey);
+        // What the sender paid in (from the link, or this wallet's own record): shown while the gift is scanned.
+        const amount = mine?.amount ?? found.amount;
         const node = s.secrets.node;
         this.sweepGift = null;
         await this.sweeper.start(async () => {
           if (v.mode === "simulation") {
             const { primaryAddress } = await inspectSeed(seed, pub.network);
-            return createSimWallet(primaryAddress);
+            return createSimWallet(primaryAddress, amount ? { amount: BigInt(amount) } : undefined);
           }
           return openWallet({ kind: "full", network: pub.network, restoreHeight: found.height, seed, ...(node ? { node } : {}) });
         }, pub.primaryAddress);
         this.sweepGift = mine?.id ?? null;
-        return { message: found.message, mine: !!mine };
+        return { message: found.message, mine: !!mine, ...(amount ? { amount } : {}) };
       },
       changePassword: async (password, code, newPassword) => {
         await this.verifyAccess(password, code);
