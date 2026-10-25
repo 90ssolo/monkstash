@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { keccak_256 } from "@noble/hashes/sha3.js";
-import { addressInfo, checkAddressFormat, cnBase58Decode, cnBase58Encode } from "../src";
+import { addressInfo, addressPublicViewKey, checkAddressFormat, cnBase58Decode, cnBase58Encode } from "../src";
 import { addressNetwork } from "../src/request";
 
 // Published addresses only (no seeds): the Monero General Fund donation addresses from getmonero.org,
@@ -104,5 +104,26 @@ describe("address validation", () => {
     expect(checkAddressFormat(GENERAL_FUND.replace("4", "0"), "mainnet").ok).toBe(false);
     expect(checkAddressFormat("", "mainnet").reason).toBe("Enter an address");
     expect(checkAddressFormat("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "mainnet").ok).toBe(false);
+  });
+});
+
+describe("addressPublicViewKey", () => {
+  const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  it("reads the public view key of primary, subaddress and integrated addresses", () => {
+    const view = hex(cnBase58Decode(GENERAL_FUND)!.subarray(33, 65));
+    expect(addressPublicViewKey(GENERAL_FUND)).toBe(view);
+    expect(addressPublicViewKey(reencode(GENERAL_FUND, 42))).toBe(view);
+    expect(addressPublicViewKey(reencode(GENERAL_FUND, 19, PID))).toBe(view);
+    expect(addressPublicViewKey(GENERAL_FUND_SUB)).not.toBe(view);
+  });
+  it("spots an address that reuses another address's view key with a different spend key", () => {
+    const keys = cnBase58Decode(GENERAL_FUND)!.subarray(1, 65);
+    const forged = new Uint8Array([42, ...new Uint8Array(32).fill(7), ...keys.subarray(32)]);
+    const crafted = cnBase58Encode(new Uint8Array([...forged, ...keccak_256(forged).subarray(0, 4)]));
+    expect(addressPublicViewKey(crafted)).toBe(addressPublicViewKey(GENERAL_FUND));
+  });
+  it("returns null for anything that is not a valid address", () => {
+    expect(addressPublicViewKey("")).toBeNull();
+    expect(addressPublicViewKey(swapChar(GENERAL_FUND, 20))).toBeNull();
   });
 });

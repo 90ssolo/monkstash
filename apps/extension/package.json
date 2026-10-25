@@ -1,6 +1,6 @@
 {
   "name": "@quietmint/extension",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "BSD-3-Clause",
   "private": true,
   "type": "module",

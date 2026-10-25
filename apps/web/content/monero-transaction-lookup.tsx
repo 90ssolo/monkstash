@@ -11,9 +11,9 @@ export const meta: ArticleMeta = {
   kicker: "Check and prove a payment",
   title: "Monero Transaction Lookup: Check or Prove a Payment",
   seoTitle: "Monero Transaction Lookup: Check a Payment",
-  summary: "Monero transaction lookup explained: what a block explorer shows, how to check a tx ID, and how to prove a payment with a tx key without losing privacy.",
+  summary: "Monero transaction lookup explained: what a block explorer shows, how to check a tx ID, and how to prove a payment with a signed proof without losing privacy.",
   keyword: "monero transaction lookup",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 10,
   toc: [
     { id: "short", label: "The short answer" },
@@ -28,6 +28,7 @@ export const meta: ArticleMeta = {
   ],
   sources: [
     { label: "The Monero Project: Prove a payment (GUI and CLI)", href: "https://www.getmonero.org/resources/user-guides/prove-payment.html" },
+    { label: "Monero issue #11586: get_tx_key/check_tx_key reveals the sender in a two-output transaction (October 2026)", href: "https://github.com/monero-project/monero/issues/11586" },
     { label: "Monero documentation: monero-wallet-cli reference", href: "https://docs.getmonero.org/interacting/monero-wallet-cli-reference/" },
     { label: "Feather Wallet documentation: Prove a payment", href: "https://docs.featherwallet.org/guides/prove-payment" },
   ],
@@ -35,11 +36,11 @@ export const meta: ArticleMeta = {
   faq: [
     { q: "Can you look up a Monero transaction?", a: "Yes, by its transaction ID (also called a tx ID or tx hash) on a block explorer. You will see that it exists, which block it is in, its confirmations and its fee. You will not see the sender, the receiver or the amount, because Monero hides them by default." },
     { q: "Can I see the amount of a Monero transaction on a block explorer?", a: "No. Monero hides amounts, senders and receivers on the blockchain. Only the people involved, using their wallet keys, can see the details of a payment." },
-    { q: "How do I prove a Monero payment?", a: "Give the recipient or a third party three items: the transaction ID, the receiving address, and the transaction key for that payment. They check these in a wallet (in the Monero GUI under Advanced, Prove/Check) and see the amount sent to that address and its confirmations. In MonkStash, open the sent payment and choose Prove this payment." },
-    { q: "What is a Monero transaction key?", a: "A secret value tied to one specific transaction. Combined with the transaction ID and the receiving address, it lets someone verify that the payment went to that address and how much it was. It does not reveal your wallet or any other transaction." },
+    { q: "How do I prove a Monero payment?", a: "Give the recipient or a third party a signed payment proof together with the transaction ID and the receiving address. They check it in a wallet (in the Monero GUI under Advanced, Prove/Check; in MonkStash with Check a payment proof) and see the amount sent to that address and its confirmations. In MonkStash, open the sent payment and choose Prove this payment." },
+    { q: "What is a Monero transaction key?", a: "A secret value tied to one specific transaction that lets someone verify the payment went to an address. Older guides suggest sharing it, but a Monero developer showed in October 2026 that the key plus the sender's main address also reveals the sender's change. Share a signed proof instead." },
     { q: "Where do I find my Monero transaction ID?", a: "In your wallet's transaction history. In MonkStash, tap the payment to open its details and use Copy transaction ID. In the Monero GUI, click the transaction on the History page to expand its details. In Feather, right-click it in the History tab and choose Show details. The ID is 64 letters and numbers." },
     { q: "Is it safe to use a block explorer website?", a: "It is fairly safe for your funds but not private. The site operator can see your IP address and which transaction you looked up. Use Tor, or run your own node and a self-hosted explorer, if that matters." },
-    { q: "Can the recipient confirm a payment without a tx key?", a: "Yes. If the recipient has the wallet that received the payment, it shows the incoming transaction after it syncs. A view-only wallet made from the address and view key can see incoming payments too." },
+    { q: "Can the recipient confirm a payment without a proof?", a: "Yes. If the recipient has the wallet that received the payment, it shows the incoming transaction after it syncs. A view-only wallet made from the address and view key can see incoming payments too." },
     { q: "Does a payment proof show the funds are still there?", a: "No. The Monero documentation warns that a successful proof shows an amount was directed to an address in that transaction. It does not prove the funds are still spendable by the recipient." },
   ],
 };
@@ -51,13 +52,13 @@ export function Body() {
         A <strong>Monero transaction lookup</strong> works like on any chain: <mark>paste the transaction ID (tx ID) into a block</mark>
         explorer and it shows whether the payment exists, which block holds it and how many confirmations it has. What it will
         not show is the sender, the receiver or the amount, because Monero hides those by default. To prove a payment, you share
-        the tx ID, the receiving address and a transaction key. This guide covers both, and how to do it without leaking your
+        the tx ID, the receiving address and a signed payment proof. This guide covers both, and how to do it without leaking your
         privacy.
       </p>
 
       <Takeaways items={[
         "A Monero block explorer shows that a transaction exists, plus its block, confirmations and fee. It does not show amounts or addresses.",
-        "To prove a payment, you share the transaction ID, the receiving address and the transaction key, and the other party checks them in a wallet.",
+        "To prove a payment, share a signed proof with the transaction ID and the receiving address. Do not share the transaction key: it can reveal your change.",
         "Third-party explorers can see your IP address and what you search for. Use Tor, or run your own explorer.",
         "A payment proof shows an amount was sent. It does not show the funds are still spendable.",
         "Never paste your private spend key or recovery words into any website.",
@@ -124,52 +125,55 @@ export function Body() {
       <h2 id="prove">Prove you paid someone</h2>
       <p>
         Sometimes you need to show a payment was made, for example to a merchant who says they did not receive it. Monero lets
-        the sender do this without revealing their wallet. The{" "}
-        <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">official prove-payment guide</a>{" "}
-        says <mark>you give the other party three pieces of information</mark>: the transaction ID, the recipient&apos;s address and the
-        transaction key.
+        the sender do this without revealing their wallet: <mark>you share a signed payment proof</mark> together with the
+        transaction ID and the recipient&apos;s address. The other party checks it in their wallet and sees the amount sent to
+        that address.
       </p>
       <Figure caption="The three items a sender shares. The verifier checks them in a wallet and sees the amount sent to that address.">
         <PaymentProofFigure />
       </Figure>
+      <Callout kind="warn" title="Share a signed proof, not the transaction key">
+        Many older guides, including Monero&apos;s own, say to share the <strong>transaction key</strong>. In October 2026 a
+        Monero developer showed that a transaction key plus the sender&apos;s main address lets anyone decode the
+        sender&apos;s change, revealing who sent the payment and how much came back (see{" "}
+        <a href="https://github.com/monero-project/monero/issues/11586" rel="noopener">monero-project/monero#11586</a>). A signed
+        proof does the same job without that leak. MonkStash makes signed proofs only.
+      </Callout>
       <h3>How to prove a Monero payment, step by step</h3>
       <ol>
         <li><strong>Find the payment.</strong> Open your wallet&apos;s history and select the payment you sent.</li>
-        <li><strong>Copy the transaction ID and the address you paid.</strong> Copy each one exactly, all characters.</li>
-        <li><strong>Get the transaction key.</strong> In MonkStash, choose <em>Prove this payment</em> in the payment&apos;s details. In the Monero GUI, click <strong>P</strong> on the transaction. In Feather, use <em>Show details</em> and copy the transaction secret key.</li>
-        <li><strong>Send the three items to the person checking.</strong> Only to them.</li>
-        <li><strong>They check it.</strong> In the Monero GUI they open Advanced, Prove/Check and paste the three items into the Check section. In MonkStash they use <em>Check a payment proof</em>. The result shows the amount sent to that address and how many confirmations it has.</li>
+        <li><strong>Make a signed proof.</strong> In MonkStash, choose <em>Prove this payment</em> in the payment&apos;s details; you can add a message such as an order number, which is signed into the proof. In the Monero GUI, use <strong>Advanced, Prove/Check</strong> and the Prove section. In the command line wallet, run the command below.</li>
+        <li><strong>Send the proof to the person checking.</strong> It carries the transaction ID, the address and the signed proof (it starts with <code>OutProofV2</code>).</li>
+        <li><strong>They check it.</strong> In MonkStash they use <em>Check a payment proof</em>; in the Monero GUI, the Check section of Advanced, Prove/Check. The result shows the amount sent to that address and how many confirmations it has.</li>
       </ol>
-      <h3>Get the transaction key</h3>
+      <h3>The command line</h3>
+      <p>In the command line wallet, the signed proof and its check are:</p>
+      <pre><code>get_tx_proof TXID ADDRESS "optional message"
+check_tx_proof TXID ADDRESS SIGNATURE "optional message"</code></pre>
       <p>
-        In the Monero GUI, per the guide, open the history page, select the transaction and click <strong>P</strong> to get the
-        payment proof. In the command line wallet, run:
-      </p>
-      <pre><code>get_tx_key TXID</code></pre>
-      <p>
-        The command line wallet only has the key if it was saving transaction keys. If the command returns nothing, the guide says
-        to check the setting with <code>set</code> and, if <code>store-tx-info</code> is 0, turn it on with{" "}
-        <code>set store-tx-info 1</code>. That only helps for future payments, so <mark>turn it on before you need it</mark>.
+        The sending wallet needs the payment&apos;s details to make a proof, so it only works on the device that sent it. If the
+        command returns nothing, the{" "}
+        <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">official guide</a> says to
+        check the setting with <code>set</code> and turn on <code>set store-tx-info 1</code>. That only helps for future
+        payments, so <mark>turn it on before you need it</mark>.
       </p>
       <h3>Other kinds of proof</h3>
       <p>
-        The command line reference also lists <code>get_tx_proof</code> and <code>check_tx_proof</code>, and{" "}
-        <code>get_spend_proof</code>, which proves that you made the payment. The reference notes that the plain transaction
-        key approach has been superseded by the spend proof for proving a payment. Which you use depends on whether you want to
-        prove an amount went to an address, or prove that you were the spender. Check the{" "}
+        <code>get_spend_proof</code> proves that you were the spender rather than that an amount reached an address. Check the{" "}
         <a href="https://docs.getmonero.org/interacting/monero-wallet-cli-reference/" rel="noopener">wallet CLI reference</a>{" "}
-        for the exact syntax of your version.
+        for the exact syntax of your version. A plain transaction key (<code>get_tx_key</code>) still works for checking, but
+        because of the change leak above, only share one if the other side cannot read anything else, and never together with
+        your main address if you can avoid it.
       </p>
       <Callout kind="warn" title="A proof is not a guarantee of funds">
         The Monero documentation says a successful check shows an amount was directed to an address in that transaction. It does
         not prove the funds are still spendable by the recipient. They may be time-locked, already spent or unspendable.
       </Callout>
-      <h3>Guard the key</h3>
+      <h3>Guard what you share</h3>
       <p>
-        A transaction key is tied to one payment, so <mark>sharing it does not expose your whole wallet</mark>. But it does let the holder
-        confirm that payment, so only send it to the person who needs it. It is a different thing from your{" "}
-        <Link href="/monero-view-key">view key</Link>, which shows all incoming payments for a wallet, and from your recovery
-        words, which control the funds. Never share those.
+        A payment proof is tied to one payment, so <mark>sharing it does not expose your whole wallet</mark>. Only send it to the
+        person who needs it. It is a different thing from your <Link href="/monero-view-key">view key</Link>, which shows all
+        incoming payments for a wallet, and from your recovery words, which control the funds. Never share those.
       </p>
 
       <h2 id="verify">Verify a payment you received</h2>
@@ -178,7 +182,7 @@ export function Body() {
       </p>
       <ul>
         <li><strong>Check your wallet.</strong> After it syncs, an incoming payment shows with its amount and confirmations. If it does not, see <Link href="/monero-wallet-not-syncing">fixing a wallet that is not syncing</Link>.</li>
-        <li><strong>Use a payment proof.</strong> If a sender gives you a tx ID, your address and a key, the guide says the CLI command is <code>check_tx_key TXID TXKEY ADDRESS</code> and the GUI has <strong>Advanced, Prove/Check</strong>. The result shows the amount sent to that address and the confirmations.</li>
+        <li><strong>Use a payment proof.</strong> If a sender gives you a signed proof, check it with <em>Check a payment proof</em> in MonkStash, <strong>Advanced, Prove/Check</strong> in the GUI, or <code>check_tx_proof</code> in the CLI (older proofs with a transaction key use <code>check_tx_key TXID TXKEY ADDRESS</code>). The result shows the amount sent to that address and the confirmations.</li>
         <li><strong>Use a view-only wallet.</strong> A <Link href="/monero-view-only-wallet">view-only wallet</Link> can see incoming payments with no power to spend.</li>
       </ul>
       <p>

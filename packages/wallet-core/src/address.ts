@@ -39,7 +39,7 @@ export interface AddressInfo {
   kind: AddressKind;
 }
 
-type Decoded = { ok: true; info: AddressInfo } | { ok: false; reason: string };
+type Decoded = { ok: true; info: AddressInfo; spendKey: Uint8Array; viewKey: Uint8Array } | { ok: false; reason: string };
 
 function readVarint(bytes: Uint8Array): { value: number; length: number } | null {
   let value = 0;
@@ -69,13 +69,26 @@ function decodeAddress(address: string): Decoded {
   if (!tag || !info) return { ok: false, reason: "Unknown address prefix" };
   const expected = tag.length + KEYS_AND_CHECKSUM + (info.kind === "integrated" ? PAYMENT_ID : 0);
   if (bytes.length !== expected) return { ok: false, reason: TYPO };
-  return { ok: true, info };
+  const keys = body.subarray(tag.length);
+  return { ok: true, info, spendKey: keys.subarray(0, 32), viewKey: keys.subarray(32, 64) };
 }
 
 /** The network and kind of a valid Monero address (checksum verified), or null. */
 export function addressInfo(address: string): AddressInfo | null {
   const d = decodeAddress(address);
   return d.ok ? d.info : null;
+}
+
+const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+/**
+ * The public view key inside a valid address (hex), or null. Used to refuse payment proofs for
+ * an address that reuses this wallet's own view key: such a proof would let its holder decode
+ * the sender's change (monero-project/monero#11586).
+ */
+export function addressPublicViewKey(address: string): string | null {
+  const d = decodeAddress(address);
+  return d.ok ? toHex(d.viewKey) : null;
 }
 
 export function checkAddressFormat(address: string, network: NetworkType): AddressFormat {

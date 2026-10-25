@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero GUI vs CLI: Which Official Wallet?",
   summary: "Monero GUI vs CLI: the GUI is the point-and-click wallet with simple and advanced modes, the CLI suits scripts and servers. Who each fits, side by side.",
   keyword: "Monero GUI vs CLI",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 9,
   toc: [
     { id: "short", label: "The short answer" },
@@ -34,7 +34,7 @@ export const meta: ArticleMeta = {
     { q: "What is simple mode in the Monero GUI?", a: "A guided mode that sets up the node connection for you. The official guide notes that simple mode and simple mode (bootstrap) cannot use a custom remote node. For that you need advanced mode." },
     { q: "How do I run my own node with the Monero GUI?", a: "Switch to advanced mode, then use the option to start a local node in Settings. It downloads and verifies the whole blockchain, which takes time and disk space. A pruned node reduces the space needed." },
     { q: "What is monero-wallet-rpc?", a: "A program that exposes wallet functions through a JSON-RPC interface over HTTP. It is meant for developers who want to automate wallet tasks. It does not store the blockchain, so it needs a node to talk to." },
-    { q: "How do I prove a Monero payment?", a: "You need the transaction ID, the recipient address and the transaction key or a payment proof. The GUI has a Prove/Check page under Advanced, and the CLI has get_tx_key, check_tx_key, get_tx_proof and check_tx_proof." },
+    { q: "How do I prove a Monero payment?", a: "You need the transaction ID, the recipient address and a signed payment proof. The GUI has a Prove/Check page under Advanced, and the CLI has get_tx_proof and check_tx_proof. The older get_tx_key route still works but can reveal the sender's change, so prefer the signed proof." },
     { q: "Is the Monero GUI safe to download?", a: "Yes, from getmonero.org, after you verify the download with the published hashes. Some antivirus tools flag Monero programs, which the Monero site acknowledges. Verify the file rather than guess." },
   ],
 };
@@ -153,7 +153,7 @@ export function Body() {
           <tr>
             <td>Prove a payment</td>
             <td>Advanced, then Prove/Check</td>
-            <td><code>get_tx_key</code> and <code>check_tx_key</code>, or <code>get_tx_proof</code> and <code>check_tx_proof</code></td>
+            <td><code>get_tx_proof</code> and <code>check_tx_proof</code> (avoid sharing <code>get_tx_key</code> output)</td>
           </tr>
           <tr>
             <td>View-only wallet</td>
@@ -168,7 +168,8 @@ export function Body() {
         </tbody>
       </table>
       <Callout title="Proofs are saved at send time">
-        A transaction key is kept only on the device that sent the payment. The official docs warn that a successful check shows
+        The details a proof needs are kept only on the device that sent the payment. Share a signed proof rather than the transaction
+        key, which with your main address can reveal your change. The official docs warn that a successful check shows
         an amount was sent to an address, not that the funds are still spendable. <mark>Save a proof when you need one</mark>, and read the{" "}
         <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">official prove-a-payment guide</a>.
       </Callout>

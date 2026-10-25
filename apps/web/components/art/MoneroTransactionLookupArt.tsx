@@ -35,7 +35,7 @@ export function ExplorerSeesFigure() {
 /** How a payment proof moves from the sender to a verifier. */
 export function PaymentProofFigure() {
   return (
-    <svg viewBox="0 0 640 220" role="img" aria-label="The sender gives a verifier three things: the transaction ID, the receiving address, and the transaction key. The verifier checks them in a wallet and sees the amount sent to that address and how many confirmations it has." style={{ width: "100%", height: "auto" }}>
+    <svg viewBox="0 0 640 220" role="img" aria-label="The sender gives a verifier three things: the transaction ID, the receiving address, and a signed payment proof. The verifier checks them in a wallet and sees the amount sent to that address and how many confirmations it has." style={{ width: "100%", height: "auto" }}>
       <rect x="10" y="60" width="120" height="70" rx="4" fill={PAPER} stroke={FOREST} strokeWidth="1.2" />
       <text x="70" y="92" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="15" fill={FOREST}>Sender</text>
       <text x="70" y="112" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="12" fill={FOREST}>made the payment</text>
@@ -47,7 +47,7 @@ export function PaymentProofFigure() {
       </g>
       <text x="290" y="51" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="14" fill={CLAY}>transaction ID</text>
       <text x="290" y="115" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="14" fill={CLAY}>receiving address</text>
-      <text x="290" y="179" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="14" fill={CLAY}>transaction key</text>
+      <text x="290" y="179" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="14" fill={CLAY}>signed proof</text>
 
       <path d="M130 95 H196" stroke={FOREST} strokeWidth="1.4" fill="none" />
       <path d="M188 89 L196 95 L188 101" stroke={FOREST} strokeWidth="1.4" fill="none" />

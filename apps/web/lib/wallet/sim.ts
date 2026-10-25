@@ -4,7 +4,7 @@
  * Used when the user selects simulation, or as a fallback when the stagenet node is
  * unreachable. Clearly labelled in the UI. Nothing here touches the real network.
  */
-import { ATOMIC_UNITS } from "@quietmint/wallet-core";
+import { assertSafeProofAddress, ATOMIC_UNITS } from "@quietmint/wallet-core";
 import { SPEED_PRIORITY, type Balances, type Coin, type Destination, type IncomingEntry, type LiveWallet, type SendOptions, type SyncState, type TxSummary } from "./engine";
 
 const xmr = (n: number) => BigInt(Math.round(n * 1e6)) * (ATOMIC_UNITS / 1_000_000n);
@@ -168,10 +168,11 @@ export function createSimWallet(address: string, only?: { amount: bigint }): Liv
       return hash;
     },
     // Simulated proofs: only payments made in this session check out.
-    async proveSent(hash: string) {
+    async proveSent(hash: string, to: string) {
+      assertSafeProofAddress(to, address);
       const s = sent.get(hash);
       if (!s) throw new Error("This wallet has no record of that payment.");
-      return { txKey: s.txKey, signature: s.signature };
+      return { signature: s.signature };
     },
     async checkProof(p: { txHash: string; address: string; txKey?: string; signature?: string }) {
       const s = sent.get(p.txHash);

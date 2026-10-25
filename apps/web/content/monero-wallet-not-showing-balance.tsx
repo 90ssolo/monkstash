@@ -13,7 +13,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Wallet Not Showing Balance? The Fix",
   summary: "Monero wallet not showing balance? Your funds are not gone. Check syncing, restore height, locked funds, the network and the account, in that order.",
   keyword: "monero wallet not showing balance",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 10,
   toc: [
     { id: "calm", label: "Your funds have not vanished" },
@@ -41,7 +41,7 @@ export const meta: ArticleMeta = {
   sources: [
     { label: "Monero user guide: Changing the wallet restore height (too high hides transactions)", href: "https://www.getmonero.org/resources/user-guides/change-restore-height.html" },
     { label: "Monero user guide: Making a view-only wallet (balance is wrong without key images)", href: "https://www.getmonero.org/resources/user-guides/view_only.html" },
-    { label: "Monero user guide: Proving a payment (transaction ID, transaction key and address)", href: "https://www.getmonero.org/resources/user-guides/prove-payment.html" },
+    { label: "Monero user guide: Proving a payment", href: "https://www.getmonero.org/resources/user-guides/prove-payment.html" },
     { label: "Monero docs: Subaddresses and accounts", href: "https://docs.getmonero.org/public-address/subaddress/" },
     { label: "Monero source code: 10-block spendable age and 2-minute block target (cryptonote_config.h)", href: "https://github.com/monero-project/monero/blob/master/src/cryptonote_config.h" },
   ],
@@ -207,7 +207,7 @@ export function Body() {
       </p>
       <ol>
         <li>Ask for the <strong>transaction ID</strong> from their wallet&apos;s history. You can then <Link href="/monero-transaction-lookup">check it on a block explorer</Link>.</li>
-        <li>Ask for the <strong>transaction key</strong>, which lets the payment be checked against your address.</li>
+        <li>Ask for a <strong>signed payment proof</strong>, which lets the payment be checked against your address.</li>
         <li>Use a wallet&apos;s check-payment feature, or ask a helper you trust, to confirm that transaction paid your address and how much.</li>
       </ol>
       <p>

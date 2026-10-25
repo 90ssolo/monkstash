@@ -7,7 +7,7 @@
  * same-origin proxy at /api/node.
  */
 import type { NetworkType, NodeConfig, WalletKind } from "@quietmint/wallet-core";
-import { encodePrimaryAddress, exodusSpendKey, isMyMoneroPhrase, myMoneroKeys, type PaymentProof } from "@quietmint/wallet-core";
+import { assertSafeProofAddress, encodePrimaryAddress, exodusSpendKey, isMyMoneroPhrase, myMoneroKeys, type PaymentProof } from "@quietmint/wallet-core";
 import { API_ORIGIN } from "./config";
 
 type MoneroTs = typeof import("monero-ts").default;
@@ -482,8 +482,11 @@ export interface LiveWallet {
   coins?(): Promise<Coin[]>;
   /** Keeps a coin out of payments (frozen) or lets it be spent again. Full wallets only. */
   freezeCoin?(keyImage: string, frozen: boolean): Promise<void>;
-  /** Proof that this wallet paid `address` in transaction `hash`: the tx key (when stored) and a signed proof. */
-  proveSent(hash: string, address: string, message?: string): Promise<{ txKey: string | null; signature: string }>;
+  /**
+   * Signed proof that this wallet paid `address` in transaction `hash`. Never the tx key: with the
+   * sender's main address it reveals the sender's change (monero-project/monero#11586).
+   */
+  proveSent(hash: string, address: string, message?: string): Promise<{ signature: string }>;
   /** Checks a payment proof (tx key or signed proof) against the blockchain. */
   checkProof(p: PaymentProof): Promise<ProofCheck>;
   /** One extra sync now (cashier mode checks for new payments more often than the background sync). */
@@ -816,10 +819,11 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       }
     },
     async proveSent(hash, address, message) {
-      // The tx key exists only for payments this wallet made and still remembers.
-      const txKey = await w.getTxKey(hash).catch(() => null);
+      // A crafted address carrying our own view key would expose our change (#11586).
+      assertSafeProofAddress(address, await w.getPrimaryAddress());
+      // Signed proof only, never the tx key (see the interface above).
       const signature = await w.getTxProof(hash, address.trim(), message || undefined);
-      return { txKey, signature };
+      return { signature };
     },
     async checkProof(p) {
       const r = p.signature

@@ -8,12 +8,15 @@
  *   Signed proof: OutProofV2...                              (optional)
  *   Message: <text the proof was signed with>                (optional)
  *
- * The transaction key is what most wallets, explorers and Bisq ask for. The signed proof
- * (wallet2's get_tx_proof) can also carry a message, such as an order number. Either one lets
- * anyone with access to the blockchain confirm the payment; neither can be used to spend.
+ * MonkStash makes signed proofs only (wallet2's get_tx_proof, which can also carry a message
+ * such as an order number). It never hands out the transaction key: together with the
+ * sender's main address, a tx key lets anyone decode the sender's change output, revealing who
+ * sent the payment and how much came back (monero-project/monero#11586). Proofs from other
+ * wallets that carry a tx key can still be checked. Neither kind can be used to spend.
  * Checking needs a node, so it happens in the wallet engine; this module only formats and
  * parses, so a bad paste gets a clear message before any network request.
  */
+import { addressPublicViewKey } from "./address";
 import { addressNetwork } from "./request";
 
 export interface PaymentProof {
@@ -81,4 +84,16 @@ export function parsePaymentProof(text: string): PaymentProof {
   };
   if (!proof.txHash && !proof.address) throw new ProofError("This does not look like a payment proof. Paste the whole text, or fill in the fields.");
   return checkPaymentProof(proof);
+}
+
+/**
+ * Refuses a payment proof for an address that carries this wallet's own view key (with any
+ * spend key). Such a crafted address would let whoever holds the proof decode the sender's
+ * change output (monero-project/monero#11586). Throws a ProofError the screen can show.
+ */
+export function assertSafeProofAddress(target: string, ownPrimaryAddress: string): void {
+  const theirs = addressPublicViewKey(target.trim());
+  if (theirs && theirs === addressPublicViewKey(ownPrimaryAddress.trim())) {
+    throw new ProofError("This address reuses your own wallet's view key, so a proof for it could reveal your change. No proof was made. Ask the recipient for their real address.");
+  }
 }

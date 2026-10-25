@@ -20,7 +20,7 @@ export const meta: ArticleMeta = {
   h1: { keyword: "How to accept Monero payments", sizzle: "Get paid privately, with nobody in the middle." },
   summary: "How to accept Monero payments in a shop, online or by invoice: the setups, confirmations, pricing in your currency, refunds and records, with no middleman.",
   keyword: "accept monero payments",
-  updated: "2026-10-17",
+  updated: "2026-10-25",
   readingMinutes: 17,
   toc: [
     { id: "how", label: "How accepting Monero works" },
@@ -301,7 +301,7 @@ export function Body() {
         <li><strong>Ask for a refund address</strong> in writing, and send to exactly that.</li>
         <li><strong>Overpaid?</strong> MonkStash shows the extra amount on the sale. Offer to send it back the same way.</li>
         <li><strong>Underpaid?</strong> The checkout or till asks for the rest, to the same address, so it adds up automatically.</li>
-        <li><strong>Need proof?</strong> A customer can prove a payment with the transaction key from their wallet; see <Link href="/monero-transaction-lookup">how to check a transaction</Link>.</li>
+        <li><strong>Need proof?</strong> A customer can prove a payment with a signed payment proof from their wallet; see <Link href="/monero-transaction-lookup">how to check a transaction</Link>.</li>
       </ul>
 
       {/* 11 */}

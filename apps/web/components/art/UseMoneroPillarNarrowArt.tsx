@@ -104,12 +104,12 @@ export function PaymentClockNarrow() {
 
 /** Phone version of proving a payment. */
 export function ProvePaymentNarrow() {
-  const chips = ["Transaction ID", "Transaction key", "Recipient's address"];
+  const chips = ["Transaction ID", "Signed proof", "Recipient's address"];
   const arrow = (y: number) => (
     <path d={`M180 ${y} v22 M174 ${y + 16} l6 6 l6 -6`} fill="none" stroke={CLAY} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
   );
   return (
-    <svg viewBox="0 0 360 500" role="img" aria-label="How to prove a Monero payment. You, the sender, hand over three things: the transaction ID, the transaction key, and the recipient's address. The other person's wallet checks them. They then see the amount that transaction sent to that address, and how many confirmations it has. This proves the payment was sent. It does not prove the money is still unspent." style={{ width: "100%", height: "auto" }}>
+    <svg viewBox="0 0 360 500" role="img" aria-label="How to prove a Monero payment. You, the sender, hand over three things: the transaction ID, a signed payment proof, and the recipient's address. The other person's wallet checks them. They then see the amount that transaction sent to that address, and how many confirmations it has. This proves the payment was sent. It does not prove the money is still unspent." style={{ width: "100%", height: "auto" }}>
       <rect x="4" y="4" width="352" height="166" rx="4" fill={CARD} stroke={INK} strokeWidth="1.2" />
       <text x="18" y="32" fontFamily={SERIF} fontStyle="italic" fontSize="17" fill={INK}>You, the sender</text>
       {chips.map((c, i) => (
@@ -121,7 +121,7 @@ export function ProvePaymentNarrow() {
       {arrow(174)}
       <rect x="4" y="202" width="352" height="64" rx="4" fill={PAPER} stroke={FOREST} strokeWidth="1.6" />
       <text x="18" y="230" fontFamily={SERIF} fontStyle="italic" fontSize="16" fill={FOREST}>Their wallet</text>
-      <text x="18" y="252" fontFamily={MONO} fontSize="12" fill={INK}>check tx key</text>
+      <text x="18" y="252" fontFamily={MONO} fontSize="12" fill={INK}>check tx proof</text>
       {arrow(270)}
       <rect x="4" y="298" width="352" height="116" rx="4" fill={CARD} stroke={FOREST} strokeWidth="1.2" />
       <text x="18" y="326" fontFamily={SERIF} fontStyle="italic" fontSize="17" fill={FOREST}>They see</text>

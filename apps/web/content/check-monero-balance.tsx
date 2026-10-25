@@ -20,7 +20,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Wallet Balance Check: What Works",
   summary: "You cannot check a Monero balance from an address alone. Here is what works: open the wallet, watch it with the view key, or prove one payment.",
   keyword: "monero wallet balance check",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 8,
   toc: [
     { id: "short", label: "The short answer" },
@@ -39,7 +39,7 @@ export const meta: ArticleMeta = {
     { q: "How do I view a Monero wallet without being able to spend from it?", a: "Create a view-only (watch-only) wallet with the primary address and the private view key. It shows incoming payments but holds no spend key, so it cannot move money. MonkStash, Monero GUI and Feather all offer this." },
     { q: "Why is the balance in my view-only wallet too high?", a: "A view-only wallet sees money coming in but cannot reliably tell when it was spent. After any send, it keeps counting the spent funds. Check the balance in the full wallet that holds the recovery words." },
     { q: "Can someone see my Monero balance if I give them my address?", a: "No. Your address lets people pay you, not watch you. Only someone with your private view key can see your incoming payments, and only your recovery words or spend key can move funds." },
-    { q: "How can I prove I sent Monero to someone?", a: "Share the transaction ID, the recipient address and the transaction key from your wallet. The recipient or a third party can check the amount that this one transaction sent to that address, without seeing anything else." },
+    { q: "How can I prove I sent Monero to someone?", a: "Share a signed payment proof with the transaction ID and the recipient address. The recipient or a third party can check the amount that this one transaction sent to that address. Avoid sharing the transaction key itself: together with your main address it can reveal your change." },
     { q: "Is it safe to enter my seed into a Monero balance checker?", a: "Never. Checking a balance does not need your recovery words. Any site that asks for them can take everything in the wallet." },
   ],
   sources: [
@@ -77,7 +77,7 @@ export function Body() {
           <tr><td>Only an address</td><td>Nothing about its balance</td><td>No tool can do this, by design</td></tr>
           <tr><td>Address + private view key</td><td>Incoming payments and their amounts</td><td>A view-only (watch-only) wallet</td></tr>
           <tr><td>Recovery words (or spend key)</td><td>The true balance, history, and the power to spend</td><td>Restore or open the wallet</td></tr>
-          <tr><td>Tx ID + tx key + address</td><td>The amount of that one payment</td><td>A payment check in a wallet or explorer</td></tr>
+          <tr><td>Tx ID + signed proof + address</td><td>The amount of that one payment</td><td>A payment check in a wallet or explorer</td></tr>
         </tbody>
       </table>
 
@@ -124,7 +124,7 @@ export function Body() {
       </p>
       <h3>3. Prove one payment</h3>
       <p>
-        If you only need to confirm that a specific transfer happened, a transaction key proves it without revealing anything else.
+        If you only need to confirm that a specific transfer happened, a signed payment proof shows it without revealing anything else.
         See <a href="#one-payment">check one payment instead</a>.
       </p>
 
@@ -176,8 +176,9 @@ export function Body() {
       <h2 id="one-payment">Check one payment instead</h2>
       <p>
         Often you do not need a balance at all. You need to know whether one payment arrived. Monero has a tool for that: the{" "}
-        <strong>transaction key</strong>. The sender takes three things from their wallet (the transaction ID, the recipient&apos;s
-        address and the transaction key) and anyone can check how much that one transaction sent to that address. The official{" "}
+        <strong>signed payment proof</strong>. The sender makes one in their wallet for the transaction ID and the recipient&apos;s
+        address, and anyone can check how much that one transaction sent to that address. Prefer it over the older transaction key,
+        which with the sender&apos;s main address can reveal their change. The official{" "}
         <a href={PROVE} rel="noopener">payment proof guide</a> shows the commands, and our{" "}
         <Link href="/monero-transaction-lookup">Monero transaction lookup guide</Link> covers explorers and proofs step by step.
       </p>

@@ -1,9 +1,9 @@
 "use client";
 /**
- * Proof of payment. "Prove this payment" makes a shareable proof for a payment this wallet
- * sent (transaction key plus a signed proof that can carry a message). "Check a payment proof"
- * verifies one someone gives you, against the blockchain. Proofs show one payment to one
- * address; they cannot be used to spend and reveal nothing about other payments.
+ * Proof of payment. "Prove this payment" makes a signed proof for a payment this wallet sent (it
+ * can carry a message). It never includes the transaction key: with the sender's main address,
+ * that key reveals the sender's change (monero-project/monero#11586). "Check a payment proof"
+ * verifies one someone gives you, signed or with another wallet's tx key, against the blockchain.
  */
 import { useState } from "react";
 import { checkPaymentProof, formatPaymentProof, formatXmr, parsePaymentProof, PROOF_MESSAGE_MAX, ProofError, shortAddress } from "@quietmint/wallet-core";
@@ -25,11 +25,11 @@ export function ProveSent({ wallet, tx }: { wallet: LiveWallet; tx: TxSummary })
     setError(null);
     setBusy(true);
     try {
-      const { txKey, signature } = await wallet.proveSent(tx.hash, address, message.trim());
-      const p = checkPaymentProof({ txHash: tx.hash, address, signature, ...(txKey ? { txKey } : {}), ...(message.trim() ? { message: message.trim() } : {}) });
+      const { signature } = await wallet.proveSent(tx.hash, address, message.trim());
+      const p = checkPaymentProof({ txHash: tx.hash, address, signature, ...(message.trim() ? { message: message.trim() } : {}) });
       setProof(formatPaymentProof(p));
     } catch (err) {
-      setError(err instanceof ProofError ? err.message : "A proof could not be made for this payment. It works for payments sent from this wallet; check the recipient address. The transaction key is kept only in the browser that sent the payment, so a wallet restored elsewhere may not have it.");
+      setError(err instanceof ProofError ? err.message : "A proof could not be made for this payment. It works for payments sent from this wallet; check the recipient address. The details a proof needs are kept only in the browser that sent the payment, so a wallet restored elsewhere may not have them.");
     } finally {
       setBusy(false);
     }
@@ -46,9 +46,9 @@ export function ProveSent({ wallet, tx }: { wallet: LiveWallet; tx: TxSummary })
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setProof(null)}>Make another</button>
         </div>
         <p className="small muted" style={{ margin: 0 }}>
-          Anyone you give this to can confirm that this payment reached this address. It shows this one payment only, and it cannot be
-          used to spend. Most wallets and block explorers accept the transaction key; the signed proof also covers your message.
-          {proof.includes("\nTransaction key: ") ? null : " This proof has no transaction key: that key exists only in the browser that sent the payment, so the signed proof is used instead."}
+          Anyone you give this to can confirm that this payment reached this address, in MonkStash, Feather, Cake or the Monero GUI
+          (check a payment proof). It shows this one payment only, cannot be used to spend, and does not reveal your change or your
+          other payments. Your message is signed into it.
         </p>
       </div>
     );
@@ -120,8 +120,8 @@ export function CheckProof({ wallet, onClose }: { wallet: LiveWallet; onClose: (
         <div className="field">
           <label htmlFor="proof-text">Paste the proof</label>
           <textarea id="proof-text" className="textarea mono" style={{ minHeight: 140 }} spellCheck={false} autoComplete="off" autoCapitalize="none" value={text}
-            onChange={(e) => { setText(e.target.value); setResult(null); setError(null); }} placeholder={"Transaction: ...\nAddress: ...\nTransaction key: ..."} />
-          <span className="hint">It needs the transaction ID, the address, and a transaction key or signed proof.</span>
+            onChange={(e) => { setText(e.target.value); setResult(null); setError(null); }} placeholder={"Transaction: ...\nAddress: ...\nSigned proof: OutProofV2..."} />
+          <span className="hint">It needs the transaction ID, the address, and a signed proof (or a transaction key from another wallet).</span>
         </div>
         {error ? <p className="error small" role="alert" style={{ margin: 0 }}>{error}</p> : null}
         <button className="btn btn-primary" disabled={busy || !text.trim()}>{busy ? "Checking on the network…" : "Check proof"}</button>
@@ -140,6 +140,7 @@ export function CheckProof({ wallet, onClose }: { wallet: LiveWallet; onClose: (
                   : ""}
               </span>
               {r.received === 0n ? <span className="small">The proof is genuine, but no XMR went to this address in this transaction.</span> : null}
+              {!result!.signed ? <span className="small">This proof uses a transaction key. Together with the sender&apos;s address, that key can reveal their change, so suggest they send a signed proof next time.</span> : null}
             </>
           ) : (
             <>

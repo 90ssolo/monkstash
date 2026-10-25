@@ -18,7 +18,7 @@ export const meta: ArticleMeta = {
   h1: { keyword: "How to use Monero", sizzle: "Six steps to private money." },
   summary: "How to use Monero, step by step: set up and back up a wallet, receive and send XMR, understand fees and confirmations, and fix common wallet problems.",
   keyword: "how to use Monero",
-  updated: "2026-10-15",
+  updated: "2026-10-25",
   readingMinutes: 21,
   toc: [
     { id: "journey", label: "How to use Monero: the whole journey" },
@@ -41,7 +41,7 @@ export const meta: ArticleMeta = {
     receive: "Share an address or a QR code, then wait for 10 blocks.",
     send: "Paste, check, confirm. And why there is no undo.",
     "fees-time": "Tiny fees, two-minute blocks, twenty minutes to spend.",
-    check: "Look up a transaction, or prove you paid with a tx key.",
+    check: "Look up a transaction, or prove you paid with a signed proof.",
     problems: "Three questions that fix most wallet scares.",
     privacy: "What Monero hides for you, and the habits that cover the rest.",
     spend: "Where XMR is accepted, and your first-day checklist.",
@@ -68,7 +68,7 @@ export const meta: ArticleMeta = {
     { q: "Can a Monero transaction be reversed or cancelled?", a: "No. Once a payment is broadcast, nobody can reverse it, and there is no chargeback. That is why you check the address carefully and send a small test amount first when the payment matters." },
     { q: "Why does my Monero wallet show a balance I cannot spend?", a: "Newly received funds, and the change from your own sends, are locked until they have 10 confirmations, about 20 minutes. Your wallet shows them as locked or not yet spendable, and they unlock by themselves." },
     { q: "Can someone see my Monero balance from my address?", a: "No. A Monero address does not reveal its balance or history to anyone looking at the blockchain. Only someone with your private view key can see incoming payments, which is why you share that key only with people you choose." },
-    { q: "How do I prove I sent a Monero payment?", a: "Give the recipient (or whoever needs proof) three things: the transaction ID, the transaction key, and the recipient's address. Their wallet can check them and show how much that transaction sent to that address. The official GUI and CLI wallets both support this." },
+    { q: "How do I prove I sent a Monero payment?", a: "Give the recipient (or whoever needs proof) a signed payment proof together with the transaction ID and the recipient's address. Their wallet can check it and show how much that transaction sent to that address. MonkStash, Feather and the official GUI and CLI wallets support this. Avoid sharing the transaction key: with your main address it can reveal your change." },
     { q: "Is it legal to use Monero?", a: "In most countries owning and using Monero is legal, but rules differ by country and some exchanges restrict it in some regions. Check the rules where you live. This is general information, not legal advice." },
   ],
 };
@@ -382,17 +382,19 @@ export function Body() {
       </p>
       <h3>Prove that you paid someone</h3>
       <p>
-        Say a seller claims your payment never arrived. You can prove it with three pieces of information, as the{" "}
-        <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">official prove-payment guide</a>{" "}
-        describes: the transaction ID, the <strong>transaction key</strong> (tx key) and the recipient&apos;s address.
+        Say a seller claims your payment never arrived. You can prove it with three pieces of information: the transaction ID, the recipient&apos;s address and a{" "}
+        <strong>signed payment proof</strong>. Older guides, including the{" "}
+        <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">official prove-payment guide</a>, use
+        the transaction key instead, but a flaw <a href="https://github.com/monero-project/monero/issues/11586" rel="noopener">reported in October 2026</a> showed that the key plus your main address reveals your change. A signed
+        proof does the same job without that leak.
       </p>
       <Figure caption="A payment proof shows one payment to one address. It reveals nothing else about your wallet.">
         <Adaptive wide={<ProvePaymentArt />} narrow={<ProvePaymentNarrow />} />
       </Figure>
       <p>
-        In the official GUI wallet, you get the proof from the transaction history, and the other person checks it under
-        Advanced, Prove/Check. In the CLI wallet the commands are <code>get_tx_key</code> and <code>check_tx_key</code>, and the
-        wallet must be set to save transaction keys before you send. One limit is worth knowing: the{" "}
+        In MonkStash, open the payment and choose Prove this payment. In the official GUI wallet, use Advanced, Prove/Check, and
+        the other person checks it in the same place. In the CLI wallet the commands are <code>get_tx_proof</code> and{" "}
+        <code>check_tx_proof</code>, and the wallet must be set to save transaction details before you send. One limit is worth knowing: the{" "}
         <a href="https://docs.getmonero.org/interacting/monero-wallet-cli-reference/" rel="noopener">CLI reference</a> notes that
         a proof shows funds were sent to an address, not that they are still unspent. For proving a balance, the CLI has a
         separate reserve proof.

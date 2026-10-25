@@ -138,11 +138,11 @@ export function PaymentClockArt() {
   );
 }
 
-/** Proving a payment with a transaction key. */
+/** Proving a payment with a signed proof. */
 export function ProvePaymentArt() {
-  const chips = ["Transaction ID", "Transaction key", "Recipient's address"];
+  const chips = ["Transaction ID", "Signed proof", "Recipient's address"];
   return (
-    <svg viewBox="0 0 600 270" role="img" aria-label="How to prove a Monero payment. You, the sender, hand over three things: the transaction ID, the transaction key, and the recipient's address. The other person's wallet checks them. They then see the amount that transaction sent to that address, and how many confirmations it has. This proves the payment was sent. It does not prove the money is still unspent." style={{ width: "100%", height: "auto" }}>
+    <svg viewBox="0 0 600 270" role="img" aria-label="How to prove a Monero payment. You, the sender, hand over three things: the transaction ID, a signed payment proof, and the recipient's address. The other person's wallet checks them. They then see the amount that transaction sent to that address, and how many confirmations it has. This proves the payment was sent. It does not prove the money is still unspent." style={{ width: "100%", height: "auto" }}>
       <rect x="8" y="12" width="200" height="176" rx="4" fill={CARD} stroke={INK} strokeWidth="1.2" />
       <text x="24" y="40" fontFamily={SERIF} fontStyle="italic" fontSize="17" fill={INK}>You, the sender</text>
       {chips.map((c, i) => (
@@ -154,7 +154,7 @@ export function ProvePaymentArt() {
       <path d="M210 100 h24 M228 94 l6 6 l-6 6" fill="none" stroke={CLAY} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="238" y="62" width="144" height="76" rx="4" fill={PAPER} stroke={FOREST} strokeWidth="1.6" />
       <text x="310" y="92" textAnchor="middle" fontFamily={SERIF} fontStyle="italic" fontSize="16" fill={FOREST}>Their wallet</text>
-      <text x="310" y="116" textAnchor="middle" fontFamily={MONO} fontSize="12" fill={INK}>check tx key</text>
+      <text x="310" y="116" textAnchor="middle" fontFamily={MONO} fontSize="12" fill={INK}>check tx proof</text>
       <path d="M384 100 h24 M402 94 l6 6 l-6 6" fill="none" stroke={CLAY} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="412" y="12" width="180" height="176" rx="4" fill={CARD} stroke={FOREST} strokeWidth="1.2" />
       <text x="428" y="40" fontFamily={SERIF} fontStyle="italic" fontSize="17" fill={FOREST}>They see</text>

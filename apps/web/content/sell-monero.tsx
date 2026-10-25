@@ -44,7 +44,8 @@ export const meta: ArticleMeta = {
     { label: "Kraken: Notice of delisting XMR in Canada", href: "https://support.kraken.com/articles/notice-of-delisting-xmr-canada" },
     { label: "The Record: German authorities take down eXch (May 2025)", href: "https://therecord.media/exch-cryptocurrency-mixer-germany-takedown" },
     { label: "Lamassu: Monero en route to Lamassu ATMs (September 2021)", href: "https://blog.lamassu.is/monero-en-route-to-lamassu-atms/" },
-    { label: "Monero: How to prove a payment (tx key)", href: "https://www.getmonero.org/resources/user-guides/prove-payment.html" },
+    { label: "Monero: How to prove a payment", href: "https://www.getmonero.org/resources/user-guides/prove-payment.html" },
+    { label: "Monero issue #11586: a transaction key can reveal the sender (October 2026)", href: "https://github.com/monero-project/monero/issues/11586" },
     { label: "IRS: Digital assets", href: "https://www.irs.gov/filing/digital-assets" },
     { label: "HMRC Cryptoassets Manual: CRYPTO22100 (disposals)", href: "https://www.gov.uk/hmrc-internal-manuals/cryptoassets-manual/crypto22100" },
   ],
@@ -204,10 +205,9 @@ export function Body() {
 
       <h2 id="records">Keep proof of every payment</h2>
       <p>
-        If a buyer says the XMR never arrived, you need to prove it did. Save the transaction ID, the address you paid and the{" "}
-        <strong>transaction key</strong>. Anyone can check the three together, as the Monero{" "}
-        <a href="https://www.getmonero.org/resources/user-guides/prove-payment.html" rel="noopener">prove-payment guide</a>{" "}
-        shows, without seeing anything else in your wallet. Our{" "}
+        If a buyer says the XMR never arrived, you need to prove it did. Make a <strong>signed payment proof</strong> for the payment: in MonkStash, open it and choose Prove this payment. Anyone can
+        check it against the transaction ID and the address you paid, without seeing anything else in your wallet. Do not share the
+        transaction key instead: a flaw <a href="https://github.com/monero-project/monero/issues/11586" rel="noopener">reported in October 2026</a> showed that it, together with your main address, reveals your change. Our{" "}
         <Link href="/monero-transaction-lookup">transaction lookup guide</Link> explains how.
       </p>
       <p>
