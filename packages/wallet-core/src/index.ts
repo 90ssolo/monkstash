@@ -21,3 +21,4 @@ export * from "./seedcheck";
 export * from "./priceHistory";
 export * from "./labels";
 export * from "./gift";
+export * from "./paste";

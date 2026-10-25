@@ -6,7 +6,7 @@ import { FiatValue } from "./FiatValue";
 import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
-import { addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, EMPTY_LABELS, addressKey, LABEL_MAX, withAddressLabel, type WalletLabels, type WalletPublic } from "@quietmint/wallet-core";
+import { readPastedRecipient, addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, EMPTY_LABELS, addressKey, LABEL_MAX, withAddressLabel, type WalletLabels, type WalletPublic } from "@quietmint/wallet-core";
 import { fetchPriceFeed, fetchQuote, MAIN_CURRENCIES, PriceUnavailableError } from "@/lib/prices";
 import { fiatText, localCurrency } from "@/lib/localCurrency";
 import { recordRequestSeen, statusOf, type PaymentRequest, type RequestStatus, type RequestStore } from "@/lib/wallet/requests";
@@ -36,6 +36,8 @@ import { payLinkOrigin, siteHref } from "@/lib/site";
 import type { CashierStore } from "@/lib/wallet/cashier";
 import { Qr } from "./Qr";
 import { QrScanButton } from "./QrScan";
+import { InstallApp } from "./InstallApp";
+import { ArrivalSettings, ArrivalToast, useArrivals } from "./Arrivals";
 import { AddressDiff, BatchForm, SpeedPicker, speedLabel } from "./SendParts";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
 import { useWalletTheme, type WalletTheme } from "@/lib/wallet/theme";
@@ -260,6 +262,8 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
   const pct = sync ? Math.min(100, Math.round(sync.percent * 1000) / 10) : 0;
   const synced = !!sync?.done;
+  // A chime and a message when Monero arrives (worked out here, see Arrivals.tsx).
+  const [arrival, closeArrival] = useArrivals(incoming, txs, synced);
   const stale = synced && !syncError && !!health?.lastOk && Date.now() - health.lastOk > STALE_MS;
   const lastChecked = health?.lastOk ? timeText(health.lastOk) : null;
   const longScan = !!sync && !sync.done && sync.height >= pub.restoreHeight && sync.endHeight - sync.height > CHECKPOINT_BLOCKS;
@@ -347,6 +351,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
         <div className={styles.content} ref={mainRef}>
           <h1 className="visually-hidden">Your MonkStash wallet</h1>
+          {arrival ? <ArrivalToast arrival={arrival} hidden={hidden} onOpen={() => { closeArrival(); go("activity"); }} onClose={closeArrival} /> : null}
           <div className={styles.strip}>
             {walletMenu ? <WalletSwitcher current={pub.name} wallets={walletMenu.wallets} onSwitch={walletMenu.onSwitch} onAdd={walletMenu.onAdd} /> : null}
             {/* Only when it tells you something: a test network, or a watch-only wallet. */}
@@ -665,6 +670,18 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 <ThemePicker />
               </section>
 
+              <section className={styles.setBlock} aria-labelledby="set-alerts">
+                <h3 id="set-alerts">Payment alerts</h3>
+                <ArrivalSettings />
+              </section>
+
+              {!compact ? (
+                <section className={styles.setBlock} aria-labelledby="set-app">
+                  <h3 id="set-app">Install as an app</h3>
+                  <InstallApp />
+                </section>
+              ) : null}
+
               <section className={styles.setBlock} aria-labelledby="set-support">
                 <h3 id="set-support">Support MonkStash</h3>
                 <p className="small muted" style={{ margin: "0 0 var(--s-3)" }}>
@@ -821,6 +838,20 @@ const EXPIRY_CHOICES: { label: string; minutes: number | null }[] = [
   { label: "7 days", minutes: 60 * 24 * 7 },
   { label: "30 days", minutes: 60 * 24 * 30 },
 ];
+
+/** Seconds to undo a payment after approving it, before it is broadcast. */
+const UNDO_SECONDS = 5;
+
+/** A typed amount in a currency ("20", "12,50") to atomic XMR at `rate`, or null if it is not a positive number. */
+function fiatAmountToAtomic(typed: string, rate: string): bigint | null {
+  const v = typed.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(v) || Number(v) <= 0) return null;
+  try {
+    return fiatToAtomic(v, rate);
+  } catch {
+    return null;
+  }
+}
 
 function moneyText(amount: string, currency: string): string {
   try {
@@ -1094,9 +1125,14 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   const [sendPw, setSendPw] = useState("");
   const [sendCode, setSendCode] = useState("");
   // The review is a frozen snapshot: what was built is what is shown and sent, whatever the form says now.
-  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string; fromAddresses?: number[]; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean; speed: SendSpeed; feeFromAmount: boolean } | null>(null);
+  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string; fromAddresses?: number[]; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean; speed: SendSpeed; feeFromAmount: boolean; typedFiat?: string } | null>(null);
   const toRef = useRef("");
-  const [state, setState] = useState<"idle" | "preparing" | "sending" | "checking" | "sent">("idle");
+  const [state, setState] = useState<"idle" | "preparing" | "countdown" | "sending" | "checking" | "sent">("idle");
+  // A few seconds to undo after approving: a Monero payment cannot be recalled once it is broadcast.
+  const [left, setLeft] = useState(0);
+  const [undone, setUndone] = useState(false);
+  const countdown = useRef<number | null>(null);
+  useEffect(() => () => { if (countdown.current !== null) window.clearInterval(countdown.current); }, []);
   // After a broadcast error the payment may or may not be on the network. Until a check shows the
   // network does not have it, the only way forward is the SAME signed payment (it can never be paid
   // twice): a new build could pick different coins and pay a second time.
@@ -1130,6 +1166,18 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
     return () => { alive = false; clearInterval(t); };
   }, []);
   const inFiat = (a: bigint) => (fx ? fiatText(atomicToFiat(a, fx.rate), fx.currency) : null);
+  // Type the amount in your own currency instead of XMR. The XMR amount is fixed at Review, so the
+  // rate cannot move between what you checked and what is sent.
+  const [typeFiat, setTypeFiat] = useState(false);
+  const fiatMode = typeFiat && !!fx;
+  function switchUnit() {
+    if (!fx) return;
+    setError(null);
+    const now = fiatMode ? fiatAmountToAtomic(amount, fx.rate) : parseXmr(amount);
+    if (now !== null && now > 0n) setAmount(fiatMode ? formatXmr(now) : atomicToFiat(now, fx.rate));
+    else setAmount("");
+    setTypeFiat(!fiatMode);
+  }
 
   useEffect(() => {
     if (!fqdn) { setAliasState("idle"); setAliasError(null); return; }
@@ -1159,20 +1207,44 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fqdn]);
 
-  /** Typed, pasted or scanned recipient. A payment link (monero:address?tx_amount=...) fills in the address and amount. */
+  /**
+   * Typed, pasted or scanned recipient. A payment link (monero:address?tx_amount=..., or a
+   * MonkStash pay link) fills in the address and amount; an address copied over several lines is
+   * joined up; a gift link is explained instead of being treated as an address.
+   */
   function takeRecipient(v: string, scanned = false) {
     setError(null);
-    if (/^\s*monero:/i.test(v)) {
+    const pasted = readPastedRecipient(v);
+    if (pasted.kind === "request") {
       try {
-        const req = parsePaymentUri(v);
+        const req = parsePaymentUri(pasted.uri);
         setTo(req.address);
-        if (req.amount) { setAmount(formatXmr(req.amount)); setSendAll(false); }
+        if (req.amount) { setAmount(formatXmr(req.amount)); setSendAll(false); setTypeFiat(false); }
         return;
       } catch (err) {
         setError((err as Error).message);
       }
     }
+    if (pasted.kind === "gift") {
+      setTo("");
+      setError("That is a gift link, not an address. Open the link in your browser to claim the gift.");
+      return;
+    }
+    if (pasted.kind === "address") return setTo(pasted.address);
     setTo(scanned ? v.trim() : v);
+  }
+
+  /** The Paste button: reads the clipboard once, on this click only. */
+  // Not inside the extension: reading the clipboard there would need an extra permission.
+  const canPaste = typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function" && /^https?:$/.test(location.protocol);
+  async function pasteRecipient() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) return setError("The clipboard is empty. Copy the address or payment link first.");
+      takeRecipient(text, true);
+    } catch {
+      setError("Your browser did not allow reading the clipboard. Paste into the box instead (Ctrl+V, or press and hold).");
+    }
   }
 
   if (pub.kind === "view-only") {
@@ -1216,7 +1288,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   const resolved = fqdn ? (alias?.fqdn === fqdn ? alias : null) : null;
   const dest = resolved ? resolved.address : to.trim();
   const fmt = fqdn ? (resolved ? checkAddressFormat(resolved.address, pub.network) : null) : to ? checkAddressFormat(to, pub.network) : null;
-  const atomic = parseXmr(amount);
+  const atomic = fiatMode ? fiatAmountToAtomic(amount, fx!.rate) : parseXmr(amount);
   const destNet = resolved ? addressNetwork(resolved.address) : null;
   const wrongNet = destNet && destNet !== pub.network ? destNet : null;
   // Contacts and the tamper alarm.
@@ -1244,7 +1316,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
     if (alarm && !alarmOk) return setError("Check the warning above before you continue.");
     const nothingSpendable = "There is nothing to send yet. Money you receive can be spent after 10 confirmations (about 20 minutes).";
     if (!sendAll) {
-      if (atomic === null) return setError(xmrAmountProblem(amount) ?? "Enter an amount in XMR, like 0.5.");
+      if (atomic === null) return setError(fiatMode ? `Enter an amount in ${fx!.currency}, like 20 or 12.50.` : xmrAmountProblem(amount) ?? "Enter an amount in XMR, like 0.5.");
       if (atomic <= 0n) return setError("Enter an amount greater than 0");
       if (unlocked <= 0n) return setError(nothingSpendable);
       if (subtractFee ? atomic > unlocked : atomic >= unlocked) return setError(subtractFee ? `That is more than you can spend now (${formatXmr(unlocked)} XMR).` : `That leaves nothing for the network fee. You can send a little under ${formatXmr(unlocked)} XMR, take the fee from the amount, or use Send all.`);
@@ -1265,7 +1337,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       if (toRef.current !== typed || built.address !== target) {
         setError("The recipient changed while the payment was being prepared. Check it and press Review again.");
       } else {
-        setReview({ ...built, alias: targetAlias, all: sendAll, speed, feeFromAmount: subtractFee && !sendAll });
+        setReview({ ...built, alias: targetAlias, all: sendAll, speed, feeFromAmount: subtractFee && !sendAll, ...(fiatMode && !sendAll ? { typedFiat: fiatText(amount.trim().replace(",", "."), fx!.currency) } : {}) });
       }
     } catch (err) {
       setError((err as Error).message);
@@ -1330,6 +1402,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
     if (!review) return;
     setState("sending");
     setError(null);
+    setUndone(false);
     // The wallet only broadcasts a payment approved with the password (and code) just now.
     try {
       if (!settings) throw new Error("Payments cannot be confirmed from here.");
@@ -1339,6 +1412,37 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       setState("idle");
       return;
     }
+    // A retry of a payment that may already be out goes straight away; a new one gets the undo window.
+    if (unsure) return broadcast();
+    setLeft(UNDO_SECONDS);
+    setState("countdown");
+    let n = UNDO_SECONDS;
+    countdown.current = window.setInterval(() => {
+      n -= 1;
+      setLeft(n);
+      if (n <= 0) sendWithoutWaiting();
+    }, 1000);
+  }
+
+  function stopCountdown() {
+    if (countdown.current !== null) window.clearInterval(countdown.current);
+    countdown.current = null;
+  }
+
+  function undo() {
+    stopCountdown();
+    setState("idle");
+    setUndone(true);
+  }
+
+  function sendWithoutWaiting() {
+    stopCountdown();
+    void broadcast();
+  }
+
+  async function broadcast() {
+    if (!review) return;
+    setState("sending");
     try {
       // Always the payment built for this review. After an error this re-sends the same signed
       // transaction, which the network accepts at most once.
@@ -1377,6 +1481,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
           <dt>Network fee</dt><dd>{formatXmr(review.fee)} XMR{inFiat(review.fee) ? <span className="muted"> (about {inFiat(review.fee)})</span> : null}<span className="muted">, {speedLabel(review.speed).toLowerCase()} speed</span></dd>
           <dt>Total</dt><dd><strong>{formatXmr(review.amount + review.fee)} XMR</strong></dd>
         </dl>
+        {review.typedFiat ? <p className="small muted" style={{ margin: "var(--s-3) 0 0" }}>You typed {review.typedFiat}. At today&apos;s rate that is the XMR amount above, which is what will be sent.</p> : null}
         {review.all ? <p className="small muted" style={{ margin: "var(--s-3) 0 0" }}>This sends everything spendable. The network fee comes out of it, so the recipient gets the amount above.</p> : null}
         {review.feeFromAmount ? <p className="small muted" style={{ margin: "var(--s-3) 0 0" }}>The fee was taken from the amount you typed, so the recipient gets a little less and you pay exactly {formatXmr(review.amount + review.fee)} XMR.</p> : null}
         {unlocked > 0n && review.amount * 2n >= unlocked ? (
@@ -1398,7 +1503,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
           </div>
         ) : null}
         <div className="notice notice-warn" style={{ margin: "var(--s-4) 0" }}>
-          <span>Once you send Monero, it cannot be undone. Check the first and last few characters of the address before you send.</span>
+          <span>Once it reaches the network, a Monero payment cannot be reversed. After you press Send now you get {UNDO_SECONDS} seconds to undo. Check the first and last few characters of the address before you send.</span>
         </div>
         <Credentials totp={!!settings?.totpEnabled} pw={sendPw} setPw={setSendPw} code={sendCode} setCode={setSendCode} idPrefix="send" />
         {error ? <p className="error small" role="alert">{error}</p> : null}
@@ -1421,10 +1526,24 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
             )}
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "var(--s-2)" }}>
-            <button className="btn btn-primary btn-block" disabled={state !== "idle" || !sendPw} onClick={confirm}>{state === "sending" ? "Sending…" : "Send now"}</button>
-            <button className="btn btn-ghost btn-block" disabled={state !== "idle"} onClick={() => setReview(null)}>Edit</button>
-          </div>
+          state === "countdown" ? (
+            <div className={styles.undoBox} role="status" aria-live="polite">
+              <div className={styles.undoHead}>
+                <strong>Sending in {left} second{left === 1 ? "" : "s"}</strong>
+                <span className={styles.undoBar} aria-hidden="true"><span style={{ width: `${(left / UNDO_SECONDS) * 100}%` }} /></span>
+              </div>
+              <div className={styles.undoActions}>
+                <button type="button" className="btn btn-secondary" onClick={undo}>Undo</button>
+                <button type="button" className="btn btn-ghost" onClick={sendWithoutWaiting}>Send without waiting</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: "var(--s-2)" }}>
+              {undone ? <p className="small" role="status" style={{ margin: 0 }}>Cancelled. Nothing was sent. You can send it again, or edit it.</p> : null}
+              <button className="btn btn-primary btn-block" disabled={state !== "idle" || !sendPw} onClick={confirm}>{state === "sending" ? "Sending…" : "Send now"}</button>
+              <button className="btn btn-ghost btn-block" disabled={state !== "idle"} onClick={() => { setUndone(false); setReview(null); }}>Edit</button>
+            </div>
+          )
         )}
       </div>
     );
@@ -1464,7 +1583,15 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       <div className="field">
         <span className={styles.toHead}>
           <label htmlFor="to">Recipient (address or name)</label>
-          <QrScanButton disabled={state === "preparing"} onScan={(text) => takeRecipient(text, true)} />
+          <span className={styles.toTools}>
+            {canPaste ? (
+              <button type="button" className={`btn btn-ghost btn-sm ${styles.scanBtn}`} disabled={state === "preparing"} onClick={() => void pasteRecipient()}>
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"><path d="M5.5 2.75h-1.75c-.69 0-1.25.56-1.25 1.25v9c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25v-9c0-.69-.56-1.25-1.25-1.25H10.5M6 1.75h4v2.5H6z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+                Paste
+              </button>
+            ) : null}
+            <QrScanButton disabled={state === "preparing"} pictures={!settings?.openFullView} onScan={(text) => takeRecipient(text, true)} />
+          </span>
         </span>
         <textarea id="to" className="textarea mono" style={{ minHeight: 80 }} spellCheck={false} autoComplete="off" autoCapitalize="none" value={to} readOnly={state === "preparing"}
           onChange={(e) => takeRecipient(e.target.value)} aria-describedby="to-hint" />
@@ -1521,14 +1648,22 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       </div>
       <div className="field">
         <span className={styles.amtHead}>
-          <label htmlFor="amt">Amount (XMR)</label>
-          <button type="button" className={`btn btn-ghost btn-sm ${sendAll ? styles.allOn : ""}`} aria-pressed={sendAll} disabled={state === "preparing" || !synced}
-            onClick={() => { setSendAll((v) => !v); setSubtractFee(false); setAmount(""); setError(null); }}>Send all</button>
+          <label htmlFor="amt">Amount ({fiatMode ? fx!.currency : "XMR"})</label>
+          <span className={styles.amtTools}>
+            {fx && !sendAll ? (
+              <button type="button" className="btn btn-ghost btn-sm" disabled={state === "preparing"} onClick={switchUnit}
+                aria-label={fiatMode ? "Type the amount in XMR instead" : `Type the amount in ${fx.currency} instead`}>
+                {fiatMode ? "Type in XMR" : `Type in ${fx.currency}`}
+              </button>
+            ) : null}
+            <button type="button" className={`btn btn-ghost btn-sm ${sendAll ? styles.allOn : ""}`} aria-pressed={sendAll} disabled={state === "preparing" || !synced}
+              onClick={() => { setSendAll((v) => !v); setSubtractFee(false); setAmount(""); setError(null); }}>Send all</button>
+          </span>
         </span>
         <input id="amt" className="input" inputMode="decimal" autoComplete="off" value={sendAll ? "" : amount} placeholder={sendAll ? "Everything spendable, minus the fee" : undefined}
           readOnly={state === "preparing"} onChange={(e) => { setSendAll(false); setAmount(e.target.value); setError(null); }} aria-describedby="amt-hint" />
         <span id="amt-hint" className="hint">
-          {atomic && atomic > 0n && inFiat(atomic) ? <><strong>About {inFiat(atomic)}</strong>. </> : null}
+          {atomic && atomic > 0n ? (fiatMode ? <><strong>{formatXmr(atomic)} XMR</strong> at today&apos;s rate. </> : inFiat(atomic) ? <><strong>About {inFiat(atomic)}</strong>. </> : null) : null}
           Spendable now: {!synced ? "syncing…" : hidden ? "hidden" : `${formatXmr(unlocked)} XMR`}
           {synced && !hidden && frozen > 0n ? `, plus ${formatXmr(frozen)} XMR frozen` : ""}
         </span>

@@ -560,7 +560,9 @@
 @media (prefers-reduced-motion: reduce) { .homeCard, .homeCard:hover { transition: none; transform: none; } .checkupBar span { transition: none; } }
 
 /* Send all */
-.amtHead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.amtHead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap; }
+.amtHead > label { white-space: nowrap; }
+.amtTools { display: flex; align-items: center; gap: var(--s-1); margin-left: auto; }
 .allOn { --btn-bg: var(--forest); --btn-fg: #fff; --btn-bd: var(--forest); }
 .moveRow { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-3) 0; border-top: 1px solid var(--line); }
 
@@ -596,6 +598,7 @@
 .speed label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
 .speed .speedOn { background: var(--raised); color: var(--ink); box-shadow: 0 1px 3px rgba(27, 42, 34, 0.14); }
 .toHead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap; }
+.toTools { display: flex; align-items: center; gap: var(--s-1); margin-left: auto; }
 .scanBtn { gap: 6px; }
 .scanDialog { width: min(440px, calc(100vw - 32px)); padding: var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--surface); color: var(--ink); box-shadow: 0 24px 60px rgba(27, 42, 34, 0.3); }
 .scanDialog[open] { display: grid; gap: var(--s-3); }
@@ -606,6 +609,8 @@
 .scanView video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .scanFrame { position: absolute; inset: 16%; border: 3px solid #f6f5ec; border-radius: 14px; box-shadow: 0 0 0 999px rgba(18, 26, 23, 0.35); }
 .scanMsg { position: relative; margin: 0; padding: var(--s-4); color: #e7eadf; text-align: center; font-size: var(--step--1); }
+.scanPicture { display: grid; gap: var(--s-2); justify-items: start; }
+.scanPicture label:focus-within { outline: 2px solid var(--forest); outline-offset: 2px; }
 .diff { word-break: break-all; font-size: 0.85rem; line-height: 1.6; }
 .diff mark { background: var(--danger); color: #fff; border-radius: 2px; padding: 0 1px; font-weight: 700; }
 .firstTime { display: flex; gap: var(--s-2); align-items: flex-start; margin: 0; font-size: var(--step--1); color: var(--ink-2); line-height: 1.5; }
@@ -724,3 +729,36 @@
 .giftRowActions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .giftMade { display: grid; gap: var(--s-3); justify-items: start; }
 .giftMade textarea { width: 100%; font-size: var(--step--1); word-break: break-all; }
+
+/* Payment status timeline (History details) */
+.timeline { list-style: none; margin: 0 0 var(--s-4); padding: 0; display: grid; gap: 0; }
+.timeline li { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: var(--s-2); align-items: start; padding: 0 0 var(--s-3); border-bottom: 0; color: var(--ink-3); }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li:not(:last-child)::before { content: ""; position: absolute; left: 8px; top: 16px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li.tlDone:not(:last-child)::before { background: var(--forest); }
+.tlDot { width: 14px; height: 14px; margin: 3px 0 0 1px; border-radius: 50%; border: 2px solid var(--line-2, var(--line)); background: var(--surface); }
+.tlDone .tlDot { border-color: var(--forest); background: var(--forest); }
+.tlNow .tlDot { border-color: var(--clay); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--clay) 18%, transparent); }
+.tlText { display: grid; gap: 1px; font-size: var(--step--1); }
+.tlDone .tlText strong, .tlNow .tlText strong { color: var(--ink); }
+
+/* Undo window before a payment is broadcast */
+.undoBox { display: grid; gap: var(--s-3); padding: var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface); }
+.undoHead { display: grid; gap: var(--s-2); }
+.undoBar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.undoBar > span { display: block; height: 100%; background: var(--clay); transition: width 1s linear; }
+.undoActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s-2); }
+@media (prefers-reduced-motion: reduce) { .undoBar > span { transition: none; } }
+
+/* "Hear it land": the message when Monero arrives */
+.arrival { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: var(--s-3); margin: 0 0 var(--s-4); padding: var(--s-3) var(--s-4); border: 1px solid var(--forest); border-radius: var(--r-2); background: var(--surface); box-shadow: 4px 4px 0 var(--line); }
+.arrivalIcon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--forest); color: #fff; font-weight: 700; }
+.arrivalText { display: grid; gap: 1px; min-width: 0; }
+.arrivalClose { border: 0; background: none; color: var(--ink-3); font-size: 1.25rem; line-height: 1; padding: var(--s-1); cursor: pointer; }
+@media (max-width: 520px) {
+  .arrival { grid-template-columns: auto 1fr auto; align-items: start; }
+  .arrivalIcon { grid-column: 1; grid-row: 1; }
+  .arrivalText { grid-column: 2; grid-row: 1; }
+  .arrivalClose { grid-column: 3; grid-row: 1; }
+  .arrival > :global(.btn) { grid-column: 2; grid-row: 2; justify-self: start; }
+}

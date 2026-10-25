@@ -19,6 +19,38 @@ export function minutesLeft(confirmations: number): number {
   return Math.max(2, (10 - Math.min(confirmations, 10)) * 2);
 }
 
+/**
+ * Where a payment is, in plain words: on the network, in a block, then spendable after 10
+ * confirmations (about 20 minutes). Monero's 10-block wait is the usual "where is my money?".
+ */
+export function TxTimeline({ tx }: { tx: TxSummary }) {
+  const conf = tx.pending ? 0 : tx.confirmations;
+  const incoming = tx.direction === "in";
+  const steps = [
+    { label: incoming ? "Seen on the network" : "Sent to the network", done: true, detail: tx.pending ? "Waiting for its first block" : null },
+    { label: "Recorded in a block", done: conf >= 1, detail: conf >= 1 ? `${conf >= 10 ? "10+" : conf} confirmation${conf === 1 ? "" : "s"}` : "Usually within 2 minutes" },
+    {
+      label: incoming || tx.direction === "self" ? "Spendable" : "Spendable by the recipient",
+      done: conf >= 10,
+      detail: conf >= 10 ? "Final. It cannot be reversed." : `In about ${minutesLeft(conf)} min, after 10 confirmations`,
+    },
+  ];
+  const current = steps.findIndex((st) => !st.done);
+  return (
+    <ol className={styles.timeline} aria-label="Payment status">
+      {steps.map((st, i) => (
+        <li key={st.label} className={st.done ? styles.tlDone : i === current ? styles.tlNow : undefined} aria-current={i === current ? "step" : undefined}>
+          <span className={styles.tlDot} aria-hidden="true" />
+          <span className={styles.tlText}>
+            <strong>{st.label}</strong>
+            {st.detail ? <span className="small muted">{st.detail}</span> : null}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 const KINDS: { kind: HistoryKind; label: string }[] = [
   { kind: "all", label: "All" },
   { kind: "in", label: "Received" },
@@ -142,6 +174,7 @@ export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidde
               </div>
               {open === t.hash ? (
                 <div className={styles.txDetails}>
+                  <TxTimeline tx={t} />
                   <dl className={styles.facts}>
                     <dt>Transaction ID</dt><dd className="mono" style={{ wordBreak: "break-all" }}>{t.hash}</dd>
                     {t.timestamp ? <><dt>Date</dt><dd>{new Date(t.timestamp * 1000).toLocaleString()}</dd></> : null}

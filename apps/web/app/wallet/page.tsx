@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   description: "Your MonkStash Monero wallet.",
   robots: { index: false, follow: false },
   alternates: { canonical: walletAbsoluteUrl },
+  // Install as an app: home-screen icon and its own window (see app/app.webmanifest).
+  manifest: "/app.webmanifest",
+  appleWebApp: { capable: true, title: "MonkStash", statusBarStyle: "default" },
+  icons: { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }], apple: "/apple-touch-icon.png" },
 };
 
 // No inline script here: every script the wallet page runs comes from the build, so anyone can
