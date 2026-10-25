@@ -93,7 +93,96 @@
   --container: 1160px;
   --container-wide: 1180px;
   --reading: 680px;
+  --surface-hi: #ffffff;   /* hover lift on paper */
+  --raised: var(--surface); /* the chosen segment of a switch */
+  --forest-text: var(--forest); /* forest used for text and icons rather than fills */
+  --deep: #1b2a22;         /* the wallet's dark panels (balance, steps); stays dark in both themes */
   color-scheme: light;
+}
+
+/* The wallet's dark theme (lib/wallet/theme.ts). Only wallet screens opt in, by system setting or by choice;
+   the content site stays light. Text-on-dark colours inside the deep panels are fixed and work in both. */
+:root[data-wallet-theme="dark"] {
+  --bg: #111813;
+  --bg-2: #151d18;
+  --surface: #1a231d;
+  --surface-2: #202a24;
+  --surface-3: #27322b;
+  --surface-hi: #222c26;
+  --raised: #35443b;
+  --forest-text: #8fcca8;
+  --deep: #1f2e25;
+  --ink: #e9ece2;
+  --ink-2: #c0c9bd;
+  --ink-3: #a3aea4;
+  --line: #2c3830;
+  --line-2: #354239;
+  --line-strong: #4a594f;
+  --line-input: #75847a;
+  --forest: #2f6b4c;
+  --forest-2: #3a7d5a;
+  --forest-soft: #1b2d23;
+  --clay: #e08a5f;
+  --clay-2: #e9a07a;
+  --clay-ink: #eea57f;
+  --clay-soft: #3a2a21;
+  --clay-line: #5c4031;
+  --clay-dim: #e9a07a;
+  --mint-soft-2: #4a3326;
+  --plum-line: #2e4436;
+  --warn: #e8b866;
+  --warn-soft: #332a19;
+  --warn-line: #5a4824;
+  --danger: #f2948a;
+  --danger-soft: #3b211e;
+  --danger-line: #6a3a34;
+  --focus: #e9a07a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 16px 36px -24px rgba(0, 0, 0, 0.7);
+  --shadow-3: 0 30px 66px -34px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:has([data-wallet-root]):not([data-wallet-theme="light"]) {
+    --bg: #111813;
+    --bg-2: #151d18;
+    --surface: #1a231d;
+    --surface-2: #202a24;
+    --surface-3: #27322b;
+    --surface-hi: #222c26;
+    --raised: #35443b;
+    --forest-text: #8fcca8;
+    --deep: #1f2e25;
+    --ink: #e9ece2;
+    --ink-2: #c0c9bd;
+    --ink-3: #a3aea4;
+    --line: #2c3830;
+    --line-2: #354239;
+    --line-strong: #4a594f;
+    --line-input: #75847a;
+    --forest: #2f6b4c;
+    --forest-2: #3a7d5a;
+    --forest-soft: #1b2d23;
+    --clay: #e08a5f;
+    --clay-2: #e9a07a;
+    --clay-ink: #eea57f;
+    --clay-soft: #3a2a21;
+    --clay-line: #5c4031;
+    --clay-dim: #e9a07a;
+    --mint-soft-2: #4a3326;
+    --plum-line: #2e4436;
+    --warn: #e8b866;
+    --warn-soft: #332a19;
+    --warn-line: #5a4824;
+    --danger: #f2948a;
+    --danger-soft: #3b211e;
+    --danger-line: #6a3a34;
+    --focus: #e9a07a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 16px 36px -24px rgba(0, 0, 0, 0.7);
+    --shadow-3: 0 30px 66px -34px rgba(0, 0, 0, 0.8);
+    color-scheme: dark;
+  }
 }
 
 /* ---------- Base ---------- */
@@ -384,4 +473,14 @@ mark, .hl { background: var(--clay-soft); color: var(--clay-ink); padding: 0.02e
 /* Very small phones: long button labels wrap onto two lines instead of pushing past the screen edge. */
 @media (max-width: 400px) {
   .btn { white-space: normal; text-align: center; max-width: 100%; padding-block: var(--s-2); }
+}
+
+/* The wallet's emergency kit (components/wallet/EmergencyKit.tsx): on paper only, and while it prints, only it. */
+#kit-print { display: none; }
+@media print {
+  html.kit-printing { color-scheme: light; background: #fff; }
+  html.kit-printing body { background: #fff; }
+  html.kit-printing body > :not(#kit-print) { display: none !important; }
+  html.kit-printing #kit-print { display: block; }
+  @page { margin: 16mm 15mm; }
 }

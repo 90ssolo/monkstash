@@ -5,12 +5,15 @@
  * though the wallet is unlocked, so someone at an unattended screen cannot use them.
  */
 import { useEffect, useState } from "react";
-import { MoveFileError, normalizeNodeUri, NodeUriError, readMoveHeader, type MoveHeader, type NetworkType, type NodeConfig, type TotpConfig, type WalletKind } from "@quietmint/wallet-core";
+import { MoveFileError, normalizeNodeUri, NodeUriError, readMoveHeader, type GiftRecord, type MoveHeader, type NetworkType, type NodeConfig, type TotpConfig, type WalletKind } from "@quietmint/wallet-core";
 import styles from "./wallet.module.css";
 import type { SendSpeed } from "@/lib/wallet/engine";
 import type { SweepPlan, SweepStatus } from "@/lib/wallet/sweep";
 import { EMPTY_START, RestoreStartField, startHeight, type RestoreStart } from "./RestoreStart";
 import { walletAbsoluteUrl, siteHref } from "@/lib/site";
+
+/** A gift this wallet made, with its link. */
+export type GiftView = GiftRecord & { link: string };
 
 export interface SettingsActions {
   kind: WalletKind;
@@ -20,6 +23,8 @@ export interface SettingsActions {
   node: string | null;
   /** The recovery words need a seed passphrase as well. */
   seedPassphrase?: boolean;
+  /** How many recovery words the wallet shows (25, or 16 for a Polyseed), for the emergency kit's blank boxes. */
+  seedWords?: number;
   /** Throws an Error with a user-facing message. */
   revealSeed(password: string, code: string): Promise<string>;
   /** Tests the node first (when given), saves it in the encrypted vault and reopens the wallet. */
@@ -32,6 +37,20 @@ export interface SettingsActions {
   /** Checks the password (and 2FA code), then sends the sweep. Returns the transaction IDs. */
   sweepSend?(password: string, code: string): Promise<string[]>;
   sweepCancel?(): Promise<void>;
+  /** Gift links this wallet made (sealed on this device), newest first, each with its link. */
+  gifts?(): Promise<GiftView[]>;
+  /** Builds (does not send) the payment into a fresh gift wallet. Full wallets only. */
+  giftPrepare?(amount: bigint, message: string, speed: SendSpeed): Promise<{ fee: bigint; amount: bigint }>;
+  /** Checks the password (and code), saves the gift, then sends it. Returns the gift with its link. */
+  giftSend?(password: string, code: string): Promise<GiftView>;
+  giftCancel?(): Promise<void>;
+  /** Removes a gift from the list (its link stops being kept here; the money is not touched). */
+  giftForget?(id: string): Promise<void>;
+  /**
+   * Starts scanning a gift (a pasted link, or the id of one this wallet made) to move it into this
+   * wallet; then sweepStatus, sweepPrepare and sweepSend as for any sweep.
+   */
+  giftOpen?(linkOrId: string): Promise<{ message: string; mine: boolean }>;
   /** Re-checks the password (and 2FA code), e.g. before leaving cashier mode. */
   checkAccess(password: string, code: string): Promise<void>;
   /**

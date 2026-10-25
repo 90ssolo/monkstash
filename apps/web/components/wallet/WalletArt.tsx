@@ -150,18 +150,18 @@ export function ArtEngine(p: SVGProps<SVGSVGElement>) {
   );
 }
 
-/* ---- Option-card icons (always on paper, so fixed Ledger colours) ---- */
+/* ---- Option-card icons (theme colours: the same Ledger values on paper) ---- */
 
 type IP = SVGProps<SVGSVGElement>;
-const ink = "#1f4733";
-const clay = "#b4532a";
+const ink = "var(--forest-text)";
+const clay = "var(--clay)";
 
 export function IconCreate(p: IP) {
   return (
     <svg viewBox="0 0 56 56" aria-hidden="true" focusable="false" fill="none" strokeLinecap="round" strokeLinejoin="round" {...p}>
       <rect x="10" y="8" width="30" height="40" rx="3" stroke={ink} strokeWidth="2" />
       <path d="M17 20h16M17 28h16M17 36h9" stroke={ink} strokeWidth="2" opacity=".55" />
-      <circle cx="41" cy="40" r="9" fill="#fbfbf7" stroke={clay} strokeWidth="2.2" />
+      <circle cx="41" cy="40" r="9" fill="var(--surface)" stroke={clay} strokeWidth="2.2" />
       <path d="M41 35v10M36 40h10" stroke={clay} strokeWidth="2.4" />
     </svg>
   );

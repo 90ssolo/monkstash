@@ -1,0 +1,29 @@
+/*
+ * The printed emergency kit (EmergencyKit.tsx). Only ever drawn by the printer: fixed black on white
+ * in both wallet themes, real paper sizes, and big word boxes for handwriting.
+ */
+.kit { color: #111; background: #fff; font-family: var(--font-sans); font-size: 10.5pt; line-height: 1.45; }
+.page { padding: 0; break-after: page; }
+.page:last-child { break-after: auto; }
+.kit h1 { margin: 2pt 0 4pt; font-family: var(--font-display); font-size: 22pt; font-weight: 500; color: #111; }
+.kit h2 { margin: 14pt 0 6pt; font-family: var(--font-sans); font-size: 11pt; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #111; }
+.kit p { margin: 0 0 6pt; }
+.head { border-bottom: 2pt solid #111; padding-bottom: 8pt; margin-bottom: 10pt; }
+.kit .brand { font-size: 9pt; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.warn { padding: 8pt 10pt; border: 1.5pt solid #111; border-radius: 4pt; }
+.box { margin-top: 10pt; padding: 8pt 10pt; border: 1pt solid #555; border-radius: 4pt; }
+.line { display: inline-block; width: 46%; border-bottom: 1pt solid #555; height: 1em; vertical-align: bottom; }
+.words { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt 8pt; margin: 0; padding: 0; list-style: none; }
+.words li { display: flex; align-items: baseline; gap: 5pt; min-height: 30pt; padding: 4pt 6pt; border: 1pt solid #777; border-radius: 3pt; }
+.num { flex: none; min-width: 14pt; font-size: 8pt; font-weight: 700; color: #555; }
+.word { font-family: var(--font-mono); font-size: 11pt; }
+.kit .small { margin-top: 6pt; font-size: 9pt; color: #444; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4pt 12pt; margin: 0; }
+.facts dt { font-weight: 700; }
+.facts dd { margin: 0; }
+.mono { font-family: var(--font-mono); font-size: 9.5pt; overflow-wrap: anywhere; }
+.kit .note { white-space: pre-wrap; padding: 6pt 8pt; border-left: 2pt solid #111; }
+.lines { display: grid; gap: 16pt; padding-top: 10pt; }
+.lines span { display: block; border-bottom: 1pt solid #888; }
+.steps { margin: 0; padding-left: 16pt; display: grid; gap: 6pt; }
+.kit .foot { margin-top: 18pt; font-size: 8.5pt; color: #555; }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PASSWORD, dashboard, openWallet, restore, setPassword, testWallets, wallet } from "./helpers";
+import { PASSWORD, dashboard, synced, openWallet, restore, setPassword, testWallets, wallet } from "./helpers";
 
 test.skip(!testWallets().length, "needs apps/web/test-wallets.local.json");
 
@@ -20,6 +20,7 @@ test("watch-only: a wrong view key is refused, the right one opens a wallet that
   await setPassword(page);
   await page.getByRole("button", { name: /^Skip/ }).first().click();
   await dashboard(page);
+  await synced(page);
   await section(page, "Settings").click();
   await expect(page.getByText("Watch-only", { exact: true }).filter({ visible: true }).first()).toBeVisible();
 });
@@ -28,6 +29,7 @@ test("receive and send (simulation): new addresses, review screen, sent", async 
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
 
   // Receive: a new address is a different subaddress.
   await section(page, "Receive").click();
@@ -62,6 +64,7 @@ test("two tabs: the wallet runs in one tab at a time", async ({ page, context })
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
 
   const second = await context.newPage();
   await second.goto("/wallet");
@@ -88,6 +91,7 @@ test("move file setup: words of another wallet are refused, the right ones skip 
   await setPassword(page);
   await page.getByRole("button", { name: /^Skip/ }).first().click();
   await dashboard(page);
+  await synced(page);
   await section(page, "Settings").click();
   // The restore height comes from the file, not the default.
   await expect(page.locator("dd.tnum").filter({ visible: true }).first()).not.toHaveText("0");
@@ -97,6 +101,7 @@ test("remove: typing REMOVE deletes the wallet from this browser", async ({ page
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
   await page.getByRole("button", { name: "Lock" }).first().click();
   await page.getByText("Forgot password?").click();
   const remove = page.getByRole("button", { name: "Remove wallet from this browser" });

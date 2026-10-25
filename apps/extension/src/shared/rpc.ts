@@ -30,7 +30,7 @@ export interface HostState {
   view: Record<string, unknown> & { name: string };
   saveProblem: "full" | "unavailable" | null;
   /** Public settings for the open wallet (the methods go through calls). */
-  settings: { kind: string; network: string; totpEnabled: boolean; node: string | null; restoreHeight: number; seedPassphrase?: boolean } | null;
+  settings: { kind: string; network: string; totpEnabled: boolean; node: string | null; restoreHeight: number; seedPassphrase?: boolean; seedWords?: number } | null;
   syncing: boolean;
   syncBusy: boolean;
   cashierOn: boolean;

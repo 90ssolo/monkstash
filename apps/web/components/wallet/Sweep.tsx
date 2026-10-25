@@ -17,7 +17,10 @@ import styles from "./wallet.module.css";
 
 const POLL_MS = 1000;
 
-export function Sweep({ actions, network, onClose, onSent }: { actions: SettingsActions; network: NetworkType; onClose: () => void; onSent: () => void }) {
+/** A gift link being claimed (or one of this wallet's own gifts being taken back): the scan is already started. */
+export interface GiftSweep { mine: boolean; message: string; onCheckAgain: () => Promise<void> }
+
+export function Sweep({ actions, network, onClose, onSent, gift }: { actions: SettingsActions; network: NetworkType; onClose: () => void; onSent: () => void; gift?: GiftSweep }) {
   const [status, setStatus] = useState<SweepStatus>({ state: "idle" });
   const [words, setWords] = useState("");
   const [passphrase, setPassphrase] = useState("");
@@ -123,9 +126,10 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
     setStatus({ state: "idle" });
   }
 
+  const title = gift ? (gift.mine ? "Take back a gift" : "Claim your gift") : "Move money from another wallet";
   const head = (
     <div className={styles.listHead}>
-      <h3 id="sweep-h" className={styles.recentH}>Move money from another wallet</h3>
+      <h3 id="sweep-h" className={styles.recentH}>{title}</h3>
       <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void (status.state === "scanning" || status.state === "ready" || status.state === "opening" ? stop() : Promise.resolve()).then(onClose); }}>
         {status.state === "scanning" || status.state === "ready" ? "Cancel" : "Close"}
       </button>
@@ -138,11 +142,12 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
       <section className={styles.sweep} aria-labelledby="sweep-h">
         {head}
         <p className="small" role="status">
-          {status.state === "opening" ? "Opening the other wallet…" : `Looking for its payments: ${pct}%`}
+          {status.state === "opening" ? (gift ? "Opening the gift…" : "Opening the other wallet…") : `${gift ? "Looking for the gift" : "Looking for its payments"}: ${pct}%`}
           {status.state === "scanning" && status.endHeight ? <span className="muted"> (block {status.height.toLocaleString()} of {status.endHeight.toLocaleString()})</span> : null}
         </p>
         <div className={styles.sweepBar} aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
-        {status.state === "scanning" ? <p className="small muted" style={{ margin: 0 }}>From <span className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</span>. This can take a while for an old wallet. You can keep using this one; the scan stops if it locks.</p> : null}
+        {status.state === "scanning" && !gift ? <p className="small muted" style={{ margin: 0 }}>From <span className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</span>. This can take a while for an old wallet. You can keep using this one; the scan stops if it locks.</p> : null}
+        {gift ? <GiftMessage text={gift.message} /> : null}
       </section>
     );
   }
@@ -155,8 +160,8 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
         <ul className={styles.sweepHashes} aria-label="Transaction IDs">
           {status.hashes.map((h) => <li key={h}><span className="mono">{h.slice(0, 12)}…{h.slice(-8)}</span> <CopyButton value={h} label="Copy ID" /></li>)}
         </ul>
-        <p className="small muted" style={{ margin: 0 }}>The other wallet is now empty. Stop using its recovery words: anyone who has them could see its past payments.</p>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void stop()}>Done</button>
+        {gift ? null : <p className="small muted" style={{ margin: 0 }}>The other wallet is now empty. Stop using its recovery words: anyone who has them could see its past payments.</p>}
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void stop().then(() => { if (gift) onClose(); })}>Done</button>
       </section>
     );
   }
@@ -166,15 +171,27 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
     return (
       <section className={styles.sweep} aria-labelledby="sweep-h">
         {head}
-        <dl className={styles.facts}>
-          <dt>Other wallet</dt><dd className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</dd>
-          <dt>Balance</dt><dd>{formatXmr(status.total)} XMR</dd>
-          {locked > 0n ? <><dt>Not spendable yet</dt><dd>{formatXmr(locked)} XMR</dd></> : null}
-        </dl>
+        {gift ? <GiftMessage text={gift.message} /> : null}
+        {gift && status.total === 0n ? null : (
+          <dl className={styles.facts}>
+            <dt>{gift ? "Gift" : "Other wallet"}</dt>{gift ? <dd><strong>{formatXmr(status.total)} XMR</strong></dd> : <dd className="mono">{status.from.slice(0, 8)}…{status.from.slice(-6)}</dd>}
+            {gift ? null : <><dt>Balance</dt><dd>{formatXmr(status.total)} XMR</dd></>}
+            {locked > 0n ? <><dt>Not spendable yet</dt><dd>{formatXmr(locked)} XMR</dd></> : null}
+          </dl>
+        )}
         {status.unlocked === 0n ? (
-          <p className="small" role="status">{status.total === 0n
-            ? "This wallet is empty. If you expected money, check the start date: payments before it are not found."
-            : "Its money is still confirming. Scan again in about 20 minutes."}</p>
+          gift ? (
+            <>
+              <p className="small" role="status">{giftWaitText(status.total, status.received, gift.mine)}</p>
+              {status.total > 0n || status.received === 0n ? (
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { setBusy(true); setError(null); void gift.onCheckAgain().catch((e: Error) => setError(`Could not check the gift: ${e.message || "the network did not answer."} Try again in a minute.`)).finally(() => setBusy(false)); }}>{busy ? "Checking…" : "Check again"}</button>
+              ) : null}
+            </>
+          ) : (
+            <p className="small" role="status">{status.total === 0n
+              ? "This wallet is empty. If you expected money, check the start date: payments before it are not found."
+              : "Its money is still confirming. Scan again in about 20 minutes."}</p>
+          )
         ) : plan ? (
           <form onSubmit={send} className={styles.settingsForm}>
             <dl className={styles.facts}>
@@ -185,17 +202,26 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
             </dl>
             <Credentials totp={actions.totpEnabled} pw={pw} setPw={setPw} code={code} setCode={setCode} idPrefix="sweep" />
             <div className={styles.exportActions}>
-              <button className="btn btn-primary btn-sm" disabled={busy || !pw}>{busy ? "Sending…" : `Move ${formatXmr(plan.amount)} XMR now`}</button>
+              <button className="btn btn-primary btn-sm" disabled={busy || !pw}>{busy ? "Sending…" : `${gift ? (gift.mine ? "Take back" : "Claim") : "Move"} ${formatXmr(plan.amount)} XMR now`}</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPlan(null)}>Back</button>
             </div>
           </form>
         ) : (
           <>
             <SpeedPicker value={speed} onChange={setSpeed} disabled={busy} />
-            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void prepare()}>{busy ? "Calculating fee…" : "Review the move"}</button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void prepare()}>{busy ? "Calculating fee…" : gift ? (gift.mine ? "Review taking it back" : "Review the claim") : "Review the move"}</button>
           </>
         )}
         {error ? <p className="error small" role="alert" style={{ margin: 0 }}>{error}</p> : null}
+      </section>
+    );
+  }
+
+  if (gift) {
+    return (
+      <section className={styles.sweep} aria-labelledby="sweep-h">
+        {head}
+        {status.state === "error" ? <p className="error small" role="alert" style={{ margin: 0 }}>{status.message}</p> : <p className="small" role="status">Opening the gift…</p>}
       </section>
     );
   }
@@ -222,4 +248,19 @@ export function Sweep({ actions, network, onClose, onSent }: { actions: Settings
       </form>
     </section>
   );
+}
+
+/** What an empty or still confirming gift means, for the person claiming it or the sender. */
+function giftWaitText(total: bigint, received: bigint, mine: boolean): string {
+  if (total > 0n) return "The gift has arrived and is confirming. It can be moved after 10 confirmations, usually about 20 minutes after it was sent. Check again then.";
+  if (received > 0n) return mine ? "This gift was claimed: the money is in the recipient's wallet now." : "This gift was already claimed. A gift link can be claimed only once.";
+  return mine
+    ? "Nothing has arrived at this gift yet. A new gift shows up after a block or two (a few minutes)."
+    : "Nothing has arrived at this gift yet. If it was just sent, it shows up after a block or two (a few minutes).";
+}
+
+/** The sender's line, shown as plain text. */
+function GiftMessage({ text }: { text: string }) {
+  if (!text) return null;
+  return <blockquote className={styles.giftMsg}><span className="visually-hidden">Message from the sender: </span>{text}</blockquote>;
 }

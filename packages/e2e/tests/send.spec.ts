@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { PASSWORD, dashboard, openWallet, restore, testWallets, wallet } from "./helpers";
+import { PASSWORD, dashboard, synced, openWallet, restore, testWallets, wallet } from "./helpers";
 
 test.skip(testWallets().length < 4, "needs four wallets in apps/web/test-wallets.local.json");
 
@@ -19,6 +19,7 @@ test("send: speed, fee from the amount, first-time note", async ({ page }) => {
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
   await section(page, "Send").click();
 
   const b = wallet("Test B").primaryAddress;
@@ -50,6 +51,7 @@ test("pay several people in one transaction", async ({ page }) => {
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
   await section(page, "Send").click();
   await page.getByRole("button", { name: "Pay several people at once" }).click();
   await expect(page.getByRole("heading", { name: "Pay several people" })).toBeVisible();
@@ -103,6 +105,7 @@ test("scan a payment QR code with the camera", async ({ page }) => {
   await openWallet(page, "simulation");
   await restore(page, wallet("Test A"));
   await dashboard(page);
+  await synced(page);
   await section(page, "Send").click();
   await page.getByRole("button", { name: "Scan QR" }).first().click();
   await expect(page.getByRole("dialog", { name: "Scan a QR code" })).toBeVisible();

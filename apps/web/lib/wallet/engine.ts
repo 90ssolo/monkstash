@@ -186,6 +186,24 @@ export async function polyseedWallet(phrase: string, passphrase: string, network
   };
 }
 
+/** A fresh one-off wallet for a gift link: the spend key goes in the link, the gift is paid to the address. */
+export async function newGiftKeys(network: NetworkType): Promise<{ spendKey: string; address: string }> {
+  const lib = await loadEngine();
+  const keys = await lib.createWalletKeys({ networkType: network, language: "English" });
+  return { spendKey: await keys.getPrivateSpendKey(), address: await keys.getPrimaryAddress() };
+}
+
+/** The gift wallet behind a link's spend key, as recovery words (what a sweep opens) and its address. */
+export async function giftWallet(spendKey: string, network: NetworkType): Promise<{ seed: string; address: string }> {
+  const lib = await loadEngine();
+  try {
+    const keys = await lib.createWalletKeys({ networkType: network, privateSpendKey: spendKey } as never);
+    return { seed: await keys.getSeed(), address: await keys.getPrimaryAddress() };
+  } catch {
+    throw new Error("This gift link does not hold a valid key. Ask the sender to copy it again.");
+  }
+}
+
 /** Derives address and view key from recovery words without touching the network. */
 export async function inspectSeed(seed: string, network: NetworkType, seedOffset?: string): Promise<{ primaryAddress: string; privateViewKey: string }> {
   if (isMyMoneroPhrase(seed)) {
@@ -296,6 +314,27 @@ export interface Balances {
   unlocked: bigint;
   /** Money in other accounts (MonkStash Pay, tills), to move into the main account. */
   other?: { account: number; balance: bigint; unlocked: bigint }[];
+  /** Frozen coins in the main account. The engine leaves them out of `total` and `unlocked`. */
+  frozen?: bigint;
+}
+
+/**
+ * One coin: a payment received and not yet spent (an output, in Monero terms). Frozen coins stay
+ * out of every payment until they are unfrozen. Only full wallets know a coin's key image, so only
+ * they can freeze.
+ */
+export interface Coin {
+  keyImage: string;
+  amount: bigint;
+  subaddressIndex: number;
+  /** The transaction it arrived in. */
+  hash: string;
+  height?: number;
+  /** Block time in seconds, once confirmed. */
+  timestamp?: number;
+  frozen: boolean;
+  /** Not spendable yet: fewer than 10 confirmations. */
+  locked: boolean;
 }
 
 /**
@@ -390,7 +429,11 @@ export const MAX_DESTINATIONS = 15;
  * A built payment. `destinations` are read back from the built transaction; `address` and `amount`
  * are the first recipient and the total they all receive (most payments have one recipient).
  */
-export interface PreparedTx { fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string }
+export interface PreparedTx {
+  fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string;
+  /** The addresses (subaddress indices, main account) whose coins this payment spends, when known. */
+  fromAddresses?: number[];
+}
 
 /**
  * Checks what the engine built against what was asked for. When the engine reports destinations,
@@ -435,6 +478,10 @@ export interface LiveWallet {
   prepareMove(account: number): Promise<{ fee: bigint; amount: bigint; metadata: string[] }>;
   /** Incoming payments with the subaddress each one arrived at. */
   incoming(): Promise<IncomingEntry[]>;
+  /** Unspent coins in the main account, frozen ones included. */
+  coins?(): Promise<Coin[]>;
+  /** Keeps a coin out of payments (frozen) or lets it be spent again. Full wallets only. */
+  freezeCoin?(keyImage: string, frozen: boolean): Promise<void>;
   /** Proof that this wallet paid `address` in transaction `hash`: the tx key (when stored) and a signed proof. */
   proveSent(hash: string, address: string, message?: string): Promise<{ txKey: string | null; signature: string }>;
   /** Checks a payment proof (tx key or signed proof) against the blockchain. */
@@ -511,11 +558,22 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
     const other = accounts
       .filter((a) => a.getIndex() > MAIN_ACCOUNT && BigInt(a.getBalance()) > 0n)
       .map((a) => ({ account: a.getIndex(), balance: BigInt(a.getBalance()), unlocked: BigInt(a.getUnlockedBalance()) }));
+    const frozen = (await w.getOutputs({ accountIndex: MAIN_ACCOUNT, isSpent: false, isFrozen: true } as never)).reduce((s, o) => s + BigInt(o.getAmount()), 0n);
     return {
       total: BigInt(await w.getBalance()),
       unlocked: BigInt(await w.getUnlockedBalance(MAIN_ACCOUNT)),
       ...(other.length ? { other } : {}),
+      ...(frozen > 0n ? { frozen } : {}),
     };
+  }
+
+  /** The main-account addresses whose coins a built transaction spends (by key image). */
+  async function spentFrom(txs: { getInputs(): { getKeyImage(): { getHex(): string } | undefined }[] | undefined }[]): Promise<number[] | undefined> {
+    const images = new Set(txs.flatMap((tx) => (tx.getInputs() ?? []).map((i) => i.getKeyImage()?.getHex()).filter((k): k is string => !!k)));
+    if (!images.size) return undefined;
+    const outs = await w.getOutputs({ accountIndex: MAIN_ACCOUNT, isSpent: false } as never);
+    const subs = new Set(outs.filter((o) => images.has(o.getKeyImage()?.getHex() ?? "")).map((o) => o.getSubaddressIndex()));
+    return [...subs].sort((a, b) => a - b);
   }
 
   await w.addListener(
@@ -724,6 +782,30 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
         };
       });
     },
+    async coins() {
+      const outs = await w.getOutputs({ accountIndex: MAIN_ACCOUNT, isSpent: false } as never);
+      return outs.map((o): Coin => {
+        const tx = o.getTx();
+        return {
+          keyImage: o.getKeyImage()?.getHex() ?? "",
+          amount: BigInt(o.getAmount()),
+          subaddressIndex: o.getSubaddressIndex(),
+          hash: tx.getHash(),
+          ...(tx.getHeight() ? { height: tx.getHeight() } : {}),
+          ...(tx.getBlock()?.getTimestamp() ? { timestamp: tx.getBlock()!.getTimestamp() } : {}),
+          frozen: !!o.getIsFrozen(),
+          locked: !!o.getIsLocked(),
+        };
+      });
+    },
+    async freezeCoin(keyImage, frozen) {
+      if (p.kind !== "full") throw new Error("A watch-only wallet cannot freeze coins.");
+      if (!/^[0-9a-f]{64}$/.test(keyImage)) throw new Error("That coin is not known to this wallet.");
+      if (frozen) await w.freezeOutput(keyImage);
+      else await w.thawOutput(keyImage);
+      const b = await readBalances().catch(() => null);
+      if (b) balanceListeners.forEach((cb) => cb(b));
+    },
     async syncNow() {
       try {
         await w.sync();
@@ -771,7 +853,8 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
       const built = checkBuilt(wanted, (tx.getOutgoingTransfer()?.getDestinations() ?? []).map((d) => ({ address: d.getAddress(), amount: BigInt(d.getAmount()) })), fee, subtractFee);
       const final = built;
       const amount = final.reduce((s, d) => s + d.amount, 0n);
-      return { fee, amount, metadata: tx.getMetadata(), address: final[0]!.address, destinations: final, ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
+      const fromAddresses = await spentFrom([tx]).catch(() => undefined);
+      return { fee, amount, metadata: tx.getMetadata(), address: final[0]!.address, destinations: final, ...(tx.getHash() ? { hash: tx.getHash() } : {}), ...(fromAddresses ? { fromAddresses } : {}) };
     },
     async prepareSweep(address, options = {}) {
       if (p.kind !== "full") throw new Error("This is a view-only wallet. It can watch funds but cannot send.");
@@ -785,7 +868,8 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
         throw new Error("The payment could not be prepared safely. Please try again.");
       }
       const amount = BigInt(dests[0]!.getAmount());
-      return { fee: tx.getFee(), amount, metadata: tx.getMetadata(), address: target, destinations: [{ address: target, amount }], ...(tx.getHash() ? { hash: tx.getHash() } : {}) };
+      const fromAddresses = await spentFrom([tx]).catch(() => undefined);
+      return { fee: tx.getFee(), amount, metadata: tx.getMetadata(), address: target, destinations: [{ address: target, amount }], ...(tx.getHash() ? { hash: tx.getHash() } : {}), ...(fromAddresses ? { fromAddresses } : {}) };
     },
     async prepareSweepAll(address, options = {}) {
       if (p.kind !== "full") throw new Error("This is a view-only wallet. It can watch funds but cannot send.");

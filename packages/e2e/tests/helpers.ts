@@ -68,6 +68,9 @@ export async function restore(page: Page, w: TestWallet, opts: { skipTotp?: bool
 
 export const dashboard = (page: Page) => expect(page.getByRole("button", { name: "Lock" }).first()).toBeVisible({ timeout: 60_000 });
 
+/** The first sync has finished: sending is refused until then (even the simulation takes a moment). */
+export const synced = (page: Page) => expect(page.getByText("Up to date", { exact: true })).toBeVisible({ timeout: 60_000 });
+
 export async function lock(page: Page) {
   await page.getByRole("button", { name: "Lock" }).first().click();
   await expect(page.locator("#upw")).toBeVisible();

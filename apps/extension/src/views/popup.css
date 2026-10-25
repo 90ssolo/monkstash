@@ -71,6 +71,10 @@ html[data-surface="side"] body {
 :is(html[data-surface="popup"], html[data-surface="side"]) .wallet__syncPill { font-size: 0.7rem; padding-inline: 8px; letter-spacing: 0.02em; }
 :is(html[data-surface="popup"], html[data-surface="side"]) .wallet__stripBal { font-size: 0.85rem; }
 :is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .wallet__lockBtn { padding-inline: 9px; }
+/* A long sync state ("Not connected, last checked ...") shortens itself; Lock always stays whole. */
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .wallet__syncPill { display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .wallet__syncDot { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+:is(html[data-surface="popup"], html[data-surface="side"]) .wallet__strip .wallet__lockBtn { flex: none; margin-left: auto; }
 
 /* Two-panel screens (unlock, notices) stack tightly. */
 :is(html[data-surface="popup"], html[data-surface="side"]) .wallet__stage { gap: 12px; }

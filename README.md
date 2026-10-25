@@ -48,6 +48,8 @@
 | 👀 **Watch-only wallets** | Follow a wallet with its view key: sees payments, can never spend |
 | 🗂️ **Several wallets** | Keep savings, a shop and more in one browser. Switch from the menu at the top; one password unlocks them all |
 | 📤 **Send** | Every payment asks for your password. Choose the speed, take the fee from the amount, scan a QR code with your camera, or pay up to 15 people in one transaction. Send to OpenAlias names like `donate.getmonero.org`, with the DNSSEC status shown |
+| 🎁 **Gift links** | Put Monero in a link for someone, without asking for their address. They open it and the gift moves into their wallet (MonkStash makes them one if they have none). Until it is claimed you can take it back. The key travels after the `#`, which browsers never send to a server |
+| 🪙 **Coin control** | See each coin you hold, grouped by the address it arrived at. Freeze coins to keep them out of payments, and get a warning before a payment combines money from several of your addresses |
 | 🚨 **Lookalike alarm** | Warns when an address starts and ends like one you paid or saved but differs in the middle (clipboard malware), and marks exactly where |
 | 📥 **Receive** | A fresh subaddress for every request, with a QR code. Name each address after the person you gave it to |
 | 🧹 **Sweep another wallet** | Enter the words of an old paper wallet or a second wallet: it is scanned on your device and everything in it moves into this one |
@@ -56,9 +58,11 @@
 | 🧾 **Get paid** | Payment links priced in EUR, USD and more, with expiry, a return link and a ready-made "Pay with Monero" button. Marked paid automatically |
 | 🏪 **Cashier mode** | A point of sale for your counter: keypad, QR per sale, sales list encrypted on the device, CSV export |
 | 🛡️ **Security checkup** | Five quick checks: test your paper backup, add a second lock, bookmark the wallet and more |
+| 🧰 **Emergency kit** | Print a recovery sheet, or save it as a PDF: boxes for your words (blank to fill in by hand, or printed), restore steps that work in any Monero wallet, and room for a note to your family |
 | 🔑 **Optional 2FA** | An authenticator code on top of your password, checked on your device |
 | 🔒 **Auto-lock** | Locks after 10 minutes idle, or soon after you leave the tab (your choice) |
 | 🖥️ **Your own node** | Connect straight to your own Monero node in Settings. The address stays inside your encrypted wallet |
+| 🌙 **Dark mode** | Light, dark or your device's setting, for the wallet screens |
 | 🧳 **Move files** | Take a wallet to another browser without waiting for a full rescan |
 
 <p align="center">
@@ -106,7 +110,7 @@ That checks every live file against the manifest. To compare with your own build
 
 | Path | What it is |
 |---|---|
-| `packages/wallet-core` | Shared, unit-tested logic: vault encryption, address and amount checks, payment links, invoices, restore formats (MyMonero, Exodus), height estimates |
+| `packages/wallet-core` | Shared, unit-tested logic: vault encryption, address and amount checks, payment links, invoices, gift links, restore formats (MyMonero, Exodus), height estimates |
 | `packages/node-client` | The client the wallet uses to talk to Monero nodes through the relay |
 | `apps/web` | The website and the wallet (Next.js), with the node relay, the free tools and the `/pay` page for payment links |
 | `apps/extension` | The Chrome and Firefox extension, built from the same wallet code |

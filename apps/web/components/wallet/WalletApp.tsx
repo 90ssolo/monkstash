@@ -21,6 +21,8 @@ import { ArtEngine, ArtLock } from "./WalletArt";
 import styles from "./wallet.module.css";
 import { siteHref } from "@/lib/site";
 import { useSingleTab } from "@/lib/wallet/tabLock";
+import { useApplyWalletTheme } from "@/lib/wallet/theme";
+import { giftInInbox, takeGiftFromUrl } from "@/lib/wallet/giftInbox";
 import { forget, mayResume, readRefreshUnlock, recall, remember, touch, writeRefreshUnlock } from "@/lib/wallet/refreshUnlock";
 
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
@@ -149,9 +151,14 @@ export function WalletApp() {
   }, [isOpen, controller]);
 
   const setCashierOn = (on: boolean) => { controller.cashierOn = on; setTillShown(on); };
+  useApplyWalletTheme();
+  // A gift link (#gift=...) is taken out of the address bar and kept for this tab; the dashboard picks it up.
+  const [giftWaiting, setGiftWaiting] = useState(false);
+  useEffect(() => { takeGiftFromUrl(); }, []);
+  useEffect(() => { setGiftWaiting(!!giftInInbox()); }, [view.name]);
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-wallet-root="">
       <header className={styles.appBar} inert={tillShown || undefined}>
         <Link href={siteHref("/")} className="brand"><BrandMark /><span>MonkStash</span></Link>
         {isDemo ? (
@@ -180,6 +187,11 @@ export function WalletApp() {
         ) : null}
         {tab.state !== "owner" ? null : (
           <>
+            {giftWaiting && view.name !== "open" && view.name !== "boot" ? (
+              <div className={`notice ${styles.giftNotice}`} role="status">
+                <span><strong>Someone sent you Monero as a gift.</strong> {view.name === "locked" ? "Unlock your wallet" : "Create a wallet (it takes a minute) or open the one you have"}, and the gift will be ready to claim on its first screen.</span>
+              </div>
+            ) : null}
             {view.name === "boot" || (view.name === "locked" && resuming) ? <Loading text={resuming ? "Opening your wallet…" : "Loading…"} /> : null}
             {view.name === "welcome" ? (
               <>

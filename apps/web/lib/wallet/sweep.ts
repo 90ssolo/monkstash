@@ -11,7 +11,7 @@ export type SweepStatus =
   | { state: "idle" }
   | { state: "opening" }
   | { state: "scanning"; from: string; height: number; startHeight: number; endHeight: number; percent: number }
-  | { state: "ready"; from: string; total: bigint; unlocked: bigint }
+  | { state: "ready"; from: string; total: bigint; unlocked: bigint; received: bigint }
   | { state: "sent"; from: string; amount: bigint; hashes: string[] }
   | { state: "error"; message: string };
 
@@ -64,7 +64,9 @@ export class SweepRunner {
           });
           if (gen !== this.gen) return;
           const b = await w.balances();
-          if (gen === this.gen) this.current = { state: "ready", from, total: b.total, unlocked: b.unlocked };
+          // Everything it ever received: an empty wallet that received money was already emptied.
+          const received = (await w.txs()).filter((t) => t.direction !== "out").reduce((s, t) => s + t.amount, 0n);
+          if (gen === this.gen) this.current = { state: "ready", from, total: b.total, unlocked: b.unlocked, received };
           return;
         } catch (e) {
           if (gen !== this.gen) return;

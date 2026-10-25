@@ -14,7 +14,7 @@ const STATIC_PAGES: { path: string; updated: string; changeFrequency: "weekly" |
   { path: "/about", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.5 },
   { path: "/verify", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.4 },
   { path: "/server", updated: "2026-10-21", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/privacy", updated: "2026-10-20", changeFrequency: "monthly", priority: 0.3 },
+  { path: "/privacy", updated: "2026-10-25", changeFrequency: "monthly", priority: 0.3 },
   { path: "/tools", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.6 },
   { path: "/tools/monero-address-validator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },
   { path: "/tools/monero-restore-height-calculator", updated: "2026-10-15", changeFrequency: "monthly", priority: 0.7 },

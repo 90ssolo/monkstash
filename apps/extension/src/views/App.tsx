@@ -18,6 +18,7 @@ import styles from "@/components/wallet/wallet.module.css";
 import { siteHref } from "@/lib/site";
 import { forgetNode, HostConnection, remoteCashier, remoteContacts, remoteLabels, remoteRequests, remoteSettings, remoteWallet } from "./remote";
 import ext from "./extension.module.css";
+import { useApplyWalletTheme } from "@/lib/wallet/theme";
 
 export type Surface = "popup" | "side" | "tab";
 
@@ -56,9 +57,11 @@ export function App({ surface }: { surface: Surface }) {
     return () => { for (const ev of ACTIVITY_EVENTS) window.removeEventListener(ev, onActivity); };
   }, []);
 
+  useApplyWalletTheme();
+
   const view = state?.view;
   return (
-    <div className={`${styles.shell} ${ext[surface]}`}>
+    <div className={`${styles.shell} ${ext[surface]}`} data-wallet-root="">
       <header className={`${styles.appBar} ${ext.bar}`} inert={state?.cashierOn || undefined}>
         <a className="brand" href={siteHref("/")}><BrandMark /><span>MonkStash</span></a>
         <div className={ext.actions}>

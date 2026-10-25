@@ -5,7 +5,7 @@
  * unreachable. Clearly labelled in the UI. Nothing here touches the real network.
  */
 import { ATOMIC_UNITS } from "@quietmint/wallet-core";
-import { SPEED_PRIORITY, type Balances, type Destination, type IncomingEntry, type LiveWallet, type SendOptions, type SyncState, type TxSummary } from "./engine";
+import { SPEED_PRIORITY, type Balances, type Coin, type Destination, type IncomingEntry, type LiveWallet, type SendOptions, type SyncState, type TxSummary } from "./engine";
 
 const xmr = (n: number) => BigInt(Math.round(n * 1e6)) * (ATOMIC_UNITS / 1_000_000n);
 
@@ -17,6 +17,32 @@ function seedTxs(address: string): TxSummary[] {
     { hash: "sim" + "c".repeat(61), direction: "out", amount: xmr(1.25), fee: xmr(0.0001), confirmations: 6, timestamp: now - 3600, pending: false },
     { hash: "sim" + "d".repeat(61), direction: "in", amount: xmr(4.75), confirmations: 2, timestamp: now - 600, pending: false },
   ];
+}
+
+/**
+ * The coins behind the canned balance (11.9999 XMR): change from the 1.25 XMR payment at the main
+ * address, 3.5 XMR at address 1 and a new 4.75 XMR at address 2 that is still unlocking.
+ */
+function seedCoins(): Coin[] {
+  const now = Math.floor(Date.now() / 1000);
+  const ki = (c: string) => c.repeat(64);
+  return [
+    { keyImage: ki("1"), amount: xmr(3.7499), subaddressIndex: 0, hash: "sim" + "c".repeat(61), height: 2_225_990, timestamp: now - 3600, frozen: false, locked: false },
+    { keyImage: ki("2"), amount: xmr(3.5), subaddressIndex: 1, hash: "sim" + "b".repeat(61), height: 2_225_300, timestamp: now - 86400, frozen: false, locked: false },
+    { keyImage: ki("3"), amount: xmr(4.75), subaddressIndex: 2, hash: "sim" + "d".repeat(61), height: 2_225_998, timestamp: now - 600, frozen: false, locked: true },
+  ];
+}
+
+/** Largest coins first, frozen ones never, until amount plus fee is covered. */
+function pickCoins(coins: Coin[], need: bigint): Coin[] | null {
+  const picked: Coin[] = [];
+  let sum = 0n;
+  for (const c of [...coins].filter((c) => !c.frozen).sort((a, b) => (b.amount > a.amount ? 1 : -1))) {
+    if (sum >= need) break;
+    picked.push(c);
+    sum += c.amount;
+  }
+  return sum >= need ? picked : null;
 }
 
 /** A placeholder subaddress. Base58 has no 0, so digits are mapped to letters it does have. */
@@ -31,13 +57,16 @@ function simFee(options: SendOptions, recipients: number): bigint {
 
 export function createSimWallet(address: string): LiveWallet {
   let txs = seedTxs(address);
+  let coins = seedCoins();
+  const frozenTotal = () => coins.filter((c) => c.frozen).reduce((s, c) => s + c.amount, 0n);
+  const fromOf = (picked: Coin[]) => [...new Set(picked.map((c) => c.subaddressIndex))].sort((a, b) => a - b);
   let balanceListener: ((b: Balances) => void) | null = null;
   const total = () => txs.filter((t) => t.direction === "in").reduce((s, t) => s + t.amount, 0n) - txs.filter((t) => t.direction === "out").reduce((s, t) => s + t.amount + (t.fee ?? 0n), 0n);
   let subIdx = 0;
   // Simulation only: incoming payments per subaddress. A new payment request is "paid" a few
   // seconds after it is created, in two steps, so the request statuses can be seen working.
   const incoming: IncomingEntry[] = [];
-  let lastSend: { address: string; amount: bigint; destinations?: Destination[] } | null = null;
+  let lastSend: { address: string; amount: bigint; destinations?: Destination[]; inputs?: Coin[] } | null = null;
   const sent = new Map<string, { address: string; amount: bigint; txKey: string; signature: string }>();
 
   return {
@@ -53,8 +82,18 @@ export function createSimWallet(address: string): LiveWallet {
       balanceListener = cb;
     },
     async balances() {
-      const t = total();
-      return { total: t, unlocked: t };
+      const f = frozenTotal();
+      const t = total() - f;
+      return { total: t, unlocked: t, ...(f > 0n ? { frozen: f } : {}) };
+    },
+    async coins() {
+      return coins.map((c) => ({ ...c }));
+    },
+    async freezeCoin(keyImage: string, frozen: boolean) {
+      const c = coins.find((x) => x.keyImage === keyImage);
+      if (!c) throw new Error("That coin is not known to this wallet.");
+      c.frozen = frozen;
+      balanceListener?.(await this.balances());
     },
     async txs() {
       return [...txs];
@@ -93,17 +132,19 @@ export function createSimWallet(address: string): LiveWallet {
       const final = options.subtractFee && wanted.length === 1 ? [{ ...wanted[0]!, amount: wanted[0]!.amount - fee }] : wanted;
       if (final.some((d) => d.amount <= 0n)) throw new Error("The amount is smaller than the network fee.");
       const amount = final.reduce((s, d) => s + d.amount, 0n);
-      if (amount + fee > total()) throw new Error("Not enough spendable balance for this amount plus the network fee. Lower the amount, or use Send all.");
-      lastSend = { address: final[0]!.address, amount, destinations: final };
-      return { fee, amount, metadata: "sim-metadata", address: final[0]!.address, destinations: final };
+      const inputs = pickCoins(coins, amount + fee);
+      if (!inputs) throw new Error("Not enough spendable balance for this amount plus the network fee. Lower the amount, or use Send all.");
+      lastSend = { address: final[0]!.address, amount, destinations: final, inputs };
+      return { fee, amount, metadata: "sim-metadata", address: final[0]!.address, destinations: final, fromAddresses: fromOf(inputs) };
     },
     async prepareSweep(address: string, options: SendOptions = {}) {
       const fee = simFee(options, 1);
-      const amount = total() - fee;
+      const inputs = coins.filter((c) => !c.frozen);
+      const amount = inputs.reduce((s, c) => s + c.amount, 0n) - fee;
       if (amount <= 0n) throw new Error("Nothing is spendable yet.");
       const destinations = [{ address: address.trim(), amount }];
-      lastSend = { address: address.trim(), amount, destinations };
-      return { fee, amount, metadata: "sim-metadata", address: address.trim(), destinations };
+      lastSend = { address: address.trim(), amount, destinations, inputs };
+      return { fee, amount, metadata: "sim-metadata", address: address.trim(), destinations, fromAddresses: fromOf(inputs) };
     },
     async prepareSweepAll(address: string, options: SendOptions = {}) {
       const built = await this.prepareSweep(address, options);
@@ -113,6 +154,13 @@ export function createSimWallet(address: string): LiveWallet {
       const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
       const hash = hex(32);
       const send = lastSend ?? { address: "", amount: xmr(0.5) };
+      // The coins spent are gone; any change comes back as a new, still locked coin at the main address.
+      if (lastSend?.inputs) {
+        const used = new Set(lastSend.inputs.map((c) => c.keyImage));
+        const change = lastSend.inputs.reduce((s, c) => s + c.amount, 0n) - send.amount - xmr(0.0001);
+        coins = coins.filter((c) => !used.has(c.keyImage));
+        if (change > 0n) coins.push({ keyImage: hex(32), amount: change, subaddressIndex: 0, hash, frozen: false, locked: true });
+      }
       sent.set(hash, { ...send, txKey: hex(32), signature: `OutProofV2Sim${hash.slice(0, 40).replace(/[0lIO]/g, "x")}` });
       txs = [{ hash, direction: "out", amount: send.amount, fee: xmr(0.0001), confirmations: 0, timestamp: Math.floor(Date.now() / 1000), pending: true, ...(send.address ? { destinations: send.destinations ?? [{ address: send.address, amount: send.amount }] } : {}) }, ...txs];
       balanceListener?.(await this.balances());

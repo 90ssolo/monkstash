@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import "../fonts.css";
 import "./popup.css";
 import { App, type Surface } from "./App";
+import { applyWalletTheme, getWalletTheme } from "@/lib/wallet/theme";
 
 const surface = (document.documentElement.dataset.surface ?? "tab") as Surface;
 
@@ -15,5 +16,8 @@ document.addEventListener("click", (e) => {
   e.preventDefault();
   void chrome.tabs.create({ url: a.href });
 });
+
+// Before the first frame, so a chosen dark theme never flashes light.
+applyWalletTheme(getWalletTheme());
 
 createRoot(document.getElementById("root")!).render(<App surface={surface} />);

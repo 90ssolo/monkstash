@@ -65,7 +65,7 @@ function state(): HostState {
   return {
     view: publicView(v),
     saveProblem: controller.saveProblem,
-    settings: s ? { kind: s.kind, network: s.network, totpEnabled: s.totpEnabled, node: s.node, restoreHeight: s.restoreHeight, seedPassphrase: !!s.seedPassphrase } : null,
+    settings: s ? { kind: s.kind, network: s.network, totpEnabled: s.totpEnabled, node: s.node, restoreHeight: s.restoreHeight, seedPassphrase: !!s.seedPassphrase, ...(s.seedWords ? { seedWords: s.seedWords } : {}) } : null,
     syncing: v.name === "open" ? !!v.wallet.syncing?.() : false,
     syncBusy: controller.syncBusy,
     cashierOn: controller.cashierOn,
@@ -137,13 +137,14 @@ function sharedSync(w: LiveWallet): Promise<void> {
 const WALLET_CALLS = new Set([
   "haltSync", "findTx", "highestSubaddress", "balances", "txs", "newSubaddress", "newRequestAddress",
   "ensureSubaddresses", "prepareMove", "incoming", "proveSent", "checkProof", "syncNow",
-  "prepareSend", "prepareSweep", "relay", "height",
+  "prepareSend", "prepareSweep", "relay", "height", "coins", "freezeCoin",
 ]);
 /** Settings actions a view may call. Each one checks the password (and code) against the vault. */
 const SETTINGS_CALLS = new Set([
   "revealSeed", "checkAccess", "approveSend", "changePassword", "enableTotp", "disableTotp", "watchOnlyKeys",
   "rescanFrom", "exportMove", "importMove", "saveNode",
   "sweepStart", "sweepStatus", "sweepPrepare", "sweepSend", "sweepCancel",
+  "gifts", "giftPrepare", "giftSend", "giftCancel", "giftForget", "giftOpen",
 ]);
 
 function openWallet(): LiveWallet {

@@ -20,6 +20,10 @@ import { arrivedAt } from "@/lib/wallet/history";
 import type { LabelStore } from "@/lib/wallet/session";
 import { Activity, minutesLeft } from "./History";
 import { Sweep } from "./Sweep";
+import { addressName, Coins } from "./Coins";
+import { EmergencyKitForm } from "./EmergencyKit";
+import { GiftClaim, GiftLinks } from "./Gifts";
+import { clearGiftInbox, giftInInbox } from "@/lib/wallet/giftInbox";
 import Link from "next/link";
 import type { TestMode } from "@/lib/wallet/demo";
 import { MoneroSymbol } from "@/components/art/MoneroSymbol";
@@ -34,6 +38,7 @@ import { Qr } from "./Qr";
 import { QrScanButton } from "./QrScan";
 import { AddressDiff, BatchForm, SpeedPicker, speedLabel } from "./SendParts";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
+import { useWalletTheme, type WalletTheme } from "@/lib/wallet/theme";
 import styles from "./wallet.module.css";
 
 interface DemoInfo { mode: TestMode; fellBack: boolean; assignedLabel: string; onSwitchMode: (m: TestMode) => void }
@@ -45,7 +50,7 @@ const timeText = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { ho
 /** A request opened from a /pay link ("Pay with MonkStash"). */
 interface Prefill { address: string; amount?: bigint; note?: string; expiresAt?: number }
 
-type Section = "home" | "send" | "receive" | "paid" | "activity" | "contacts" | "checkup" | "settings" | "more";
+type Section = "home" | "send" | "receive" | "paid" | "activity" | "contacts" | "coins" | "checkup" | "settings" | "more";
 
 const ICONS: Record<Section, React.ReactNode> = {
   home: <><path d="M4 11 12 4l8 7" /><path d="M6 10v10h12V10" /><path d="M10 20v-5h4v5" /></>,
@@ -54,27 +59,28 @@ const ICONS: Record<Section, React.ReactNode> = {
   paid: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
   activity: <path d="M4 12h3.5l2.5-6 4 12 2.5-6H20" />,
   contacts: <><circle cx="10" cy="8" r="3.2" /><path d="M4 19c.8-3.4 3.2-5 6-5s5.2 1.6 6 5" /><path d="M17 7h4M19 5v4" /></>,
+  coins: <><ellipse cx="9" cy="7" rx="5.5" ry="2.5" /><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5" /><path d="M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5" /><ellipse cx="15" cy="13" rx="5.5" ry="2.5" /><path d="M9.5 13v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4" /></>,
   checkup: <><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 const LABEL: Record<Section, string> = {
   home: "Home", send: "Send", receive: "Receive", paid: "Get paid", activity: "Activity",
-  contacts: "Contacts", checkup: "Checkup", settings: "Settings", more: "More",
+  contacts: "Contacts", coins: "Coins", checkup: "Checkup", settings: "Settings", more: "More",
 };
 /** Desktop rail: everyday tasks first, then the rest below a divider. */
 const RAIL_MAIN: Section[] = ["home", "send", "receive", "paid", "activity"];
-const RAIL_MORE: Section[] = ["contacts", "checkup", "settings"];
+const RAIL_MORE: Section[] = ["contacts", "coins", "checkup", "settings"];
 /** Phone bottom bar: five slots; "More" holds the rest. */
 const BAR: Section[] = ["home", "send", "receive", "paid", "more"];
-const MORE_LIST: Section[] = ["activity", "contacts", "checkup", "settings"];
+const MORE_LIST: Section[] = ["activity", "contacts", "coins", "checkup", "settings"];
 /**
  * Compact view (the browser extension's popup): only quick everyday tasks. Everything else opens
  * in the full view, at that section, instead of being squeezed into a small window.
  */
 const COMPACT: Section[] = ["home", "send", "receive", "activity", "more"];
 const COMPACT_BAR: Section[] = ["home", "send", "receive", "activity", "more"];
-const COMPACT_MORE: Section[] = ["paid", "contacts", "checkup", "settings"];
+const COMPACT_MORE: Section[] = ["paid", "contacts", "coins", "checkup", "settings"];
 const SECTIONS = Object.keys(LABEL) as Section[];
 
 /** A section asked for in the address (#section=settings), as the extension's full view opens it. */
@@ -152,6 +158,10 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     await labels?.save(l);
     setLabelData(l);
   }, [labels]);
+  // A gift link opened in this tab waits on Home until it is claimed or closed; one can also be pasted on Receive.
+  const [giftCode, setGiftCode] = useState<string | null>(null);
+  useEffect(() => { setGiftCode(giftInInbox()); }, []);
+  const [claimOpen, setClaimOpen] = useState(false);
   const local = useLocalChecks(pub);
   const clockMsg = clockWarning(useClockOffset());
   // Node health after the first sync: a node that stops answering must not leave "Up to date" on screen.
@@ -276,7 +286,12 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
   };
   const active = (s: Section) => section === s || (s === "more" && (compact ? COMPACT_MORE : MORE_LIST).includes(section));
   const bar = compact ? COMPACT_BAR : BAR;
-  const moreList = compact ? COMPACT_MORE : MORE_LIST;
+  // Coin control needs a full wallet: only it knows which coins are spent and can freeze them.
+  const hasCoins = pub.kind === "full" && !!wallet.coins;
+  const withCoins = (list: Section[]) => (hasCoins ? list : list.filter((s) => s !== "coins"));
+  const moreList = withCoins(compact ? COMPACT_MORE : MORE_LIST);
+  // The strip's sync state (the popup may shorten it on screen; the title keeps all of it).
+  const syncText = syncError ? "Sync stopped" : stale ? `Not connected, last checked ${lastChecked}` : synced ? "Up to date" : !sync ? "Connecting" : sync.height < pub.restoreHeight ? "Preparing" : `Syncing ${Math.floor(pct)}%`;
   const balanceText = hidden ? "••••" : bal && synced ? `${formatXmr(bal.total, 4)} XMR` : "…";
 
   let openRequests = 0;
@@ -321,7 +336,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
           </ul>
           <hr />
           <ul>
-            {RAIL_MORE.map((s) => (
+            {withCoins(RAIL_MORE).map((s) => (
               <li key={s}><button type="button" className={`${styles.navItem} ${active(s) ? styles.navOn : ""}`} aria-current={section === s ? "page" : undefined} title={LABEL[s]} onClick={() => go(s)}>
                 <NavIcon s={s} /><span>{LABEL[s]}</span>
                 {s === "checkup" && score.done < score.total ? <span className={styles.navBadge}>{score.done}/{score.total}</span> : null}
@@ -338,9 +353,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
             {pub.network !== "mainnet" || pub.kind === "view-only" ? (
               <span className={styles.heroChip}>{[pub.kind === "view-only" ? "Watch-only" : null, pub.network !== "mainnet" ? pub.network : null].filter(Boolean).join(", ")}</span>
             ) : null}
-            <span className={`${styles.syncPill} ${syncError ? styles.syncBad : stale ? styles.syncWarn : synced ? styles.syncOk : ""}`}>
+            <span className={`${styles.syncPill} ${syncError ? styles.syncBad : stale ? styles.syncWarn : synced ? styles.syncOk : ""}`} title={syncText}>
               <span className={styles.syncDot} aria-hidden="true" />
-              {syncError ? "Sync stopped" : stale ? `Not connected, last checked ${lastChecked}` : synced ? "Up to date" : !sync ? "Connecting" : sync.height < pub.restoreHeight ? "Preparing" : `Syncing ${Math.floor(pct)}%`}
+              {syncText}
             </span>
             {section !== "home" ? <span className={styles.stripBal}>{balanceText}</span> : null}
             <button className={`btn btn-ghost btn-sm ${styles.lockBtn}`} onClick={onLock}>
@@ -383,6 +398,9 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
           {/* Sections stay mounted (hidden when inactive) so a half-filled form survives switching. */}
           <section hidden={section !== "home"} aria-labelledby="bal-h" className={`${styles.section} ${styles.sectionBare}`}>
+            {giftCode && settings?.giftOpen ? (
+              <GiftClaim actions={settings} network={pub.network} code={giftCode} onClose={() => { clearGiftInbox(); setGiftCode(null); }} onSent={() => { clearGiftInbox(); void refresh(); }} />
+            ) : null}
             <div className={styles.home}>
               <div className={styles.homeBal}>
                 <div className={styles.balHead}>
@@ -405,6 +423,12 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                 <FiatValue atomic={bal && synced ? bal.total : null} hidden={hidden} />
                 {bal && synced && !hidden && bal.total - otherTotal(bal) > bal.unlocked ? (
                   <p className={styles.heroNote}><strong>{formatXmr(bal.unlocked, 6)} XMR</strong> spendable now. {unlockNote(txs)}</p>
+                ) : null}
+                {bal?.frozen && synced && !hidden ? (
+                  <p className={styles.heroNote}>
+                    Plus <strong>{formatXmr(bal.frozen, 6)} XMR</strong> in frozen coins, kept out of payments.{" "}
+                    <button type="button" className={styles.heroLink} onClick={() => go("coins")}>See coins</button>
+                  </p>
                 ) : null}
                 {pub.kind === "view-only" ? (
                   <p className={styles.heroNote}>A watch-only wallet sees money coming in, not money going out, so the real balance may be lower.</p>
@@ -448,9 +472,13 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
           <section hidden={section !== "send"} aria-labelledby="send-h" className={styles.section}>
             <h2 id="send-h" className={styles.panelH} tabIndex={-1}>Send Monero</h2>
             {pub.kind === "full" ? (
-              <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} settings={settings} synced={synced} unlocked={bal?.unlocked ?? 0n} onSent={refresh} prefill={prefill}
+              <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} settings={settings} synced={synced} unlocked={bal?.unlocked ?? 0n} frozen={bal?.frozen ?? 0n} labels={labelData} onCoins={hasCoins ? () => go("coins") : undefined} onSent={refresh} prefill={prefill}
                 contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} past={pastRecipients} />
-            ) : (
+            ) : null}
+            {pub.kind === "full" && settings?.giftPrepare && !compact ? (
+              <GiftLinks actions={settings} network={pub.network} unlocked={bal?.unlocked ?? 0n} synced={synced} hidden={hidden} onSent={() => void refresh()} />
+            ) : null}
+            {pub.kind === "full" ? null : (
               <p className="muted">This is a watch-only wallet: it can see payments but has no key to send. Send from the full wallet that holds your recovery words.</p>
             )}
           </section>
@@ -462,13 +490,23 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
               Want a set amount, a price in your currency, or to see when someone has paid?{" "}
               <button type="button" className={styles.inlineLink} onClick={() => go("paid")}>Make a payment request</button>.
             </p>
+            {settings?.giftOpen ? (
+              claimOpen
+                ? <GiftClaim actions={settings} network={pub.network} onClose={() => setClaimOpen(false)} onSent={() => void refresh()} />
+                : (
+                  <p className="small muted" style={{ marginTop: "var(--s-2)" }}>
+                    Someone sent you a gift link?{" "}
+                    <button type="button" className={styles.inlineLink} onClick={() => { setSweepOpen(false); setClaimOpen(true); }}>Claim it here</button>.
+                  </p>
+                )
+            ) : null}
             {settings?.sweepStart ? (
               sweepOpen
                 ? <Sweep actions={settings} network={pub.network} onClose={() => setSweepOpen(false)} onSent={() => void refresh()} />
                 : (
                   <p className="small muted" style={{ marginTop: "var(--s-2)" }}>
                     Have money in another wallet, like an old paper wallet?{" "}
-                    <button type="button" className={styles.inlineLink} onClick={() => setSweepOpen(true)}>Move it into this one</button>.
+                    <button type="button" className={styles.inlineLink} onClick={() => { setClaimOpen(false); setSweepOpen(true); }}>Move it into this one</button>.
                   </p>
                 )
             ) : null}
@@ -499,6 +537,13 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
               <ContactManager contacts={contactList} network={pub.network} onSave={saveContacts} onClose={() => go("home")} />
             ) : <p className="muted">Contacts are available once the wallet is unlocked.</p>}
           </section>
+
+          {hasCoins ? (
+            <section hidden={section !== "coins"} aria-labelledby="coins-h" className={styles.section}>
+              <h2 id="coins-h" className={styles.panelH} tabIndex={-1}>Coins</h2>
+              {section === "coins" ? <Coins wallet={wallet} labels={labelData} hidden={hidden} synced={synced} balance={bal?.total ?? 0n} onChanged={() => void refresh()} /> : null}
+            </section>
+          ) : null}
 
           <section hidden={section !== "checkup"} aria-labelledby="checkup-h" className={styles.section}>
             <h2 id="checkup-h" className={styles.panelH} tabIndex={-1}>Checkup</h2>
@@ -591,6 +636,12 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                       <summary>Show recovery words</summary>
                       <RevealWords actions={settings} />
                     </details>
+                    {pub.kind === "full" ? (
+                      <details className={styles.danger}>
+                        <summary>Emergency kit (print or save as PDF)</summary>
+                        <EmergencyKitForm pub={pub} actions={settings} />
+                      </details>
+                    ) : null}
                     <details className={styles.danger}>
                       <summary>Watch-only keys (for a till)</summary>
                       <WatchOnlyKeys actions={settings} />
@@ -608,6 +659,11 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
                   </details>
                 </section>
               ) : null}
+
+              <section className={styles.setBlock} aria-labelledby="set-look">
+                <h3 id="set-look">Appearance</h3>
+                <ThemePicker />
+              </section>
 
               <section className={styles.setBlock} aria-labelledby="set-support">
                 <h3 id="set-support">Support MonkStash</h3>
@@ -1024,7 +1080,7 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged, hidden }: { 
   );
 }
 
-function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contacts, onSaveContacts, hidden, past }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean; past: string[] }) {
+function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins, onSent, prefill, contacts, onSaveContacts, hidden, past }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; frozen: bigint; labels: WalletLabels; onCoins?: () => void; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean; past: string[] }) {
   const [to, setTo] = useState(prefill?.address ?? "");
   const [speed, setSpeed] = useState<SendSpeed>("standard");
   // The fee comes out of the typed amount: the recipient gets a little less, you pay exactly that amount.
@@ -1038,7 +1094,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
   const [sendPw, setSendPw] = useState("");
   const [sendCode, setSendCode] = useState("");
   // The review is a frozen snapshot: what was built is what is shown and sent, whatever the form says now.
-  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean; speed: SendSpeed; feeFromAmount: boolean } | null>(null);
+  const [review, setReview] = useState<{ fee: bigint; amount: bigint; metadata: string; address: string; destinations: Destination[]; hash?: string; fromAddresses?: number[]; alias: { fqdn: string; name?: string; dnssec: boolean } | null; all: boolean; speed: SendSpeed; feeFromAmount: boolean } | null>(null);
   const toRef = useRef("");
   const [state, setState] = useState<"idle" | "preparing" | "sending" | "checking" | "sent">("idle");
   // After a broadcast error the payment may or may not be on the network. Until a check shows the
@@ -1331,6 +1387,16 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
             </span>
           </div>
         ) : null}
+        {review.fromAddresses && review.fromAddresses.length > 1 ? (
+          <div className="notice notice-warn" role="status" style={{ margin: "var(--s-4) 0 0" }}>
+            <span>
+              <strong>This payment combines money from {review.fromAddresses.length} of your addresses</strong>
+              {hidden ? "" : ` (${review.fromAddresses.map((i) => addressName(labels, i)).join(", ")})`}. People who paid those addresses
+              could guess they belong to the same wallet.{onCoins ? <> To keep them apart, freeze the coins you do not want to use in{" "}
+              <button type="button" className={styles.inlineLink} onClick={onCoins}>Coins</button>, then review again.</> : null}
+            </span>
+          </div>
+        ) : null}
         <div className="notice notice-warn" style={{ margin: "var(--s-4) 0" }}>
           <span>Once you send Monero, it cannot be undone. Check the first and last few characters of the address before you send.</span>
         </div>
@@ -1464,6 +1530,7 @@ function Send({ pub, wallet, settings, synced, unlocked, onSent, prefill, contac
         <span id="amt-hint" className="hint">
           {atomic && atomic > 0n && inFiat(atomic) ? <><strong>About {inFiat(atomic)}</strong>. </> : null}
           Spendable now: {!synced ? "syncing…" : hidden ? "hidden" : `${formatXmr(unlocked)} XMR`}
+          {synced && !hidden && frozen > 0n ? `, plus ${formatXmr(frozen)} XMR frozen` : ""}
         </span>
       </div>
       {!sendAll ? (
@@ -1516,6 +1583,31 @@ function AddressCheck({ address }: { address: string }) {
 }
 
 /** The wallet's name in the wallet menu. */
+const THEMES: { value: WalletTheme; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
+/** Light, dark or the device's setting, for this browser only (the content site stays light). */
+function ThemePicker() {
+  const [theme, setTheme] = useWalletTheme();
+  return (
+    <div className="field" style={{ margin: 0 }}>
+      <span id="theme-l" className={styles.fieldLabel}>Colours</span>
+      <div className={styles.speed} role="radiogroup" aria-labelledby="theme-l" aria-describedby="theme-h">
+        {THEMES.map((t) => (
+          <label key={t.value} className={theme === t.value ? styles.speedOn : undefined}>
+            <input type="radio" name="wallet-theme" value={t.value} checked={theme === t.value} onChange={() => setTheme(t.value)} />
+            {t.label}
+          </label>
+        ))}
+      </div>
+      <span id="theme-h" className="hint">System follows your device&apos;s light or dark setting. Saved in this browser only.</span>
+    </div>
+  );
+}
+
 function RenameWallet({ name, onRename }: { name: string; onRename: (name: string) => Promise<void> }) {
   const [value, setValue] = useState(name);
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
