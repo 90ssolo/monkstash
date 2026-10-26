@@ -5,7 +5,7 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { buildPaymentUri, formatXmr, parsePaymentUri, PaymentRequestError, shortAddress, type NetworkType, type PaymentLinkExtras } from "@quietmint/wallet-core";
+import { buildPaymentFragment, buildPaymentUri, formatXmr, parsePaymentUri, PaymentRequestError, shortAddress, type NetworkType, type PaymentLinkExtras } from "@quietmint/wallet-core";
 import { CopyButton } from "@/components/wallet/CopyButton";
 import { Qr } from "@/components/wallet/Qr";
 import styles from "./pay.module.css";
@@ -18,6 +18,15 @@ function moneyText(amount: string, currency: string): string {
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number(amount));
   } catch {
     return `${amount} ${currency}`;
+  }
+}
+
+/** The request with its MonkStash extras, rebuilt from what parsed cleanly (falls back to the plain URI). */
+function fullFragment(r: Parsed): string {
+  try {
+    return buildPaymentFragment({ address: r.address, amount: r.amount, note: r.note, name: r.name, expiresAt: r.expiresAt, fiat: r.fiat, returnUrl: r.returnUrl, invoiceId: r.invoiceId });
+  } catch {
+    return r.uri;
   }
 }
 
@@ -63,7 +72,8 @@ export function PayRequest() {
 
   const r = state.r;
   const testNet = r.network !== "mainnet";
-  const walletLink = `${walletUrl}#pay=${encodeURIComponent(r.uri)}`;
+  // MonkStash gets the extras too (price hold, way back to the shop, invoice id); other wallets do not.
+  const walletLink = `${walletUrl}#pay=${encodeURIComponent(fullFragment(r))}`;
   const expired = r.expiresAt !== undefined && now >= r.expiresAt;
   const until = r.expiresAt ? new Date(r.expiresAt).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
   const backTo = r.returnUrl ? new URL(r.returnUrl).host : null;

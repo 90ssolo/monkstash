@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { EXPIRY_GRACE_MS } from "@quietmint/wallet-core";
+import { EXPIRY_GRACE_MS, parsePaymentUri } from "@quietmint/wallet-core";
 import { loadConfig, ConfigError, type PayConfig } from "../src/config";
 import { createApp, SYNCING_MESSAGE, type AppState } from "../src/app";
 import { accountsInUse, createShopInvoice, highestIndexes, presentInvoice, reconcile, subaddressUsage } from "../src/invoices";
@@ -235,6 +235,23 @@ describe("API", () => {
     expect(qr.headers.get("content-type")).toBe("image/svg+xml");
     expect(await qr.text()).toContain("<svg");
     expect((await fetch(base + "/pay/doesnotexist0000000000")).status).toBe(404);
+  });
+  it("offers Pay with MonkStash with the order filled in, and the shop can turn it off", async () => {
+    const inv = await (await create({ amount: "10", currency: "EUR", reference: "Order 7", returnUrl: "https://shop.example/orders/7" })).json();
+    expect(inv.monkstashUrl.startsWith("https://wallet.monkstash.com/#pay=")).toBe(true);
+    const r = parsePaymentUri(decodeURIComponent(inv.monkstashUrl.split("#pay=")[1]));
+    expect(r).toMatchObject({ address: inv.address, note: "Order 7", name: "Corner Coffee", invoiceId: inv.id, returnUrl: "https://shop.example/orders/7", fiat: { currency: "EUR", amount: "10" } });
+    expect(r.expiresAt).toBe(Math.floor(Date.parse(inv.expiresAt) / 1000) * 1000);
+    const html = await (await fetch(base + `/pay/${inv.id}`)).text();
+    expect(html).toContain('id="monkstash"');
+    expect((await (await fetch(base + `/pay/${inv.id}/status`)).json()).monkstashUrl).toBe(inv.monkstashUrl);
+
+    const off = await startApp({ PAY_MONKSTASH_WALLET: "off" });
+    const res = await fetch(off.url + "/api/invoices", { method: "POST", headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json" }, body: JSON.stringify({ amount: "1", currency: "XMR" }) });
+    const inv2 = await res.json();
+    expect(inv2.monkstashUrl).toBeNull();
+    expect(await (await fetch(off.url + `/pay/${inv2.id}`)).text()).not.toContain('id="monkstash"');
+    expect(() => loadConfig(env(dir, { PAY_MONKSTASH_WALLET: "http://evil.example/" }) as never)).toThrow(/PAY_MONKSTASH_WALLET/);
   });
 });
 

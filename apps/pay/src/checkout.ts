@@ -67,6 +67,7 @@ export function checkoutPage(v: View, cfg: PayConfig): string {
       <figure class="qr"><img id="qr" src="/pay/${esc(encodeURIComponent(v.id))}/qr.svg" width="260" height="260" alt="QR code to pay ${esc(price)} in Monero"><figcaption>Scan with any Monero wallet</figcaption></figure>
       <div class="side">
         <a class="btn primary" id="open" href="${esc(v.paymentUri)}">Open in my wallet</a>
+        ${v.monkstashUrl ? `<a class="btn" id="monkstash" href="${esc(v.monkstashUrl)}" rel="noopener">Pay with MonkStash</a>` : ""}
         <div class="field">
           <span class="label">Amount</span>
           <code class="value" id="amount">${esc(v.status === "partial" ? v.remaining : v.amount.xmr)} XMR</code>
@@ -241,6 +242,8 @@ export const CHECKOUT_JS = `
     if (st.paymentUri && st.paymentUri !== lastUri) {
       lastUri = st.paymentUri;
       document.getElementById("open").setAttribute("href", st.paymentUri);
+      var ms = document.getElementById("monkstash");
+      if (ms && st.monkstashUrl) ms.setAttribute("href", st.monkstashUrl);
       document.getElementById("qr").setAttribute("src", qrUrl + "?v=" + encodeURIComponent(st.remaining));
     }
     if (st.status === "partial" && !st.expired) document.getElementById("amount").textContent = st.remaining + " XMR";

@@ -39,6 +39,7 @@ import { QrScanButton } from "./QrScan";
 import { InstallApp } from "./InstallApp";
 import { ArrivalSettings, ArrivalToast, useArrivals } from "./Arrivals";
 import { AddressDiff, BatchForm, SpeedPicker, speedLabel } from "./SendParts";
+import { isOrder, OrderCard, orderExpired, shopHost, type Order } from "./OrderCard";
 import { AUTO_LOCK_HIDDEN_MS, AUTO_LOCK_IDLE_MS } from "@/lib/wallet/autolock";
 import { useWalletTheme, type WalletTheme } from "@/lib/wallet/theme";
 import styles from "./wallet.module.css";
@@ -50,7 +51,7 @@ const STALE_MS = 2 * 60 * 1000;
 const timeText = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 /** A request opened from a /pay link ("Pay with MonkStash"). */
-interface Prefill { address: string; amount?: bigint; note?: string; name?: string; expiresAt?: number }
+interface Prefill extends Order { address: string }
 
 type Section = "home" | "send" | "receive" | "paid" | "activity" | "contacts" | "coins" | "checkup" | "settings" | "more";
 
@@ -224,7 +225,11 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     if (!window.location.hash.startsWith("#pay=")) return;
     try {
       const r = parsePaymentUri(window.location.hash);
-      setPrefill({ address: r.address, amount: r.amount, note: r.note, name: r.name, ...(r.expiresAt !== undefined ? { expiresAt: r.expiresAt } : {}) });
+      setPrefill({
+        address: r.address, amount: r.amount, note: r.note, name: r.name,
+        ...(r.expiresAt !== undefined ? { expiresAt: r.expiresAt } : {}),
+        ...(r.fiat ? { fiat: r.fiat } : {}), ...(r.returnUrl ? { returnUrl: r.returnUrl } : {}), ...(r.invoiceId ? { invoiceId: r.invoiceId } : {}),
+      });
       setSection("send");
     } catch {
       /* not a valid request: ignore */
@@ -1144,6 +1149,13 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   // What a payment link said it was for, and who asked: kept as the payment's note (a receipt).
   const [requestInfo, setRequestInfo] = useState<{ note?: string; name?: string } | null>(prefill?.note || prefill?.name ? { note: prefill.note, name: prefill.name } : null);
   const [refund, setRefund] = useState<{ busy: boolean; address?: string; error?: string }>({ busy: false });
+  // Still paying what the link asked for ("Send another" leaves it). A shop order locks the
+  // address and amount, and is refused once the shop's price hold has ended.
+  const [linked, setLinked] = useState(!!prefill);
+  const order = linked && isOrder(prefill) ? prefill : null;
+  const [, setHoldEnded] = useState(0);
+  const holdEnded = useCallback(() => setHoldEnded((n) => n + 1), []);
+  const linkExpired = () => linked && orderExpired(prefill);
   const [to, setTo] = useState(prefill?.address ?? "");
   const [speed, setSpeed] = useState<SendSpeed>("standard");
   // The fee comes out of the typed amount: the recipient gets a little less, you pay exactly that amount.
@@ -1169,7 +1181,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   // network does not have it, the only way forward is the SAME signed payment (it can never be paid
   // twice): a new build could pick different coins and pay a second time.
   const [unsure, setUnsure] = useState<{ message: string; absent: boolean } | null>(null);
-  const expiredRequest = prefill?.expiresAt !== undefined && serverNow() >= prefill.expiresAt;
+  const expiredRequest = linkExpired();
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   // OpenAlias: a name like donate.getmonero.org instead of an address.
@@ -1300,6 +1312,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       <div>
         <h3>Sent{review && review.destinations.length > 1 ? ` to ${review.destinations.length} people` : paidTo ? ` to ${paidTo.name}` : ""}</h3>
         <p className="muted">Your payment was sent to the network. It usually confirms in about 2 minutes.</p>
+        {order?.returnUrl ? <a className={`btn btn-primary ${styles.orderBack}`} href={order.returnUrl} rel="noopener noreferrer">Back to {shopHost(order)}</a> : null}
         <p className="small">Transaction ID</p>
         <p className={`mono ${styles.addr}`}>{txHash}</p>
         <CopyButton value={txHash} label="Copy transaction ID" />
@@ -1335,7 +1348,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
             )}
           </div>
         ) : null}
-        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setSubtractFee(false); setBatch(false); setReview(null); setTxHash(null); setRefund({ busy: false }); setRequestInfo(null); }}>Send another</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setSubtractFee(false); setBatch(false); setReview(null); setTxHash(null); setRefund({ busy: false }); setRequestInfo(null); setLinked(false); }}>Send another</button>
       </div>
     );
   }
@@ -1355,15 +1368,16 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   const pastLook = dest && fmt?.ok && !known && !lookalike && !past.includes(dest) ? lookalikeAddress(dest, past) : null;
   const alarm = !!(lookalike || aliasMoved || pastLook);
   // A calm note, not an alarm: most new recipients are fine, but this is when to double-check.
-  const firstTime = !!(synced && dest && fmt?.ok && !known && !alarm && !past.includes(dest));
+  // Not for a shop order: checkouts use a fresh address for every order, so it is always new.
+  const firstTime = !!(synced && dest && fmt?.ok && !known && !alarm && !past.includes(dest) && !order);
 
   async function prepare(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!synced) return setError("Wait until the wallet has finished syncing.");
-    if (prefill?.expiresAt !== undefined && serverNow() >= prefill.expiresAt) {
-      return setError("This payment request has expired. Ask the person for a new one before you pay.");
+    if (linkExpired()) {
+      return setError(order ? "The shop's price hold has ended. Get a new price from the shop before you pay." : "This payment request has expired. Ask the person for a new one before you pay.");
     }
+    if (!synced) return setError("Wait until the wallet has finished syncing.");
     if (fqdn && !resolved) return setError(aliasState === "looking" ? "Still looking up that name." : aliasError ?? "That name has no Monero address.");
     if (resolved && !resolved.dnssec && !trusted) return setError("This name is not protected by DNSSEC. Tick the box to confirm you trust it and checked the address.");
     if (wrongNet) return setError(`${resolved!.fqdn} points to a ${wrongNet} address, but this wallet is on ${pub.network}.`);
@@ -1419,7 +1433,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   function markSent(hash: string) {
     if (!review) return;
     // A payment from a link keeps what it was for, as its note: the start of a receipt.
-    const forText = requestInfo ? [requestInfo.name, requestInfo.note].filter(Boolean).join(": ") : "";
+    const forText = requestInfo ? [requestInfo.name, requestInfo.note].filter(Boolean).join(": ") + (order?.invoiceId ? ` (invoice ${order.invoiceId})` : "") : "";
     if (forText && onSaveLabels && !labels.tx[hash]) void onSaveLabels(withTxNote(labels, hash, forText.slice(0, LABEL_MAX))).catch(() => {});
     setTxHash(hash);
     setUnsure(null);
@@ -1458,6 +1472,8 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
 
   async function confirm() {
     if (!review) return;
+    // The hold can end while the payment waits on this screen: nothing goes out after that.
+    if (!unsure && linkExpired()) return setError(order ? "The shop's price hold ended before the payment left. Nothing was sent." : "This payment request expired before the payment left. Nothing was sent.");
     setState("sending");
     setError(null);
     setUndone(false);
@@ -1500,6 +1516,12 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
 
   async function broadcast() {
     if (!review) return;
+    // The last moment to refuse: the undo countdown may have run past the end of the hold. A
+    // retry of a payment that may already be out is never stopped.
+    if (!unsure && linkExpired()) {
+      setState("idle");
+      return setError(order ? "The shop's price hold ended before the payment left. Nothing was sent." : "This payment request expired before the payment left. Nothing was sent.");
+    }
     setState("sending");
     try {
       // Always the payment built for this review. After an error this re-sends the same signed
@@ -1518,6 +1540,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
     return (
       <div>
         <h3>Review payment</h3>
+        {order ? <OrderCard order={order} compact onExpire={holdEnded} /> : null}
         {review.destinations.length > 1 ? (
           <ol className={styles.reviewList} aria-label="Recipients">
             {review.destinations.map((d, i) => {
@@ -1621,7 +1644,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
   return (
     <form onSubmit={prepare}>
       {contacts ? <ContactChips contacts={contacts} onManage={() => setManaging(true)} onPick={(c) => { setTo(c.alias ?? c.address); setError(null); }} /> : null}
-      {prefill ? (
+      {order ? <OrderCard order={order} onExpire={holdEnded} /> : linked && prefill ? (
         <div className="notice notice-info" style={{ marginBottom: "var(--s-4)" }}>
           <span>
             <strong>Paying a request{prefill.note ? `: ${prefill.note}` : ""}.</strong> Check the address and amount below, then review. Only pay requests from
@@ -1630,7 +1653,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
           </span>
         </div>
       ) : null}
-      {expiredRequest ? (
+      {expiredRequest && !order ? (
         <div className="notice notice-warn" role="alert" style={{ marginBottom: "var(--s-4)" }}>
           <span>
             <strong>This payment request has expired.</strong> The price or address may no longer be valid. Ask the person for a new
@@ -1641,7 +1664,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       <div className="field">
         <span className={styles.toHead}>
           <label htmlFor="to">Recipient (address or name)</label>
-          <span className={styles.toTools}>
+          {order ? null : <span className={styles.toTools}>
             {canPaste ? (
               <button type="button" className={`btn btn-ghost btn-sm ${styles.scanBtn}`} disabled={state === "preparing"} onClick={() => void pasteRecipient()}>
                 <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"><path d="M5.5 2.75h-1.75c-.69 0-1.25.56-1.25 1.25v9c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25v-9c0-.69-.56-1.25-1.25-1.25H10.5M6 1.75h4v2.5H6z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
@@ -1649,9 +1672,9 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
               </button>
             ) : null}
             <QrScanButton disabled={state === "preparing"} pictures={!settings?.openFullView} onScan={(text) => takeRecipient(text, true)} />
-          </span>
+          </span>}
         </span>
-        <textarea id="to" className="textarea mono" style={{ minHeight: 80 }} spellCheck={false} autoComplete="off" autoCapitalize="none" value={to} readOnly={state === "preparing"}
+        <textarea id="to" className="textarea mono" style={{ minHeight: 80 }} spellCheck={false} autoComplete="off" autoCapitalize="none" value={to} readOnly={state === "preparing" || !!order}
           onChange={(e) => takeRecipient(e.target.value)} aria-describedby="to-hint" />
         <span id="to-hint" className={fmt && !fmt.ok ? "error" : "hint"}>
           {fqdn ? (resolved ? (fmt?.ok ? `Name found: valid ${fmt.kind} address` : wrongNet ? `${resolved.fqdn} points to a ${wrongNet} address, but this wallet is on ${pub.network}.` : fmt?.reason) : aliasState === "looking" ? `Looking up ${fqdn}…` : aliasError)
@@ -1707,7 +1730,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       <div className="field">
         <span className={styles.amtHead}>
           <label htmlFor="amt">Amount ({fiatMode ? fx!.currency : "XMR"})</label>
-          <span className={styles.amtTools}>
+          {order ? null : <span className={styles.amtTools}>
             {fx && !sendAll ? (
               <button type="button" className="btn btn-ghost btn-sm" disabled={state === "preparing"} onClick={switchUnit}
                 aria-label={fiatMode ? "Type the amount in XMR instead" : `Type the amount in ${fx.currency} instead`}>
@@ -1716,17 +1739,17 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
             ) : null}
             <button type="button" className={`btn btn-ghost btn-sm ${sendAll ? styles.allOn : ""}`} aria-pressed={sendAll} disabled={state === "preparing" || !synced}
               onClick={() => { setSendAll((v) => !v); setSubtractFee(false); setAmount(""); setError(null); }}>Send all</button>
-          </span>
+          </span>}
         </span>
         <input id="amt" className="input" inputMode="decimal" autoComplete="off" value={sendAll ? "" : amount} placeholder={sendAll ? "Everything spendable, minus the fee" : undefined}
-          readOnly={state === "preparing"} onChange={(e) => { setSendAll(false); setAmount(e.target.value); setError(null); }} aria-describedby="amt-hint" />
+          readOnly={state === "preparing" || !!order} onChange={(e) => { setSendAll(false); setAmount(e.target.value); setError(null); }} aria-describedby="amt-hint" />
         <span id="amt-hint" className="hint">
-          {atomic && atomic > 0n ? (fiatMode ? <><strong>{formatXmr(atomic)} XMR</strong> at today&apos;s rate. </> : inFiat(atomic) ? <><strong>About {inFiat(atomic)}</strong>. </> : null) : null}
+          {order ? <>Set by the shop. </> : atomic && atomic > 0n ? (fiatMode ? <><strong>{formatXmr(atomic)} XMR</strong> at today&apos;s rate. </> : inFiat(atomic) ? <><strong>About {inFiat(atomic)}</strong>. </> : null) : null}
           Spendable now: {!synced ? "syncing…" : hidden ? "hidden" : `${formatXmr(unlocked)} XMR`}
           {synced && !hidden && frozen > 0n ? `, plus ${formatXmr(frozen)} XMR frozen` : ""}
         </span>
       </div>
-      {!sendAll ? (
+      {!sendAll && !order ? (
         <label className={`${styles.trust} ${styles.feeFrom}`}>
           <input type="checkbox" checked={subtractFee} disabled={state === "preparing"} onChange={(e) => { setSubtractFee(e.target.checked); setError(null); }} />
           <span>Take the network fee from this amount <span className="muted">(they receive a little less, you pay exactly this)</span></span>
@@ -1735,7 +1758,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       <SpeedPicker value={speed} onChange={setSpeed} disabled={state === "preparing"} />
       {error ? <p className="error small" role="alert">{error}</p> : null}
       <button className="btn btn-primary btn-block" disabled={state === "preparing"}>{state === "preparing" ? "Calculating fee…" : "Review"}</button>
-      <button type="button" className={`btn btn-ghost btn-sm ${styles.multiLink}`} disabled={state === "preparing"} onClick={() => { setBatch(true); setError(null); }}>Pay several people at once</button>
+      {order ? null : <button type="button" className={`btn btn-ghost btn-sm ${styles.multiLink}`} disabled={state === "preparing"} onClick={() => { setBatch(true); setError(null); }}>Pay several people at once</button>}
     </form>
   );
 }

@@ -53,6 +53,7 @@ The first start scans the chain from your restore height, which can take a while
 | `PAY_WEBHOOK_SECRET` | with webhooks | 32+ character secret for signing events |
 | `PAY_PUBLIC_URL` | yes in production | Public HTTPS address of this server |
 | `PAY_SHOP_NAME` | no | Shown on the checkout page and in the customer's wallet |
+| `PAY_MONKSTASH_WALLET` | no | The wallet the checkout's "Pay with MonkStash" button opens (`https://wallet.monkstash.com/` unless set). `off` hides the button |
 | `PAY_CURRENCY` | no | Default price currency (`EUR` unless set) |
 | `PAY_CONFIRMATIONS` | no | `quick`, `standard` (default) or `safe`, see below |
 | `PAY_EXPIRY_MINUTES` | no | How long a price is held (default 30) |
@@ -131,6 +132,7 @@ Response `201`:
   "requiredConfirmations": 1,
   "address": "7BBJ5m...",
   "paymentUri": "monero:7BBJ5m...?tx_amount=0.041277",
+  "monkstashUrl": "https://wallet.monkstash.com/#pay=monero%3A7BBJ5m...",
   "createdAt": "2026-10-15T15:21:08.369Z",
   "expiresAt": "2026-10-15T15:51:08.369Z",
   "checkoutUrl": "https://pay.yourshop.com/pay/SKqy6lEvr9TElqiK17G9euyG_R4OcUef",
@@ -144,6 +146,8 @@ Response `201`:
 `txHashes` lists the payments counted toward the invoice. `lockedPayments` lists payments that arrived but are not counted because the sender locked the coins (see [Locked payments never count](#when-is-an-order-paid)), each with `txHash`, `amount`, `unlockTime` and `confirmations`.
 
 Send your customer to `checkoutUrl`.
+
+`monkstashUrl` opens the MonkStash wallet with the order filled in: next to the amount and address it carries the price in your currency, when the price hold ends, the way back to your shop (`returnUrl`) and the invoice id. The wallet shows the customer a countdown, refuses to pay once the hold has ended (with a button back to your shop for a fresh price), and keeps the order with their receipt. Other wallets use `paymentUri`, which stays a plain standard `monero:` request. The extra details travel in the link's `#` part, which browsers never send to any server. The checkout page shows the button for you; set `PAY_MONKSTASH_WALLET=off` to hide it (`monkstashUrl` is then `null`).
 
 ### Check an invoice
 

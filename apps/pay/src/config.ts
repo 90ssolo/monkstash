@@ -33,6 +33,11 @@ export interface PayConfig {
   /** Public base URL of this server, used to build checkout links. */
   publicUrl: string;
   shopName?: string;
+  /**
+   * The MonkStash wallet the checkout's "Pay with MonkStash" button opens, with the order filled
+   * in (price, hold time, way back to the shop). Unset to hide the button.
+   */
+  walletLink?: string;
   policy: ConfirmationPolicy;
   /** Default minutes before an invoice expires (fiat prices are held this long). */
   expiryMinutes: number;
@@ -103,6 +108,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PayConfig {
   const expiryMinutes = Number(env.PAY_EXPIRY_MINUTES ?? "30");
   if (!Number.isFinite(expiryMinutes) || expiryMinutes < 5 || expiryMinutes > 60 * 24 * 7) throw new ConfigError("PAY_EXPIRY_MINUTES must be between 5 and 10080.");
 
+  // "off" hides the button; anything else must be an https address (http only for localhost).
+  const walletRaw = env.PAY_MONKSTASH_WALLET?.trim() || "https://wallet.monkstash.com/";
+  const walletLink = /^off$/i.test(walletRaw) ? undefined : walletRaw;
+  if (walletLink && !/^https:\/\/[^\s#]+$/.test(walletLink) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s#]*$/.test(walletLink)) {
+    throw new ConfigError("PAY_MONKSTASH_WALLET must be an https:// address, or off.");
+  }
+
   const defaultCurrency = (env.PAY_CURRENCY?.trim() || "EUR").toUpperCase();
   if (defaultCurrency !== "XMR" && !isCurrencyCode(defaultCurrency)) throw new ConfigError("PAY_CURRENCY must be XMR or a currency code like EUR.");
 
@@ -114,6 +126,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PayConfig {
     dataDir: env.PAY_DATA_DIR?.trim() || "./data",
     port, host: env.PAY_HOST?.trim() || "0.0.0.0", publicUrl,
     shopName: env.PAY_SHOP_NAME?.trim().slice(0, 60) || undefined,
+    walletLink,
     policy: CONFIRMATION_PRESETS[speed],
     expiryMinutes, defaultCurrency,
     liveCoinWatchKey: env.LIVECOINWATCH_API_KEY?.trim() || undefined,

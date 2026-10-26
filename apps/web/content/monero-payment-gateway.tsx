@@ -14,7 +14,7 @@ export const meta: ArticleMeta = {
   seoTitle: "Monero Payment Gateway: Self-Hosted and Private",
   summary: "A Monero payment gateway you run yourself: invoices, a checkout page and signed webhooks, with a view-only wallet that cannot spend. How it works and compares.",
   keyword: "monero payment gateway",
-  updated: "2026-10-17",
+  updated: "2026-10-26",
   readingMinutes: 10,
   toc: [
     { id: "what", label: "What a Monero payment gateway does" },
@@ -80,7 +80,7 @@ export function Body() {
       <Steps items={[
         { title: "Your shop asks for an invoice", body: <>One API call: &quot;€19.99, Order 1001&quot;.</> },
         { title: "MonkStash Pay creates it", body: <>A fresh subaddress from your view-only wallet, the price converted to XMR and held for 30 minutes, and a checkout link.</> },
-        { title: "The customer pays", body: <>On the checkout page: QR code, exact amount, copy buttons and a status that updates by itself.</> },
+        { title: "The customer pays", body: <>On the checkout page: QR code, exact amount, copy buttons and a status that updates by itself. Customers with MonkStash can tap <em>Pay with MonkStash</em>: their wallet opens with the order filled in, counts down the held price, refuses to pay once it has ended, and offers a way back to your shop afterwards.</> },
         { title: "Your shop gets told", body: <>A signed webhook for each change: confirming, paid, partly paid, late or expired.</> },
       ]} />
 

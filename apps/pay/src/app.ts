@@ -255,7 +255,7 @@ export function createApp(deps: AppDeps) {
           const svg = await QRCode.toString(view.paymentUri, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#121a17", light: "#ffffff" } });
           return send(res, 200, svg, "image/svg+xml", { "cache-control": "no-store" });
         }
-        if (pay[2]) return json(res, 200, { status: view.status, expired: view.expired, pending: view.pending, received: view.received, remaining: view.remaining, overpaid: view.overpaid, confirmations: view.confirmations, requiredConfirmations: view.requiredConfirmations, paymentUri: view.paymentUri, expiresAt: view.expiresAt });
+        if (pay[2]) return json(res, 200, { status: view.status, expired: view.expired, pending: view.pending, received: view.received, remaining: view.remaining, overpaid: view.overpaid, confirmations: view.confirmations, requiredConfirmations: view.requiredConfirmations, paymentUri: view.paymentUri, monkstashUrl: view.monkstashUrl, expiresAt: view.expiresAt });
         return send(res, 200, checkoutPage(view, cfg), "text/html; charset=utf-8", { "cache-control": "no-store" });
       }
 

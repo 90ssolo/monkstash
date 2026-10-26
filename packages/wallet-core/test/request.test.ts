@@ -67,6 +67,13 @@ describe("payment link extras", () => {
       fiat: { currency: "EUR", amount: "12.80", rate: "476.22" }, returnUrl: "https://shop.example/orders/42?paid=1",
     });
   });
+  it("carries a shop's invoice id, and drops a damaged one", () => {
+    const frag = buildPaymentFragment({ address: MAIN, amount: 1_000_000_000_000n, invoiceId: "inv_Ab-12" });
+    expect(frag).toBe(`monero:${MAIN}?tx_amount=1&ms_inv=inv_Ab-12`);
+    expect(parsePaymentUri(frag).invoiceId).toBe("inv_Ab-12");
+    expect(parsePaymentUri(`monero:${MAIN}?ms_inv=${encodeURIComponent("<b>x</b>")}`).invoiceId).toBeUndefined();
+    expect(() => buildPaymentFragment({ address: MAIN, invoiceId: "a b" })).toThrow(PaymentRequestError);
+  });
   it("leaves the standard URI untouched when there are no extras", () => {
     expect(buildPaymentFragment({ address: MAIN })).toBe(`monero:${MAIN}`);
     expect(buildPaymentFragment({ address: MAIN, expiresAt: exp })).toBe(`monero:${MAIN}?ms_exp=${exp / 1000}`);

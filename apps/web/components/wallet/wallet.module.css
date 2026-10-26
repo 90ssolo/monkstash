@@ -764,3 +764,13 @@
   .arrival > :global(.btn) { grid-column: 2; grid-row: 2; justify-self: start; }
 }
 .refundBox { display: grid; gap: var(--s-2); justify-items: start; margin: var(--s-4) 0; padding: var(--s-3) var(--s-4); border: 1px dashed var(--line-2); border-radius: var(--r-2); }
+
+/* Pay with MonkStash: a shop order with a held price */
+.order { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); padding: var(--s-4); border: 1px solid var(--forest); border-radius: var(--r-2); background: var(--forest-soft); }
+.orderEnded { border-color: var(--clay); background: var(--clay-soft); }
+.orderTop { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); justify-content: space-between; align-items: baseline; }
+.orderWho { min-width: 0; overflow-wrap: anywhere; }
+.orderHold { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--forest); white-space: nowrap; }
+.orderPrice { margin: 0; font-family: var(--font-display); font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.orderEnd { display: grid; gap: var(--s-2); justify-items: start; }
+.orderBack { margin: var(--s-3) 0; }

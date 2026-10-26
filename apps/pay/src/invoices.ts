@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import {
-  buildPaymentUri, checkReturnUrl, createInvoice, expiryIsFinal, formatXmr, invoiceFromJson, invoiceStatus, invoiceToJson, InvoiceError, isCurrencyCode,
+  buildPaymentFragment, buildPaymentUri, checkReturnUrl, createInvoice, expiryIsFinal, formatXmr, invoiceFromJson, invoiceStatus, invoiceToJson, InvoiceError, isCurrencyCode,
   type Invoice, type InvoiceStatus,
 } from "@quietmint/wallet-core";
 import type { PayConfig } from "./config";
@@ -252,6 +252,22 @@ export function presentInvoice(rec: StoredInvoice, incoming: IncomingPayment[], 
   } catch {
     paymentUri = `monero:${inv.address}`;
   }
+  // "Pay with MonkStash": the same request plus what only MonkStash reads (other wallets ignore
+  // it): the held price, when the hold ends, the way back to the shop and the invoice id.
+  let monkstashUrl: string | null = null;
+  if (cfg.walletLink) {
+    const partial = st.kind === "partial";
+    const amount = (partial ? remaining : due) || undefined;
+    const base = { address: inv.address, amount, note: inv.reference, name: cfg.shopName, invoiceId: inv.id, ...(inv.expiresAt ? { expiresAt: inv.expiresAt } : {}) };
+    // The fiat price only describes the full amount: a remainder is shown in XMR.
+    const fiat = !partial && inv.fiat ? { fiat: { currency: inv.fiat.currency, amount: inv.fiat.amount, rate: inv.fiat.rate } } : {};
+    const ret = rec.returnUrl && checkReturnUrl(rec.returnUrl) ? { returnUrl: rec.returnUrl } : {};
+    try {
+      monkstashUrl = `${cfg.walletLink}#pay=${encodeURIComponent(buildPaymentFragment({ ...base, ...fiat, ...ret }))}`;
+    } catch {
+      try { monkstashUrl = `${cfg.walletLink}#pay=${encodeURIComponent(buildPaymentFragment(base))}`; } catch { monkstashUrl = null; }
+    }
+  }
   return {
     id: inv.id,
     status: publicStatus(rec, st, at),
@@ -270,6 +286,8 @@ export function presentInvoice(rec: StoredInvoice, incoming: IncomingPayment[], 
     pending: st.kind === "partial" || st.kind === "confirming" || st.kind === "late" ? st.pending : st.kind === "paid" ? st.confirmations === 0 : false,
     address: inv.address,
     paymentUri,
+    /** Opens the MonkStash wallet with this order filled in; null when the shop turned it off. */
+    monkstashUrl,
     createdAt: new Date(inv.createdAt).toISOString(),
     expiresAt: inv.expiresAt ? new Date(inv.expiresAt).toISOString() : null,
     checkoutUrl: `${cfg.publicUrl}/pay/${encodeURIComponent(inv.id)}`,

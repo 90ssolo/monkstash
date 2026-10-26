@@ -30,7 +30,12 @@ export interface PaymentLinkExtras {
   fiat?: { currency: string; amount: string; rate: string };
   /** Where the payer can go back to after paying, e.g. the shop's order page. https only. */
   returnUrl?: string;
+  /** The shop's invoice id (MonkStash Pay), kept with the payer's receipt. */
+  invoiceId?: string;
 }
+
+/** Invoice ids are short tokens: letters, digits, "-" and "_". */
+const INVOICE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export const RETURN_URL_MAX = 300;
 
@@ -110,6 +115,10 @@ export function buildPaymentFragment(r: PaymentRequestData & PaymentLinkExtras):
     if (!ret) throw new PaymentRequestError("The return address must be a full https:// link.");
     extra.push(`ms_ret=${encodeURIComponent(ret)}`);
   }
+  if (r.invoiceId) {
+    if (!INVOICE_ID.test(r.invoiceId)) throw new PaymentRequestError("The invoice id may only use letters, digits, - and _.");
+    extra.push(`ms_inv=${r.invoiceId}`);
+  }
   if (!extra.length) return uri;
   return `${uri}${uri.includes("?") ? "&" : "?"}${extra.join("&")}`;
 }
@@ -160,6 +169,8 @@ export function parsePaymentUri(input: string): PaymentRequestData & PaymentLink
       } else if (key === "ms_ret") {
         const ret = checkReturnUrl(value);
         if (ret) out.returnUrl = ret;
+      } else if (key === "ms_inv") {
+        if (INVOICE_ID.test(value)) out.invoiceId = value;
       }
     }
   }

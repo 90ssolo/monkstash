@@ -303,3 +303,76 @@ test("proof of funds: prove at least an amount, check it, and a changed message 
   await page.getByRole("button", { name: "Check proof" }).click();
   await expect(page.getByText("This proof does not check out")).toBeVisible();
 });
+
+/** A shop order link as MonkStash Pay makes it: 40 EUR held at 200 EUR per XMR. */
+function orderLink(to: string, holdSeconds: number) {
+  const exp = Math.floor(Date.now() / 1000) + holdSeconds;
+  const ret = encodeURIComponent("https://shop.example/orders/42");
+  return `monero:${to}?tx_amount=0.2&tx_description=Order%2042&recipient_name=Corner%20Shop&ms_exp=${exp}&ms_fiat=EUR%3A40.00%3A200&ms_ret=${ret}&ms_inv=inv_42abc`;
+}
+async function openOrder(page: Page, uri: string) {
+  // The wallet reads #pay= when it opens; a reload keeps it unlocked for this tab.
+  await page.evaluate((u) => { location.hash = `pay=${encodeURIComponent(u)}`; }, uri);
+  await page.reload();
+  await dashboard(page);
+}
+
+test("pay with MonkStash: a shop order shows the held price, pays, and leads back to the shop", async ({ page }) => {
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await synced(page);
+  await openOrder(page, orderLink(wallet("Test B").primaryAddress, 600));
+  const card = page.getByRole("region", { name: "Order" });
+  await expect(card).toContainText("Order from Corner Shop: Order 42");
+  await expect(card).toContainText("40,00 €");
+  await expect(card).toContainText(/Price held for (9|10):\d\d/);
+  await expect(page.locator("#to")).toHaveAttribute("readonly", "");
+  await expect(page.locator("#amt")).toHaveValue("0.2");
+  await expect(page.locator("#amt")).toHaveAttribute("readonly", "");
+  await expect(page.getByRole("button", { name: "Send all" })).toHaveCount(0);
+  await shoot(page, "order");
+  await synced(page);
+  await page.getByRole("button", { name: "Review" }).click();
+  await expect(page.getByRole("region", { name: "Order" })).toContainText("Price held");
+  await page.locator("#send-pw").fill(PASSWORD);
+  await page.getByRole("button", { name: "Send now" }).click();
+  await page.getByRole("button", { name: "Send without waiting" }).click();
+  await expect(page.getByText(/Your payment was sent to the network/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to shop.example" })).toHaveAttribute("href", "https://shop.example/orders/42");
+  await section(page, "Activity").click();
+  await expect(page.getByText("Corner Shop: Order 42 (invoice inv_42abc)").filter({ visible: true }).first()).toBeVisible();
+});
+
+test("pay with MonkStash: an order whose price hold ended is refused, even on the review screen", async ({ page }) => {
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await synced(page);
+  await openOrder(page, orderLink(wallet("Test B").primaryAddress, -60));
+  await expect(page.getByText("The price hold has ended. Do not pay this order now.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get a new price at shop.example" })).toHaveAttribute("href", "https://shop.example/orders/42");
+  await shoot(page, "order-ended");
+  await page.getByRole("button", { name: "Review" }).click();
+  await expect(page.getByText("The shop's price hold has ended. Get a new price from the shop before you pay.")).toBeVisible();
+
+  // The hold ends while the payment waits on the review screen: nothing is sent.
+  await openOrder(page, orderLink(wallet("Test B").primaryAddress, 25));
+  await synced(page);
+  await page.getByRole("button", { name: "Review" }).click();
+  await page.locator("#send-pw").fill(PASSWORD);
+  await expect(page.getByText("The price hold has ended. Do not pay this order now.")).toBeVisible({ timeout: 40_000 });
+  await page.getByRole("button", { name: "Send now" }).click();
+  await expect(page.getByText("The shop's price hold ended before the payment left. Nothing was sent.")).toBeVisible();
+  await expect(page.getByText(/Your payment was sent to the network/)).toHaveCount(0);
+});
+
+test("pay with MonkStash: the /pay page hands the whole order to the wallet, other wallets get the plain request", async ({ page }) => {
+  const uri = orderLink(wallet("Test B").primaryAddress, 600);
+  await page.goto(`/pay#${uri}`);
+  const ms = decodeURIComponent((await page.getByRole("link", { name: "Pay with MonkStash" }).getAttribute("href"))!.split("#pay=")[1]!);
+  expect(ms).toContain("ms_inv=inv_42abc");
+  expect(ms).toContain("ms_fiat=");
+  expect(ms).toContain("ms_ret=");
+  expect(await page.getByRole("link", { name: "Open in my wallet" }).getAttribute("href")).not.toContain("ms_");
+});
