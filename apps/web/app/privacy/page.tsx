@@ -9,8 +9,8 @@ import { KeysOnDeviceArt } from "../_trust/TrustArt";
 import trust from "../_trust/trust.module.css";
 import styles from "./privacy.module.css";
 
-const UPDATED = "2026-10-25";
-const UPDATED_TEXT = "25 October 2026";
+const UPDATED = "2026-10-26";
+const UPDATED_TEXT = "26 October 2026";
 const DESCRIPTION =
   "What MonkStash can and cannot see: no accounts, no cookies, no tracking. Your keys never leave your device. Here is exactly what passes through our server.";
 
@@ -142,6 +142,7 @@ export default function PrivacyPage() {
                 <li><strong>Storage, unlimited storage:</strong> to keep the encrypted wallet and its sync progress, which can grow to tens of megabytes for an older wallet.</li>
                 <li><strong>Access to wallet.monkstash.com:</strong> the relay described below, the only site it connects to by default.</li>
                 <li><strong>Idle:</strong> to lock the wallet when your computer locks.</li>
+                <li><strong>Context menus:</strong> for one right-click item, &ldquo;Pay with MonkStash&rdquo;. Only when you choose it, the browser hands the extension the address or link you right-clicked, and the extension opens its own Send page with it filled in. It sees nothing else on the page.</li>
                 <li><strong>Offscreen and side panel (Chrome):</strong> to keep the wallet running while the small popup is closed, and to show it in the side panel.</li>
                 <li><strong>Your own node, if you add one:</strong> the browser asks you to allow that one address, and the access is removed again when you stop using it.</li>
               </ul>

@@ -63,6 +63,7 @@ const permissions = [
   { p: "Storage and unlimited storage", why: "to keep the encrypted wallet and its scan progress on your device, in storage that clearing your browsing history does not erase." },
   { p: "wallet.monkstash.com", why: "our relay to the Monero network, the only site it connects to by default." },
   { p: "Idle", why: "to lock the wallet when your computer locks." },
+  { p: "Context menus", why: "for one right-click item, \"Pay with MonkStash\": when you choose it, the browser hands over only the address or link you right-clicked, and Send opens filled in." },
   { p: "Offscreen and side panel (Chrome only)", why: "to keep the wallet running while the popup is closed, and to open it in the side panel." },
   { p: "Your own node, only if you add one", why: "the browser asks you to allow that one address." },
 ];
