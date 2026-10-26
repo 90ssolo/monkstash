@@ -194,6 +194,8 @@ export function remoteWallet(host: HostConnection, pub: WalletPublic, seq: numbe
     freezeCoin: (keyImage, frozen) => call("freezeCoin", keyImage, frozen),
     proveSent: (hash, address, message) => call("proveSent", hash, address, message),
     checkProof: (p) => call("checkProof", p),
+    proveFunds: (amount, message) => call("proveFunds", amount, message),
+    checkFunds: (f) => call("checkFunds", f),
     syncNow: () => call("syncNow"),
     prepareSend: (destinations, options) => call("prepareSend", destinations, options),
     prepareSweep: (address, options) => call("prepareSweep", address, options),

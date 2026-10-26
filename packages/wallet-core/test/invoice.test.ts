@@ -156,6 +156,11 @@ describe("invoice status", () => {
     const close = pay(XMR, { pending: false, confirmations: 50, seenAt: T0 - 10 * MIN });
     expect(invoiceStatus(inv, [close], T0 + MIN)).toMatchObject({ kind: "paid" });
   });
+  it("never counts a payment the sender locked with a custom unlock time", () => {
+    const locked = pay(XMR, { pending: false, confirmations: 50, locked: true });
+    expect(invoiceStatus(inv, [locked], T0 + MIN)).toEqual({ kind: "waiting" });
+    expect(invoiceStatus(inv, [locked, pay(XMR / 2n, { pending: false, confirmations: 3 })], T0 + MIN)).toMatchObject({ kind: "partial", remaining: XMR / 2n });
+  });
   it("tracks partial payments and what is left", () => {
     expect(invoiceStatus(inv, [pay(XMR / 4n)], T0 + 2 * MIN)).toMatchObject({ kind: "partial", remaining: (XMR * 3n) / 4n, pending: true, expired: false });
   });

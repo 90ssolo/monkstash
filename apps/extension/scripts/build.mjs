@@ -61,7 +61,8 @@ const perBrowser = firefox
       // heartbeat (views/remote.ts) and the host locks itself shortly after the last view closes.
       background: { page: "host.html" },
       sidebar_action: { default_panel: "sidepanel.html", default_title: "MonkStash", default_icon: icons, open_at_install: false },
-      permissions: ["storage", "unlimitedStorage", "idle"],
+      // contextMenus: the right-click "Pay with MonkStash" item (no access to pages).
+      permissions: ["storage", "unlimitedStorage", "idle", "contextMenus"],
       browser_specific_settings: {
         gecko: {
           id: "extension@monkstash.com",
@@ -77,7 +78,8 @@ const perBrowser = firefox
       minimum_chrome_version: "116",
       side_panel: { default_path: "sidepanel.html" },
       background: { service_worker: "sw.js", type: "module" },
-      permissions: ["storage", "unlimitedStorage", "idle", "offscreen", "sidePanel"],
+      // contextMenus: the right-click "Pay with MonkStash" item (no access to pages).
+      permissions: ["storage", "unlimitedStorage", "idle", "offscreen", "sidePanel", "contextMenus"],
     };
 const manifest = {
   ...common,

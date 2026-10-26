@@ -26,6 +26,11 @@ export interface Contact {
   note?: string;
   createdAt: string;
   lastPaidAt?: string;
+  /**
+   * Their own receive address in this wallet (subaddress index, main account): given only to them,
+   * so their payments show who they came from, and a leak shows who had it.
+   */
+  receiveIndex?: number;
 }
 
 export const CONTACT_NAME_MAX = 40;

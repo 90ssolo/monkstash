@@ -5,7 +5,8 @@
  * device only (see lib/wallet/contacts.ts).
  */
 import { useState } from "react";
-import { checkContact, ContactError, shortAddress, sortContacts, type Contact, type NetworkType } from "@quietmint/wallet-core";
+import { checkContact, ContactError, formatXmr, shortAddress, sortContacts, type Contact, type NetworkType } from "@quietmint/wallet-core";
+import { CopyButton } from "./CopyButton";
 import styles from "./wallet.module.css";
 
 export function ContactChips({ contacts, onPick, onManage }: { contacts: Contact[]; onPick: (c: Contact) => void; onManage: () => void }) {
@@ -34,12 +35,21 @@ export function ContactChips({ contacts, onPick, onManage }: { contacts: Contact
   );
 }
 
-export function ContactManager({ contacts, network, onSave, onClose }: {
+/** A contact's own receive address, with what arrived at it. */
+export interface PayAddress { address: string; received: bigint }
+
+export function ContactManager({ contacts, network, onSave, onClose, payAddress, onGiveAddress, hidden = false }: {
   contacts: Contact[];
   network: NetworkType;
   onSave: (list: Contact[]) => Promise<void>;
   onClose: () => void;
+  /** The address this contact was given to pay you, if any. */
+  payAddress?: (c: Contact) => PayAddress | null;
+  /** Makes a fresh address just for this contact (full wallets only). */
+  onGiveAddress?: (c: Contact) => Promise<void>;
+  hidden?: boolean;
 }) {
+  const [giving, setGiving] = useState<string | null>(null);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -62,9 +72,10 @@ export function ContactManager({ contacts, network, onSave, onClose }: {
       const clean = checkContact({ name, address, note, alias: editing?.alias }, network, contacts, editing?.id);
       // Editing a contact's address removes its OpenAlias link: the name no longer vouches for it.
       const alias = editing && editing.address === clean.address ? editing.alias : undefined;
-      const record = (base: Pick<Contact, "id" | "createdAt" | "lastPaidAt">): Contact => ({
+      const record = (base: Pick<Contact, "id" | "createdAt" | "lastPaidAt" | "receiveIndex">): Contact => ({
         id: base.id, name: clean.name, address: clean.address, createdAt: base.createdAt,
         ...(base.lastPaidAt ? { lastPaidAt: base.lastPaidAt } : {}),
+        ...(base.receiveIndex !== undefined ? { receiveIndex: base.receiveIndex } : {}),
         ...(clean.note ? { note: clean.note } : {}),
         ...(alias ? { alias } : {}),
       });
@@ -96,20 +107,44 @@ export function ContactManager({ contacts, network, onSave, onClose }: {
         <h3 id="contacts-list-h" style={{ margin: 0 }}>Contacts</h3>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>Done</button>
       </div>
+      {contacts.length && onGiveAddress ? (
+        <p className="small muted" style={{ margin: 0 }}>
+          Give each person their own address to pay you. Their payments then show who they came from, and if an address ever
+          turns up somewhere else, you know who shared it.
+        </p>
+      ) : null}
       {contacts.length ? (
         <ul className={styles.contactList}>
-          {sortContacts(contacts).map((c) => (
-            <li key={c.id}>
-              <div style={{ minWidth: 0 }}>
-                <strong>{c.name}</strong>
-                <span className="small muted mono">{c.alias ? `${c.alias} (${shortAddress(c.address, 5)})` : shortAddress(c.address, 6)}</span>
-              </div>
-              <span className={styles.contactActions}>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEdit(c)}>Edit</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void remove(c)}>Remove</button>
-              </span>
-            </li>
-          ))}
+          {sortContacts(contacts).map((c) => {
+            const mine = payAddress?.(c) ?? null;
+            return (
+              <li key={c.id}>
+                <div style={{ minWidth: 0 }}>
+                  <strong>{c.name}</strong>
+                  <span className="small muted mono">{c.alias ? `${c.alias} (${shortAddress(c.address, 5)})` : shortAddress(c.address, 6)}</span>
+                </div>
+                <span className={styles.contactActions}>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEdit(c)}>Edit</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => void remove(c)}>Remove</button>
+                </span>
+                {mine ? (
+                  <div className={styles.payAddr}>
+                    <span className="small">Their address for paying you: <span className="mono">{shortAddress(mine.address, 6)}</span></span>
+                    <span className="small muted">{hidden ? "Received: hidden" : mine.received > 0n ? `Received ${formatXmr(mine.received, 6)} XMR from it` : "Nothing received at it yet"}</span>
+                    <CopyButton value={mine.address} label={`Copy ${c.name}'s address`} />
+                  </div>
+                ) : onGiveAddress ? (
+                  <div className={styles.payAddr}>
+                    <button type="button" className="btn btn-ghost btn-sm" disabled={giving !== null} onClick={async () => {
+                      setGiving(c.id);
+                      setError(null);
+                      try { await onGiveAddress(c); } catch (err) { setError((err as Error).message || "A new address could not be made."); } finally { setGiving(null); }
+                    }}>{giving === c.id ? "Creating…" : `Give ${c.name} their own address`}</button>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       <form onSubmit={save} className={styles.contactForm}>

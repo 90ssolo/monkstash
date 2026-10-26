@@ -248,6 +248,8 @@ export interface InvoicePayment {
    * time. If unknown after the invoice expired, it is treated as late, to be safe.
    */
   seenAt?: number;
+  /** Sent with a custom unlock time, so it cannot be spent for a long time: never counts as paid. */
+  locked?: boolean;
 }
 
 export type InvoiceStatus =
@@ -294,7 +296,7 @@ export function expiryIsFinal(inv: Invoice, now: number): boolean {
 /** Works out an invoice's status from the incoming payments at time `now`. */
 export function invoiceStatus(inv: Invoice, payments: InvoicePayment[], now: number): InvoiceStatus {
   const mine = payments.filter(
-    (p) => p.subaddressIndex === inv.subaddressIndex && p.amount > 0n && !(p.seenAt !== undefined && p.seenAt < inv.createdAt - EARLY_PAYMENT_GRACE_MS),
+    (p) => p.subaddressIndex === inv.subaddressIndex && p.amount > 0n && !p.locked && !(p.seenAt !== undefined && p.seenAt < inv.createdAt - EARLY_PAYMENT_GRACE_MS),
   );
   const expired = inv.expiresAt !== undefined && now >= inv.expiresAt;
   const isLate = (p: InvoicePayment) =>

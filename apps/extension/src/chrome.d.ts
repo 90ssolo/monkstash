@@ -67,4 +67,10 @@ declare namespace chrome {
   namespace windows {
     function getCurrent(): Promise<{ id?: number }>;
   }
+  namespace contextMenus {
+    interface OnClickData { menuItemId: string | number; selectionText?: string; linkUrl?: string }
+    function create(p: { id: string; title: string; contexts: ("selection" | "link")[] }): void;
+    function removeAll(done?: () => void): void;
+    const onClicked: Event<(info: OnClickData) => void>;
+  }
 }

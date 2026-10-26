@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { keccak_256 } from "@noble/hashes/sha3.js";
-import { assertSafeProofAddress, checkPaymentProof, formatPaymentProof, parsePaymentProof, ProofError } from "../src/proofs";
+import { assertSafeProofAddress, checkPaymentProof, formatFundsProof, formatPaymentProof, parseFundsProof, parsePaymentProof, ProofError } from "../src/proofs";
 import { cnBase58Decode, cnBase58Encode } from "../src/base58";
 
 const HASH = "a".repeat(64);
@@ -45,5 +45,19 @@ describe("assertSafeProofAddress", () => {
   it("refuses an address that carries our own view key", () => {
     expect(() => assertSafeProofAddress(crafted(ADDR), ADDR)).toThrow(/reuses your own wallet's view key/);
     expect(() => assertSafeProofAddress(` ${crafted(ADDR)} `, ADDR)).toThrow(ProofError);
+  });
+});
+
+describe("proof of funds", () => {
+  const RES = "ReserveProofV2Abc123xyz";
+  it("round-trips through the shareable text", () => {
+    const text = formatFundsProof({ address: ADDR, amount: 2_500_000_000_000n, signature: RES, message: "Trade 7" }, (a) => (Number(a) / 1e12).toString());
+    expect(text).toContain("At least: 2.5 XMR");
+    expect(parseFundsProof(text)).toEqual({ address: ADDR, signature: RES, message: "Trade 7" });
+    expect(formatFundsProof({ address: ADDR, signature: RES }, String)).toContain("Covers: the whole wallet");
+  });
+  it("explains what is wrong", () => {
+    expect(() => parseFundsProof(`Address: nope\nSigned proof: ${RES}`)).toThrow(/address/);
+    expect(() => parseFundsProof(`Address: ${ADDR}\nSigned proof: OutProofV2abc`)).toThrow(/ReserveProofV2/);
   });
 });

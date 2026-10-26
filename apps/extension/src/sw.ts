@@ -4,6 +4,7 @@
  * host page keeps running on its own, so nothing here holds wallet state.
  */
 import { VAULT_COPY_KEY, type Control } from "./shared/rpc";
+import { installPayMenu, listenPayMenu } from "./shared/payMenu";
 
 const HOST_URL = "host.html";
 /** A host page that has not said it is ready by then is closed and started again on the next try. */
@@ -81,4 +82,7 @@ chrome.idle.onStateChanged.addListener((state) => {
 chrome.runtime.onInstalled.addListener((details) => {
   // First install: onboarding (create or restore) happens in a full tab, never in the small popup.
   if (details.reason === "install") void chrome.tabs.create({ url: chrome.runtime.getURL("tab.html") });
+  installPayMenu();
 });
+// Right-click "Pay with MonkStash" on a selected address or a payment link.
+listenPayMenu();

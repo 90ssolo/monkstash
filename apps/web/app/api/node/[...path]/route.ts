@@ -198,8 +198,14 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   // (timeout, dropped answer, 5xx), asking the next node would at best get "double spend" back
   // and hide that the payment went out. The wallet then checks the pool for the transaction.
   const isSend = SEND_ENDPOINTS.has(endpoint);
+  // Split broadcast: a finished payment goes out through a different node than the one the wallet
+  // syncs and builds payments with (the first healthy node). That node saw which outputs were
+  // fetched as decoys; it should not also see the transaction they ended up in. Only when that
+  // other node is healthy: a broadcast that times out is never retried elsewhere.
+  const splitTo = nodes[1];
+  const order = isSend && splitTo && (downUntil.get(splitTo) ?? 0) <= Date.now() ? [splitTo, nodes[0]!, ...nodes.slice(2)] : nodes;
   let lastError = "unknown error";
-  for (const base of nodes) {
+  for (const base of order) {
     try {
       const abort = new AbortController();
       const firstByte = setTimeout(() => abort.abort(new Error("no answer in time")), stream ? FIRST_BYTE_MS : TIMEOUT_MS);

@@ -359,6 +359,9 @@ export interface TxSummary {
   destinations?: { address: string; amount: bigint }[];
 }
 
+/** Result of checking a proof of funds: the total it proves, and how much of that is already being spent. */
+export interface FundsCheck { good: boolean; total: bigint; unconfirmedSpent: bigint }
+
 /** Result of checking someone's payment proof against the blockchain. */
 export interface ProofCheck {
   good: boolean;
@@ -378,6 +381,11 @@ export interface IncomingEntry {
   hash: string;
   /** Block time in seconds, once confirmed. */
   timestamp?: number;
+  /**
+   * Sent with a custom unlock time: it cannot be spent for a long time, so it never counts as
+   * paid (the same rule as MonkStash Pay). Nodes refuse these since 2026 and FCMP++ removes them.
+   */
+  locked?: boolean;
 }
 
 /** Where a transaction is, as the node sees it. */
@@ -489,6 +497,10 @@ export interface LiveWallet {
   proveSent(hash: string, address: string, message?: string): Promise<{ signature: string }>;
   /** Checks a payment proof (tx key or signed proof) against the blockchain. */
   checkProof(p: PaymentProof): Promise<ProofCheck>;
+  /** Proof of funds (reserve proof): at least `amount` from the main account, or the whole wallet. */
+  proveFunds(amount?: bigint, message?: string): Promise<string>;
+  /** Checks someone's proof of funds against the blockchain. */
+  checkFunds(p: { address: string; signature: string; message?: string }): Promise<FundsCheck>;
   /** One extra sync now (cashier mode checks for new payments more often than the background sync). */
   syncNow?(): Promise<void>;
   /**
@@ -782,6 +794,7 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
           pending: !tx.getIsConfirmed(),
           hash: tx.getHash(),
           ...(tx.getBlock()?.getTimestamp() ? { timestamp: tx.getBlock()!.getTimestamp() } : {}),
+          ...(BigInt(tx.getUnlockTime() ?? 0) !== 0n ? { locked: true } : {}),
         };
       });
     },
@@ -836,6 +849,15 @@ export async function openWallet(p: OpenParams): Promise<LiveWallet> {
         confirmations: good ? Number(r.getNumConfirmations() ?? 0) : 0,
         inPool: good ? !!r.getInTxPool() : false,
       };
+    },
+    async proveFunds(amount, message) {
+      if (p.kind !== "full") throw new Error("A watch-only wallet cannot prove funds: it cannot see what has been spent.");
+      return amount !== undefined ? w.getReserveProofAccount(MAIN_ACCOUNT, amount, message || undefined) : w.getReserveProofWallet(message || undefined);
+    },
+    async checkFunds(f) {
+      const r = await w.checkReserveProof(f.address.trim(), f.message || undefined, f.signature.trim());
+      const good = !!r.getIsGood();
+      return { good, total: good ? BigInt(r.getTotalAmount() ?? 0n) : 0n, unconfirmedSpent: good ? BigInt(r.getUnconfirmedSpentAmount() ?? 0n) : 0n };
     },
     async newSubaddress(label) {
       return (await w.createSubaddress(0, label ?? "")).getAddress();

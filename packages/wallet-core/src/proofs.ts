@@ -97,3 +97,42 @@ export function assertSafeProofAddress(target: string, ownPrimaryAddress: string
     throw new ProofError("This address reuses your own wallet's view key, so a proof for it could reveal your change. No proof was made. Ask the recipient for their real address.");
   }
 }
+
+/**
+ * Proof of funds (wallet2's reserve proof): shows that the wallet behind `address` holds at least
+ * `amount` (or everything it has), without moving anything. It names the coins it covers (their
+ * key images), so spending them later can be linked to the proof: prove only what is needed.
+ */
+export interface FundsProof {
+  address: string;
+  /** Atomic units the proof was made for; absent means the whole wallet. */
+  amount?: bigint;
+  signature: string;
+  message?: string;
+}
+
+const RESERVE = /^ReserveProofV[12][1-9A-HJ-NP-Za-km-z]+$/;
+
+export function formatFundsProof(p: FundsProof, formatAmount: (a: bigint) => string): string {
+  const lines = ["Monero proof of funds", `Address: ${p.address}`];
+  lines.push(p.amount !== undefined ? `At least: ${formatAmount(p.amount)} XMR` : "Covers: the whole wallet");
+  if (p.message) lines.push(`Message: ${p.message}`);
+  lines.push(`Signed proof: ${p.signature}`);
+  return lines.join("\n");
+}
+
+/** Reads a pasted proof of funds; the amount line is informational (the check reports the real total). */
+export function parseFundsProof(text: string): FundsProof {
+  const fields: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const m = /^\s*([A-Za-z][A-Za-z ]{1,30}?)\s*:\s*(.*?)\s*$/.exec(raw);
+    if (m) fields[m[1]!.toLowerCase()] = m[2]!;
+  }
+  const address = (fields["address"] ?? "").trim();
+  if (!addressNetwork(address)) throw new ProofError("The proof needs the wallet's address.");
+  const signature = (fields["signed proof"] ?? fields["signature"] ?? "").trim();
+  if (!RESERVE.test(signature)) throw new ProofError("The signed proof should start with ReserveProofV2.");
+  const message = fields["message"];
+  if (message && message.length > PROOF_MESSAGE_MAX) throw new ProofError(`The message is longer than ${PROOF_MESSAGE_MAX} characters.`);
+  return { address, signature, ...(message ? { message } : {}) };
+}

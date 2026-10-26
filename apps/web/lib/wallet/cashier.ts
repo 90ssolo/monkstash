@@ -48,7 +48,8 @@ export const EMPTY_CASHIER: CashierData = { config: null, sales: [] };
 /** Payments for a sale, with first-seen times attached. */
 export function salePayments(sale: Sale, incoming: IncomingEntry[]): InvoicePayment[] {
   return incoming
-    .filter((e) => (e.accountIndex ?? MAIN_ACCOUNT) === (sale.account ?? MAIN_ACCOUNT) && e.subaddressIndex === sale.invoice.subaddressIndex)
+    // A payment with a custom unlock time cannot be spent for a long time: never counted as paid.
+    .filter((e) => (e.accountIndex ?? MAIN_ACCOUNT) === (sale.account ?? MAIN_ACCOUNT) && e.subaddressIndex === sale.invoice.subaddressIndex && !e.locked)
     .map((e) => ({ ...e, seenAt: sale.seen[e.hash] ?? (e.timestamp ? e.timestamp * 1000 : undefined) }));
 }
 

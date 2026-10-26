@@ -11,7 +11,7 @@ import { fetchPriceHistory, historyYears, isFiltered, matchesFilter, NO_FILTER, 
 import { fetchPriceFeed, MAIN_CURRENCIES } from "@/lib/prices";
 import { CurrencyPicker, OFF, useCurrencyPref } from "./FiatValue";
 import { CopyButton } from "./CopyButton";
-import { CheckProof, ProveSent } from "./Proofs";
+import { CheckProof, FundsProofPanel, ProveSent, Receipt } from "./Proofs";
 import styles from "./wallet.module.css";
 
 /** About two minutes per block until the 10-block spendable age. */
@@ -57,7 +57,7 @@ const KINDS: { kind: HistoryKind; label: string }[] = [
   { kind: "out", label: "Sent" },
 ];
 
-export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidden, compact = false, onSeeAll, labels, arrived, onSaveLabels }: {
+export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidden, compact = false, onSeeAll, labels, arrived, onSaveLabels, funds }: {
   txs: TxSummary[];
   synced: boolean;
   onReceive: () => void;
@@ -71,8 +71,11 @@ export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidde
   arrived: Map<string, string[]>;
   /** Absent while the labels cannot be saved (for example in a locked extension view). */
   onSaveLabels?: (l: WalletLabels) => Promise<void>;
+  /** Proof of funds: the wallet's main address, and whether it can prove (full wallets only). */
+  funds?: { primaryAddress: string; canProve: boolean };
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [proving, setProving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [filter, setFilter] = useState<HistoryFilter>(NO_FILTER);
@@ -83,6 +86,7 @@ export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidde
   const shown = compact || !filtered ? txs : txs.filter((t) => matchesFilter(t, tags(t), filter));
 
   if (checking) return <CheckProof wallet={wallet} onClose={() => setChecking(false)} />;
+  if (proving && funds) return <FundsProofPanel wallet={wallet} primaryAddress={funds.primaryAddress} canProve={funds.canProve} onClose={() => setProving(false)} />;
   if (!txs.length) {
     return (
       <div className={styles.empty}>
@@ -106,6 +110,7 @@ export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidde
             <>
               {onToggleHidden ? <button type="button" className="btn btn-ghost btn-sm" aria-pressed={hidden} onClick={onToggleHidden}>Hide<span className="visually-hidden"> amounts and notes</span></button> : null}
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChecking(true)}>Check a payment proof</button>
+              {funds ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => setProving(true)}>Proof of funds</button> : null}
               <button type="button" className="btn btn-ghost btn-sm" aria-expanded={exporting} onClick={() => setExporting((x) => !x)}>Export</button>
             </>
           )}
@@ -184,6 +189,7 @@ export function Activity({ txs, synced, onReceive, wallet, hidden, onToggleHidde
                   </dl>
                   {onSaveLabels && !hidden ? <NoteEditor key={t.hash} note={tg.note ?? ""} onSave={(n) => onSaveLabels(withTxNote(labels, t.hash, n))} /> : null}
                   <CopyButton value={t.hash} label="Copy transaction ID" />
+                  {t.direction !== "in" ? <Receipt wallet={wallet} tx={t} note={tg.note} /> : null}
                   {t.direction !== "in" ? <ProveSent wallet={wallet} tx={t} /> : (
                     <p className="small muted" style={{ margin: 0 }}>Received payments are proven by the sender. If someone sent you a proof, use <em>Check a payment proof</em> above.</p>
                   )}

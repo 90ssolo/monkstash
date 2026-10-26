@@ -69,6 +69,7 @@ export function createSimWallet(address: string, only?: { amount: bigint }): Liv
   const incoming: IncomingEntry[] = [];
   let lastSend: { address: string; amount: bigint; destinations?: Destination[]; inputs?: Coin[] } | null = null;
   const sent = new Map<string, { address: string; amount: bigint; txKey: string; signature: string }>();
+  const funds = new Map<string, { amount: bigint; message: string }>();
 
   return {
     primaryAddress: address,
@@ -168,6 +169,19 @@ export function createSimWallet(address: string, only?: { amount: bigint }): Liv
       return hash;
     },
     // Simulated proofs: only payments made in this session check out.
+    // Simulated proofs of funds: they check out in this session, for at most the balance.
+    async proveFunds(amount?: bigint, message?: string) {
+      const have = total();
+      if (amount !== undefined && amount > have) throw new Error("Not enough funds for a proof of this amount.");
+      const sig = `ReserveProofV2Sim${(amount ?? have).toString().replace(/0/g, "z")}x${(message ?? "").length + 1}`;
+      funds.set(sig, { amount: amount ?? have, message: message ?? "" });
+      return sig;
+    },
+    async checkFunds(f: { address: string; signature: string; message?: string }) {
+      const known = funds.get(f.signature);
+      const good = !!known && f.address === address && known.message === (f.message ?? "");
+      return { good, total: good ? known!.amount : 0n, unconfirmedSpent: 0n };
+    },
     async proveSent(hash: string, to: string) {
       assertSafeProofAddress(to, address);
       const s = sent.get(hash);

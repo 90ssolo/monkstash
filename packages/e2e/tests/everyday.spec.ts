@@ -221,3 +221,85 @@ test("hear it land: a chime and a message when Monero arrives, sound can be turn
   await expect(page.getByRole("status").filter({ hasText: "Received 0.6 XMR" })).toBeVisible({ timeout: 25_000 });
   expect(await notes()).toBe(before);
 });
+
+test("contacts: give someone their own address, and see what arrived from it", async ({ page }) => {
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await synced(page);
+  await section(page, "Contacts").click();
+  await page.locator("#c-name").fill("Kai");
+  await page.locator("#c-addr").fill(wallet("Test B").primaryAddress);
+  await page.getByRole("button", { name: "Save contact" }).click();
+
+  await page.getByRole("button", { name: "Give Kai their own address" }).click();
+  await expect(page.getByText(/Their address for paying you/)).toBeVisible();
+  await expect(page.getByText("Nothing received at it yet")).toBeVisible();
+  // The simulation pays a new address 0.1 XMR a few seconds after it is made.
+  await expect(page.getByText("Received 0.1 XMR from it")).toBeVisible({ timeout: 25_000 });
+  await shoot(page, "contact-address");
+
+  // The same address is listed under Receive, named after Kai, with its total.
+  await section(page, "Receive").click();
+  const kai = page.getByRole("region", { name: "Addresses you named" }).locator("li").filter({ hasText: "Kai" });
+  await expect(kai).toContainText("Received 0.1 XMR");
+});
+
+test("receipts and refunds: a link's shop and purpose become the note, a refund address, a receipt with signed proofs", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await synced(page);
+  await section(page, "Send").click();
+  const b = wallet("Test B").primaryAddress;
+  await page.evaluate((t) => navigator.clipboard.writeText(t), `monero:${b}?tx_amount=0.2&recipient_name=Corner%20Shop&tx_description=Order%2042`);
+  await page.getByRole("button", { name: "Paste", exact: true }).click();
+  await page.getByRole("button", { name: "Review" }).click();
+  await page.locator("#send-pw").fill(PASSWORD);
+  await page.getByRole("button", { name: "Send now" }).click();
+  await page.getByRole("button", { name: "Send without waiting" }).click();
+  await expect(page.getByText(/Your payment was sent to the network/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Get a refund address" }).click();
+  await expect(page.getByText(/Your refund address for Corner Shop/)).toBeVisible();
+  await shoot(page, "refund");
+
+  await section(page, "Activity").click();
+  await expect(page.getByText("Corner Shop: Order 42").filter({ visible: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Details of this outgoing payment" }).first().click();
+  await page.getByRole("button", { name: "Make a receipt" }).click();
+  const receipt = page.locator("pre code").filter({ hasText: "MonkStash payment receipt" });
+  await expect(receipt).toContainText("For: Corner Shop: Order 42");
+  await expect(receipt).toContainText("Signed proof: OutProofV2");
+  await expect(receipt).not.toContainText("Transaction key");
+
+  await section(page, "Receive").click();
+  await expect(page.getByRole("region", { name: "Addresses you named" })).toContainText("Refund from Corner Shop");
+});
+
+test("proof of funds: prove at least an amount, check it, and a changed message fails", async ({ page }) => {
+  await openWallet(page, "simulation");
+  await restore(page, wallet("Test A"));
+  await dashboard(page);
+  await synced(page);
+  await section(page, "Activity").click();
+  await page.getByRole("button", { name: "Proof of funds" }).click();
+  await expect(page.getByText(/names the coins it covers/)).toBeVisible();
+  await page.locator("#funds-amt").fill("2.5");
+  await page.locator("#funds-msg").fill("Trade 7");
+  await page.getByRole("button", { name: "Make proof of funds" }).click();
+  const proof = page.locator("pre code").filter({ hasText: "Monero proof of funds" });
+  await expect(proof).toContainText("At least: 2.5 XMR");
+  await expect(proof).toContainText("Signed proof: ReserveProofV2");
+  await shoot(page, "funds");
+  const text = await proof.innerText();
+
+  await page.locator("#funds-paste").fill(text);
+  await page.getByRole("button", { name: "Check proof" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Valid: this wallet holds at least 2.5 XMR" })).toBeVisible();
+
+  await page.locator("#funds-paste").fill(text.replace("Message: Trade 7", "Message: Trade 8"));
+  await page.getByRole("button", { name: "Check proof" }).click();
+  await expect(page.getByText("This proof does not check out")).toBeVisible();
+});

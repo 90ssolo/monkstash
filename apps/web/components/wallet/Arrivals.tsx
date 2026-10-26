@@ -88,7 +88,8 @@ export function useArrivals(incoming: IncomingEntry[], txs: TxSummary[], ready: 
   useEffect(() => {
     if (!ready) return;
     const byHash = new Map<string, bigint>();
-    for (const e of incoming) byHash.set(e.hash, (byHash.get(e.hash) ?? 0n) + e.amount);
+    // A payment locked by the sender (custom unlock time) is not money you can use: no chime.
+    for (const e of incoming) if (!e.locked) byHash.set(e.hash, (byHash.get(e.hash) ?? 0n) + e.amount);
     if (seen.current === null) { seen.current = new Set(byHash.keys()); return; }
     // Payments held back last time: now we know whether they were our own change.
     for (const [hash, amount] of waiting.current) {

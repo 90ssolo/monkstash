@@ -56,7 +56,8 @@ export function statusOf(req: PaymentRequest, entries: IncomingEntry[]): Request
   // Payment requests live in the main account. First-seen time wins (the payment was already on
   // its way); otherwise a confirmed payment's block time; unknown counts as late only after expiry.
   const payments = entries
-    .filter((e) => (e.accountIndex ?? MAIN_ACCOUNT) === MAIN_ACCOUNT)
+    // A payment with a custom unlock time cannot be spent for a long time: never counted as paid.
+    .filter((e) => (e.accountIndex ?? MAIN_ACCOUNT) === MAIN_ACCOUNT && !e.locked)
     .map((e) => {
       const seenAt = req.seen?.[e.hash] ?? (e.timestamp ? e.timestamp * 1000 : undefined);
       return { ...e, ...(seenAt !== undefined ? { seenAt } : {}) };

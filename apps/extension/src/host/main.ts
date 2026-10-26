@@ -12,6 +12,7 @@ import { STATE_SAVE_EVERY_MS, WalletController, type View } from "@/lib/wallet/s
 import { AUTO_LOCK_IDLE_MS, AUTO_LOCK_NO_VIEWS_MS } from "@/lib/wallet/autolock";
 import { setVaultMirror, VAULT_KEY } from "@/lib/wallet/storage";
 import { post, PORT_NAME, receiver, type Control, type HostState, type ToHost, type ToView } from "../shared/rpc";
+import { installPayMenu, listenPayMenu } from "../shared/payMenu";
 
 const controller = new WalletController();
 // Stagenet test builds only: lets automated tests inspect the controller from DevTools.
@@ -136,7 +137,7 @@ function sharedSync(w: LiveWallet): Promise<void> {
  */
 const WALLET_CALLS = new Set([
   "haltSync", "findTx", "highestSubaddress", "balances", "txs", "newSubaddress", "newRequestAddress",
-  "ensureSubaddresses", "prepareMove", "incoming", "proveSent", "checkProof", "syncNow",
+  "ensureSubaddresses", "prepareMove", "incoming", "proveSent", "checkProof", "proveFunds", "checkFunds", "syncNow",
   "prepareSend", "prepareSweep", "relay", "height", "coins", "freezeCoin",
 ]);
 /** Settings actions a view may call. Each one checks the password (and code) against the vault. */
@@ -278,7 +279,10 @@ if (__FIREFOX__) {
   chrome.runtime.onInstalled.addListener((details) => {
     // First install: onboarding happens in a full tab, never in the small popup.
     if (details.reason === "install") void chrome.tabs.create({ url: chrome.runtime.getURL("tab.html") });
+    installPayMenu();
   });
+  // Right-click "Pay with MonkStash" on a selected address or a payment link.
+  listenPayMenu();
 }
 
 // ---- Auto-lock and periodic saves ------------------------------------------------------------------

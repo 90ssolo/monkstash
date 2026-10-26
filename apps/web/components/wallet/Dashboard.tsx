@@ -6,7 +6,7 @@ import { FiatValue } from "./FiatValue";
 import type { WalletSummary } from "@/lib/wallet/session";
 import { ChangePassword, TwoFactor, WatchOnlyKeys } from "./Security";
 import { Checkup, checkupItems, checkupScore, useLocalChecks } from "./Checkup";
-import { readPastedRecipient, addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, EMPTY_LABELS, addressKey, LABEL_MAX, withAddressLabel, type WalletLabels, type WalletPublic } from "@quietmint/wallet-core";
+import { readPastedRecipient, withTxNote, addressNetwork, aliasChanged, atomicToFiat, buildPaymentFragment, checkContact, ContactError, contactForAddress, contactForAlias, lookalikeAddress, lookalikeContact, type Contact, buildPaymentUri, checkAddressFormat, checkReturnUrl, fiatToAtomic, formatXmr, NOTE_MAX, openAliasFqdn, parsePaymentUri, parseXmr, paymentLink, shortAddress, xmrAmountProblem, EMPTY_LABELS, addressKey, LABEL_MAX, withAddressLabel, type WalletLabels, type WalletPublic } from "@quietmint/wallet-core";
 import { fetchPriceFeed, fetchQuote, MAIN_CURRENCIES, PriceUnavailableError } from "@/lib/prices";
 import { fiatText, localCurrency } from "@/lib/localCurrency";
 import { recordRequestSeen, statusOf, type PaymentRequest, type RequestStatus, type RequestStore } from "@/lib/wallet/requests";
@@ -50,7 +50,7 @@ const STALE_MS = 2 * 60 * 1000;
 const timeText = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 /** A request opened from a /pay link ("Pay with MonkStash"). */
-interface Prefill { address: string; amount?: bigint; note?: string; expiresAt?: number }
+interface Prefill { address: string; amount?: bigint; note?: string; name?: string; expiresAt?: number }
 
 type Section = "home" | "send" | "receive" | "paid" | "activity" | "contacts" | "coins" | "checkup" | "settings" | "more";
 
@@ -224,7 +224,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
     if (!window.location.hash.startsWith("#pay=")) return;
     try {
       const r = parsePaymentUri(window.location.hash);
-      setPrefill({ address: r.address, amount: r.amount, note: r.note, ...(r.expiresAt !== undefined ? { expiresAt: r.expiresAt } : {}) });
+      setPrefill({ address: r.address, amount: r.amount, note: r.note, name: r.name, ...(r.expiresAt !== undefined ? { expiresAt: r.expiresAt } : {}) });
       setSection("send");
     } catch {
       /* not a valid request: ignore */
@@ -262,6 +262,31 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
   const pct = sync ? Math.min(100, Math.round(sync.percent * 1000) / 10) : 0;
   const synced = !!sync?.done;
+  // What arrived at each receive address (main account), for named addresses and contacts.
+  const receivedAt = useMemo(() => {
+    const m = new Map<number, bigint>();
+    for (const e of incoming) if ((e.accountIndex ?? MAIN_ACCOUNT) === MAIN_ACCOUNT) m.set(e.subaddressIndex, (m.get(e.subaddressIndex) ?? 0n) + e.amount);
+    return m;
+  }, [incoming]);
+  const contactPayAddress = useCallback((c: Contact) => {
+    if (c.receiveIndex === undefined) return null;
+    const a = labelData.addr[addressKey(MAIN_ACCOUNT, c.receiveIndex)];
+    return a ? { address: a.address, received: receivedAt.get(c.receiveIndex) ?? 0n } : null;
+  }, [labelData, receivedAt]);
+  // A fresh address only this contact gets, named after them (same guards as payment requests).
+  const giveContactAddress = useCallback(async (c: Contact) => {
+    const used = requests ? (await requests.load()).map((r) => r.index) : [];
+    const sub = await freshAddress(wallet, c.name, used);
+    await saveLabels(withAddressLabel(labelData, MAIN_ACCOUNT, sub.index, sub.address, c.name));
+    await saveContacts(contactList.map((x) => (x.id === c.id ? { ...x, receiveIndex: sub.index } : x)));
+  }, [requests, wallet, saveLabels, labelData, saveContacts, contactList]);
+  // A fresh address to give a shop for a refund, named after the shop.
+  const refundAddress = useCallback(async (label: string) => {
+    const used = requests ? (await requests.load()).map((r) => r.index) : [];
+    const sub = await freshAddress(wallet, label, used);
+    if (labels) await saveLabels(withAddressLabel(labelData, MAIN_ACCOUNT, sub.index, sub.address, label));
+    return sub.address;
+  }, [requests, wallet, labels, saveLabels, labelData]);
   // A chime and a message when Monero arrives (worked out here, see Arrivals.tsx).
   const [arrival, closeArrival] = useArrivals(incoming, txs, synced);
   const stale = synced && !syncError && !!health?.lastOk && Date.now() - health.lastOk > STALE_MS;
@@ -478,7 +503,8 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
             <h2 id="send-h" className={styles.panelH} tabIndex={-1}>Send Monero</h2>
             {pub.kind === "full" ? (
               <Send key={prefill ? `${prefill.address}${prefill.amount ?? ""}` : "send"} pub={pub} wallet={wallet} settings={settings} synced={synced} unlocked={bal?.unlocked ?? 0n} frozen={bal?.frozen ?? 0n} labels={labelData} onCoins={hasCoins ? () => go("coins") : undefined} onSent={refresh} prefill={prefill}
-                contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} past={pastRecipients} />
+                contacts={contacts ? contactList : null} onSaveContacts={saveContacts} hidden={hidden} past={pastRecipients}
+                {...(labels ? { onSaveLabels: saveLabels } : {})} onRefundAddress={refundAddress} />
             ) : null}
             {pub.kind === "full" && settings?.giftPrepare && !compact ? (
               <GiftLinks actions={settings} network={pub.network} unlocked={bal?.unlocked ?? 0n} synced={synced} hidden={hidden} onSent={() => void refresh()} />
@@ -490,7 +516,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
 
           <section hidden={section !== "receive"} aria-labelledby="receive-h" className={styles.section}>
             <h2 id="receive-h" className={styles.panelH} tabIndex={-1}>Receive Monero</h2>
-            <AddressView pub={pub} wallet={wallet} requests={requests} labels={labelData} onSaveLabels={labels ? saveLabels : undefined} hidden={hidden} />
+            <AddressView pub={pub} wallet={wallet} requests={requests} labels={labelData} onSaveLabels={labels ? saveLabels : undefined} hidden={hidden} receivedAt={receivedAt} />
             <p className="small muted" style={{ marginTop: "var(--s-5)" }}>
               Want a set amount, a price in your currency, or to see when someone has paid?{" "}
               <button type="button" className={styles.inlineLink} onClick={() => go("paid")}>Make a payment request</button>.
@@ -533,13 +559,15 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
           </section>
 
           <section hidden={section !== "activity"} aria-label="Activity" className={styles.section}>
-            <Activity txs={txs} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} onToggleHidden={toggleHidden} {...historyProps} />
+            <Activity txs={txs} synced={synced} onReceive={() => go("receive")} wallet={wallet} hidden={hidden} onToggleHidden={toggleHidden} {...historyProps}
+              funds={{ primaryAddress: pub.primaryAddress, canProve: pub.kind === "full" }} />
           </section>
 
           <section hidden={section !== "contacts"} aria-labelledby="contacts-h" className={styles.section}>
             <h2 id="contacts-h" className={styles.panelH} tabIndex={-1}>Contacts</h2>
             {contacts ? (
-              <ContactManager contacts={contactList} network={pub.network} onSave={saveContacts} onClose={() => go("home")} />
+              <ContactManager contacts={contactList} network={pub.network} onSave={saveContacts} onClose={() => go("home")} hidden={hidden}
+                payAddress={contactPayAddress} {...(pub.kind === "full" && labels ? { onGiveAddress: giveContactAddress } : {})} />
             ) : <p className="muted">Contacts are available once the wallet is unlocked.</p>}
           </section>
 
@@ -716,7 +744,7 @@ export function Dashboard({ pub, wallet, onLock, onRemove, onSynced, settings, r
   );
 }
 
-function AddressView({ pub, wallet, requests, labels, onSaveLabels, hidden }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore; labels: WalletLabels; onSaveLabels?: (l: WalletLabels) => Promise<void>; hidden: boolean }) {
+function AddressView({ pub, wallet, requests, labels, onSaveLabels, hidden, receivedAt }: { pub: WalletPublic; wallet: LiveWallet; requests?: RequestStore; labels: WalletLabels; onSaveLabels?: (l: WalletLabels) => Promise<void>; hidden: boolean; receivedAt?: Map<number, bigint> }) {
   const [address, setAddress] = useState(pub.primaryAddress);
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -767,7 +795,7 @@ function AddressView({ pub, wallet, requests, labels, onSaveLabels, hidden }: { 
       {named.length && !hidden ? (
         <section className={styles.addrNamed} aria-labelledby="named-h">
           <h3 id="named-h" className={styles.recentH}>Addresses you named</h3>
-          <p className="small muted" style={{ margin: "var(--s-1) 0 0" }}>Payments to these show the name in Activity.</p>
+          <p className="small muted" style={{ margin: "var(--s-1) 0 0" }}>Payments to these show the name in Activity. If one ever turns up somewhere else, you know who shared it.</p>
           <ul className={styles.addrNames}>
             {named.map(([k, a]) => (
               <li key={k}>
@@ -777,6 +805,7 @@ function AddressView({ pub, wallet, requests, labels, onSaveLabels, hidden }: { 
                   <CopyButton value={a.address} label="Copy" />
                 </span>
                 <span className="mono">{shortAddress(a.address)}</span>
+                <span className="small muted">{(() => { const r = receivedAt?.get(Number(k.split("/")[1])) ?? 0n; return r > 0n ? `Received ${formatXmr(r, 6)} XMR` : "Nothing received yet"; })()}</span>
               </li>
             ))}
           </ul>
@@ -1111,7 +1140,10 @@ function RequestsView({ pub, wallet, requests, incoming, onChanged, hidden }: { 
   );
 }
 
-function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins, onSent, prefill, contacts, onSaveContacts, hidden, past }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; frozen: bigint; labels: WalletLabels; onCoins?: () => void; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean; past: string[] }) {
+function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins, onSent, prefill, contacts, onSaveContacts, hidden, past, onSaveLabels, onRefundAddress }: { pub: WalletPublic; wallet: LiveWallet; settings?: SettingsActions; synced: boolean; unlocked: bigint; frozen: bigint; labels: WalletLabels; onCoins?: () => void; onSent: () => void; prefill?: Prefill | null; contacts: Contact[] | null; onSaveContacts: (l: Contact[]) => Promise<void>; hidden?: boolean; past: string[]; onSaveLabels?: (l: WalletLabels) => Promise<void>; onRefundAddress?: (label: string) => Promise<string> }) {
+  // What a payment link said it was for, and who asked: kept as the payment's note (a receipt).
+  const [requestInfo, setRequestInfo] = useState<{ note?: string; name?: string } | null>(prefill?.note || prefill?.name ? { note: prefill.note, name: prefill.name } : null);
+  const [refund, setRefund] = useState<{ busy: boolean; address?: string; error?: string }>({ busy: false });
   const [to, setTo] = useState(prefill?.address ?? "");
   const [speed, setSpeed] = useState<SendSpeed>("standard");
   // The fee comes out of the typed amount: the recipient gets a little less, you pay exactly that amount.
@@ -1219,6 +1251,7 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
       try {
         const req = parsePaymentUri(pasted.uri);
         setTo(req.address);
+        setRequestInfo(req.note || req.name ? { note: req.note, name: req.name } : null);
         if (req.amount) { setAmount(formatXmr(req.amount)); setSendAll(false); setTypeFiat(false); }
         return;
       } catch (err) {
@@ -1280,7 +1313,29 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
             {saveMsg ? <p className="small" role="status" style={{ margin: 0 }}>{saveMsg}</p> : null}
           </form>
         ) : null}
-        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setSubtractFee(false); setBatch(false); setReview(null); setTxHash(null); }}>Send another</button>
+        {onRefundAddress && (review?.destinations.length ?? 1) === 1 ? (
+          <div className={styles.refundBox}>
+            {refund.address ? (
+              <>
+                <span className="small">Your refund address{requestInfo?.name ? ` for ${requestInfo.name}` : ""}. Give it to them only if they need to send money back:</span>
+                <span className={`mono ${styles.addr}`}>{refund.address}</span>
+                <CopyButton value={refund.address} label="Copy refund address" />
+              </>
+            ) : (
+              <>
+                <span className="small muted">Paying a shop? If they ever need to send money back, give them a refund address of your own. Monero never shows them where a payment came from.</span>
+                <button type="button" className="btn btn-ghost btn-sm" disabled={refund.busy} onClick={async () => {
+                  setRefund({ busy: true });
+                  const who = requestInfo?.name || (paidTo ? paidTo.name : shortAddress(sentTo.current, 4));
+                  try { setRefund({ busy: false, address: await onRefundAddress(`Refund from ${who}`.slice(0, LABEL_MAX)) }); }
+                  catch (err) { setRefund({ busy: false, error: (err as Error).message || "A refund address could not be made." }); }
+                }}>{refund.busy ? "Creating…" : "Get a refund address"}</button>
+                {refund.error ? <span className="error small" role="alert">{refund.error}</span> : null}
+              </>
+            )}
+          </div>
+        ) : null}
+        <button className="btn btn-ghost btn-sm" onClick={() => { setState("idle"); setTo(""); setAmount(""); setSendAll(false); setSubtractFee(false); setBatch(false); setReview(null); setTxHash(null); setRefund({ busy: false }); setRequestInfo(null); }}>Send another</button>
       </div>
     );
   }
@@ -1363,6 +1418,9 @@ function Send({ pub, wallet, settings, synced, unlocked, frozen, labels, onCoins
 
   function markSent(hash: string) {
     if (!review) return;
+    // A payment from a link keeps what it was for, as its note: the start of a receipt.
+    const forText = requestInfo ? [requestInfo.name, requestInfo.note].filter(Boolean).join(": ") : "";
+    if (forText && onSaveLabels && !labels.tx[hash]) void onSaveLabels(withTxNote(labels, hash, forText.slice(0, LABEL_MAX))).catch(() => {});
     setTxHash(hash);
     setUnsure(null);
     sentTo.current = review.address;
